@@ -38,9 +38,21 @@
 | Frontend | Nuxt 4 / Three.js / PrimeVue |
 | Backend | Python / FastAPI |
 | LLM | Ollama（ローカル） / OpenAI API（切替可） |
-| DB | PostgreSQL |
+| DB | Supabase CLI（Docker 上の PostgreSQL） |
 
 詳細な実装手順は [docs/design/Architecture.md](./docs/design/Architecture.md) を参照。
+
+---
+
+## 公式ドキュメント（参照）
+
+| 技術 | ドキュメント |
+|------|--------------|
+| Nuxt 4 | [Introduction](https://nuxt.com/docs/4.x/getting-started/introduction) |
+| Three.js | [Docs](https://threejs.org/docs/) |
+| Supabase CLI | [Getting started](https://supabase.com/docs/guides/local-development/cli/getting-started) |
+| FastAPI | [公式（日本語）](https://fastapi.tiangolo.com/ja/) |
+| PrimeVue 3 | [Setup](https://v3.primevue.org/setup/) |
 
 ---
 

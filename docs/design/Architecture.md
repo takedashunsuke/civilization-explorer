@@ -4,9 +4,9 @@
 
 ### Frontend
 
-* Nuxt 4
-* Three.js
-* PrimeVue
+* Nuxt 4 — [Introduction](https://nuxt.com/docs/4.x/getting-started/introduction)
+* Three.js — [Docs](https://threejs.org/docs/)
+* PrimeVue 3 — [Setup](https://v3.primevue.org/setup/)
 
 役割
 
@@ -17,7 +17,7 @@
 ### Backend
 
 * Python
-* FastAPI
+* FastAPI — [公式（日本語）](https://fastapi.tiangolo.com/ja/)
 
 役割
 
@@ -27,8 +27,9 @@
 
 ### LLM
 
-* Ollama（ローカル開発・デモ）
-* OpenAI API（切替可能）
+* Ollama（ローカル開発・ローカルデモ）
+* 外部 API（OpenAI など。発表・品質重視時に切替）
+* プロバイダは `.env` で切替可能な薄い抽象層にする（Kimi 等も同層に追加可）
 
 用途
 
@@ -42,6 +43,12 @@
 
 理由は単なる保存ではない。文明を構造化して蓄積し、比較・再実行・分析できるようにする。
 
+運用の目安（現行方針: [ADR 0001](../decisions/0001-local-runtime-and-supabase.md)）
+
+* Frontend / Backend / LLM はローカルで動かす
+* DB は [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)（`supabase init` → `supabase start`、Docker 上）を使う
+* アプリは FastAPI 経由で Postgres に接続する
+
 最低限のテーブル
 
 * Simulation
@@ -51,6 +58,16 @@
 * Event
 * History
 * Relationship
+
+### 公式ドキュメント一覧
+
+| 技術 | URL |
+|------|-----|
+| Nuxt 4 | https://nuxt.com/docs/4.x/getting-started/introduction |
+| Three.js | https://threejs.org/docs/ |
+| Supabase CLI | https://supabase.com/docs/guides/local-development/cli/getting-started |
+| FastAPI | https://fastapi.tiangolo.com/ja/ |
+| PrimeVue 3 | https://v3.primevue.org/setup/ |
 
 ---
 
@@ -114,7 +131,7 @@ LLM 依存部分は後から差し替え可能な薄い層として置く。
 ### Phase 0 — リポジトリ・環境
 
 1. `frontend/`（Nuxt 4）と `backend/`（FastAPI）を初期化する
-2. PostgreSQL を用意する（ローカル Docker 推奨）
+2. Supabase CLI でローカル DB を起動する（`supabase init` → `supabase start`）
 3. Ollama を起動し、使用モデルを決める（例: `llama3.2`）
 4. `.env` で LLM プロバイダ切替（`ollama` / `openai`）を可能にする
 

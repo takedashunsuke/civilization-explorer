@@ -10,3 +10,17 @@ Civilization Explorer のドキュメント置き場。
 | [decisions/](./decisions/) | 設計判断の記録（ADR） |
 
 詳細な索引は各ディレクトリの `README.md` を参照。
+
+## 公式ドキュメント（参照）
+
+実装時の一次情報。詳細な使い方は各サイトを優先する。
+
+| 技術 | URL |
+|------|-----|
+| Nuxt 4 | https://nuxt.com/docs/4.x/getting-started/introduction |
+| Three.js | https://threejs.org/docs/ |
+| Supabase CLI | https://supabase.com/docs/guides/local-development/cli/getting-started |
+| FastAPI | https://fastapi.tiangolo.com/ja/ |
+| PrimeVue 3 | https://v3.primevue.org/setup/ |
+
+スタック上の位置づけは [design/Architecture.md](./design/Architecture.md) を参照。

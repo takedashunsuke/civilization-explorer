@@ -4,6 +4,12 @@
 
 迷いどころ・トレードオフを短く残し、後から「なぜそうしたか」を追えるようにする。
 
+## 記録一覧
+
+| ファイル | 内容 | Status |
+|----------|------|--------|
+| [0001-local-runtime-and-supabase.md](./0001-local-runtime-and-supabase.md) | ローカル実行＋DB は Supabase（Docker） | accepted |
+
 ## テンプレート
 
 ファイル名: `NNNN-short-title.md`（例: `0001-llm-provider-abstraction.md`）
