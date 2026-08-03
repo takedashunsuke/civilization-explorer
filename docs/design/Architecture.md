@@ -1,0 +1,220 @@
+# Architecture（技術スタック・実装手順）
+
+## 技術スタック
+
+### Frontend
+
+* Nuxt 4
+* Three.js
+* PrimeVue
+
+役割
+
+* シミュレーション表示
+* パラメータ変更
+* タイムライン表示
+
+### Backend
+
+* Python
+* FastAPI
+
+役割
+
+* シミュレーション管理
+* エージェント管理
+* API
+
+### LLM
+
+* Ollama（ローカル開発・デモ）
+* OpenAI API（切替可能）
+
+用途
+
+* Agent の思考
+* Agent 間対話
+* 意思決定
+
+### データベース
+
+**PostgreSQL**
+
+理由は単なる保存ではない。文明を構造化して蓄積し、比較・再実行・分析できるようにする。
+
+最低限のテーブル
+
+* Simulation
+* World
+* Agent
+* Institution
+* Event
+* History
+* Relationship
+
+---
+
+## ディレクトリ構成
+
+```text
+docs/
+├── README.md
+├── design/                 # 要件・設計・ルール
+│   ├── FeatureSpec.md
+│   ├── Architecture.md
+│   ├── SimulationRules.md
+│   ├── DesignDoc.md
+│   └── AGENTS.md
+├── updates/                # 進捗・変更記録
+├── guides/                 # セットアップ・デモ手順
+└── decisions/              # 設計判断（ADR）
+
+frontend/
+├── pages/
+├── components/
+└── three/
+
+backend/
+├── api/
+├── simulation/
+│   ├── world.py
+│   ├── agent.py
+│   ├── llm.py
+│   ├── event.py
+│   ├── simulation.py
+│   └── metrics.py
+├── models/
+└── database/
+```
+
+---
+
+## 開発方針
+
+実装より先にドキュメントを整備する（本ドキュメント群がその第一段階）。
+
+AI に実装を任せる前提で、「AI が理解しやすいプロジェクト構成」を採用する。
+
+関連ドキュメント
+
+* [FeatureSpec.md](./FeatureSpec.md) — 要件定義
+* [SimulationRules.md](./SimulationRules.md) — 行動・ターン・状態
+* [DesignDoc.md](./DesignDoc.md) — UI / API / データ設計
+* [AGENTS.md](./AGENTS.md) — 開発エージェント向け指針
+* [../updates/](../updates/) — 進捗記録
+* [../decisions/](../decisions/) — 設計判断
+
+---
+
+## 実装手順
+
+MVP は「動くシミュレーションループ → 観測 UI → 永続化」の順で積み上げる。  
+LLM 依存部分は後から差し替え可能な薄い層として置く。
+
+### Phase 0 — リポジトリ・環境
+
+1. `frontend/`（Nuxt 4）と `backend/`（FastAPI）を初期化する
+2. PostgreSQL を用意する（ローカル Docker 推奨）
+3. Ollama を起動し、使用モデルを決める（例: `llama3.2`）
+4. `.env` で LLM プロバイダ切替（`ollama` / `openai`）を可能にする
+
+完了条件: `frontend` と `backend` がそれぞれ起動し、DB に接続できる
+
+---
+
+### Phase 1 — コア状態モデル（ルール実装）
+
+[SimulationRules.md](./SimulationRules.md) に従い、コード上の状態を定義する。
+
+1. `World` / `Agent` / `Relationship` / `Institution` のデータモデルを実装する
+2. ターン進行の骨格 `simulation.tick()` を実装する（LLM なしでも動くスタブで可）
+3. 行動の解決ロジック（協力・争う・移住・従う）をルールベースで先に実装する
+4. メトリクス（格差・信頼・協力率など）の最小計算を追加する
+
+完了条件: 固定シードで数ターン進められ、状態変化と Event がログに残る
+
+---
+
+### Phase 2 — LLM 意思決定の接続
+
+1. `llm.py` にプロバイダ抽象（Ollama / OpenAI）を作る
+2. Agent ごとに「観測 → 候補行動 → 選択」のプロンプトを定義する
+3. レスポンスを行動スキーマ（JSON）にパースし、ルール解決に渡す
+4. 失敗時フォールバック（パース失敗・タイムアウト時はランダム/ヒューリスティック）を入れる
+5. Agent 数・並列度・呼び出し頻度を制限する（MVP: 5〜20 Agent）
+
+完了条件: LLM の選択結果で社会状態が変わり、同条件再実行で傾向が観察できる
+
+---
+
+### Phase 3 — API
+
+1. `POST /simulations` — 世界パラメータから Simulation 作成
+2. `POST /simulations/{id}/start` — 実行開始
+3. `POST /simulations/{id}/tick` — 1ターン進行（またはバッチ）
+4. `GET /simulations/{id}` — 現在状態取得
+5. `GET /simulations/{id}/events` — Event / History 取得
+6. （任意）WebSocket または SSE でターン更新を配信
+
+完了条件: API だけでシミュレーションを作成・進行・観測できる
+
+---
+
+### Phase 4 — 永続化
+
+1. SQLAlchemy（または同等）でテーブルを定義する
+2. ターン終了時に Agent / Relationship / Event / History を保存する
+3. 同条件再実行用に初期パラメータ（seed 含む）を保存する
+4. 過去 Simulation の一覧・詳細取得 API を追加する
+
+完了条件: 再起動後も結果を読み出せ、同条件で再実行できる
+
+---
+
+### Phase 5 — Frontend（観測 UI）
+
+1. パラメータ入力画面（人口・資源・税率・制度など）
+2. シミュレーション開始 / 一時停止 / 1ターン進行
+3. Three.js で Agent・集落の最小可視化（球体＋位置＋所属色）
+4. タイムライン（Event の時系列）と簡易メトリクス表示
+5. 過去 Simulation の読み込み
+
+完了条件: ブラウザからパラメータを変え、文明の変化を眺められる
+
+---
+
+### Phase 6 — 磨き込み（余裕があれば）
+
+1. Agent 間の短い対話ログ表示
+2. 制度パラメータの効果が見えるデモシナリオを 1〜2 本用意する
+3. パフォーマンス調整（LLM バッチ化、表示間引き）
+4. README / デモ手順の整備
+
+---
+
+## 実装上の制約（MVP）
+
+| 項目 | MVP の目安 |
+|------|------------|
+| Agent 数 | 5〜20 |
+| 行動空間 | 協力 / 争う / 移住 / 従う（＋待機） |
+| 地図 | 簡易 2D/3D グリッドまたは平面上の点 |
+| ターン進行 | 同期 tick（全 Agent が各ターン 1 回意思決定） |
+| LLM | 構造化 JSON 出力必須、失敗時フォールバックあり |
+| 相図 UI | 作らない（発展機能） |
+
+---
+
+## 推奨実装順序（最短パス）
+
+```text
+Phase 0 環境
+  → Phase 1 ルール＋スタブ tick
+  → Phase 3 API（スタブのまま）
+  → Phase 5 最小 UI（スタブでも可視化）
+  → Phase 2 LLM 接続
+  → Phase 4 永続化
+  → Phase 6 磨き込み
+```
+
+「先に画面で回す → 後から知能と保存を足す」方が、ハッカソンでは完成度を上げやすい。
