@@ -4,19 +4,22 @@
 
 > What if...? を何万回も試す。
 
-人間は初期条件・環境・制度だけを変え、AIエージェント同士の相互作用から文明が生まれる過程を観測する。
+人間は初期条件・環境・制度だけを変え、AIエージェント同士の相互作用から文明が生まれる過程を観測する。  
+AI 文明そのものが目的ではなく、**人間社会の問い（格差・権力・幸福・少数派など）を探る実験場**として使う。
+
+ハッカソン第2回に向けたテーマ根拠: [docs/hackathon/review.md](./docs/hackathon/review.md)
 
 ---
 
 ## コンセプト
 
-社会シミュレーションの目的は「未来予測」ではない。
+社会シミュレーションの目的は「未来予測」でも「人間への助言」でもない。
 
 **どんな条件から、どんな文明が繰り返し生まれるのか**を探索するための実験環境である。
 
 | 役割 | やること |
 |------|----------|
-| 人間 | パラメータを変え、結果を観測・比較する |
+| 人間 | 世界の法則と初期条件を変え、結果を観測・比較する |
 | AI Agent | 協力・争い・移住・服従などを自律的に意思決定する |
 
 ---
@@ -65,6 +68,7 @@
 | [docs/design/](./docs/design/) | 要件・設計・ルール（FeatureSpec / Architecture / SimulationRules など） |
 | [docs/updates/](./docs/updates/) | 進捗・変更記録 |
 | [docs/guides/](./docs/guides/) | セットアップ・デモ手順 |
+| [docs/hackathon/](./docs/hackathon/) | ハッカソン発表・デモ資料（[review.md](./docs/hackathon/review.md) 含む） |
 | [docs/decisions/](./docs/decisions/) | 設計判断（ADR） |
 
 主な設計ドキュメント:
@@ -75,6 +79,7 @@
 | [Architecture.md](./docs/design/Architecture.md) | 技術スタック・構成・**実装手順** |
 | [DesignDoc.md](./docs/design/DesignDoc.md) | 技術別の使い方・**機能要件**・画面分担 |
 | [SimulationRules.md](./docs/design/SimulationRules.md) | 行動・ターン・状態の最小定義 |
+| [hackathon/review.md](./docs/hackathon/review.md) | 第1回反省と第2回テーマ根拠 |
 
 ---
 
@@ -85,6 +90,7 @@ docs/
 ├── design/      # 仕様・設計
 ├── updates/     # 進捗記録
 ├── guides/      # 手順書
+├── hackathon/   # ハッカソン発表・デモ資料
 └── decisions/   # 設計判断
 frontend/        # Nuxt 4 + PrimeVue + 2D マップ
 backend/         # FastAPI + シミュレーションエンジン

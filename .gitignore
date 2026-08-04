@@ -1,0 +1,89 @@
+# --- OS ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# --- Editors / IDE ---
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.cursor/
+!.cursor/rules/
+
+# --- Env & secrets（提出時も絶対に入れない） ---
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+credentials.json
+service-account*.json
+
+# --- Logs & caches ---
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.cache/
+tmp/
+temp/
+*.tmp
+
+# --- Node / Nuxt (frontend/) ---
+node_modules/
+.output/
+.nuxt/
+.nitro/
+.vercel/
+.wrangler/
+dist/
+coverage/
+*.local
+
+# --- Python / FastAPI (backend/) ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.tox/
+.python-version
+
+# --- Supabase local ---
+supabase/.branches/
+supabase/.temp/
+# ローカル dump や秘密を含む可能性のあるもの
+supabase/.env
+supabase/.env.*
+
+# --- Test / tooling artifacts ---
+playwright-report/
+test-results/
+.turbo/
+
+# --- Media / large binaries（必要なら後で個別に track） ---
+*.mp4
+*.mov
+*.zip
+*.7z
+*.rar
+
+# --- Misc ---
+*.bak
+*.orig

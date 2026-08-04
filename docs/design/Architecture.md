@@ -87,6 +87,7 @@ docs/
 │   └── AGENTS.md
 ├── updates/                # 進捗・変更記録
 ├── guides/                 # セットアップ・デモ手順
+├── hackathon/              # ハッカソン発表・デモ資料
 └── decisions/              # 設計判断（ADR）
 
 frontend/
@@ -121,6 +122,7 @@ AI に実装を任せる前提で、「AI が理解しやすいプロジェク�
 * [SimulationRules.md](./SimulationRules.md) — 行動・ターン・状態
 * [DesignDoc.md](./DesignDoc.md) — UI / API / データ設計
 * [AGENTS.md](./AGENTS.md) — 開発エージェント向け指針
+* [../hackathon/review.md](../hackathon/review.md) — ハッカソンテーマ根拠
 * [../updates/](../updates/) — 進捗記録
 * [../decisions/](../decisions/) — 設計判断
 
