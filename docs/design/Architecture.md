@@ -5,14 +5,17 @@
 ### Frontend
 
 * Nuxt 4 — [Introduction](https://nuxt.com/docs/4.x/getting-started/introduction)
-* Three.js — [Docs](https://threejs.org/docs/)
 * PrimeVue 3 — [Setup](https://v3.primevue.org/setup/)
+* 2D マップ（Canvas 2D または SVG）。Three.js は任意（[ADR 0002](../decisions/0002-2d-visualization.md)）
 
 役割
 
-* シミュレーション表示
-* パラメータ変更
-* タイムライン表示
+* アプリの枠（ページ・ルーティング・API 連携）: **Nuxt 4**
+* 操作・一覧・数値 UI: **PrimeVue**（フォーム、表、タイムライン、メトリクス）
+* 空間可視化: **2D マップ**（Agent = 円、所属色、集落。地球背景は使わない）
+
+> PrimeVue は世界マップを描かない。パラメータ変更や Event 閲覧など「実験操作 UI」を担当する。  
+> 技術ごとの機能要件の詳細は [DesignDoc.md](./DesignDoc.md) を参照。
 
 ### Backend
 
@@ -64,7 +67,7 @@
 | 技術 | URL |
 |------|-----|
 | Nuxt 4 | https://nuxt.com/docs/4.x/getting-started/introduction |
-| Three.js | https://threejs.org/docs/ |
+| Three.js（任意・後追い） | https://threejs.org/docs/ |
 | Supabase CLI | https://supabase.com/docs/guides/local-development/cli/getting-started |
 | FastAPI | https://fastapi.tiangolo.com/ja/ |
 | PrimeVue 3 | https://v3.primevue.org/setup/ |
@@ -89,7 +92,7 @@ docs/
 frontend/
 ├── pages/
 ├── components/
-└── three/
+└── three/       # （任意）後追い 2.5D 用。MVP は components/map 等の 2D を優先
 
 backend/
 ├── api/
@@ -192,7 +195,7 @@ LLM 依存部分は後から差し替え可能な薄い層として置く。
 
 1. パラメータ入力画面（人口・資源・税率・制度など）
 2. シミュレーション開始 / 一時停止 / 1ターン進行
-3. Three.js で Agent・集落の最小可視化（球体＋位置＋所属色）
+3. **2D マップ**で Agent・集落の最小可視化（円＋位置＋所属色。地球背景なし）
 4. タイムライン（Event の時系列）と簡易メトリクス表示
 5. 過去 Simulation の読み込み
 
@@ -215,7 +218,7 @@ LLM 依存部分は後から差し替え可能な薄い層として置く。
 |------|------------|
 | Agent 数 | 5〜20 |
 | 行動空間 | 協力 / 争う / 移住 / 従う（＋待機） |
-| 地図 | 簡易 2D/3D グリッドまたは平面上の点 |
+| 地図 | 簡易 2D 平面（円とクラスタ）。地球・本格 3D は作らない |
 | ターン進行 | 同期 tick（全 Agent が各ターン 1 回意思決定） |
 | LLM | 構造化 JSON 出力必須、失敗時フォールバックあり |
 | 相図 UI | 作らない（発展機能） |

@@ -9,6 +9,7 @@
 | ファイル | 内容 | Status |
 |----------|------|--------|
 | [0001-local-runtime-and-supabase.md](./0001-local-runtime-and-supabase.md) | ローカル実行＋DB は Supabase（Docker） | accepted |
+| [0002-2d-visualization.md](./0002-2d-visualization.md) | 可視化は 2D 中心（地球・本格 3D は不要） | accepted |
 
 ## テンプレート
 

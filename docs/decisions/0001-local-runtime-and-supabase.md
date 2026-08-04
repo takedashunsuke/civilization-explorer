@@ -14,7 +14,7 @@
 
 | 層 | 実行場所 |
 |----|----------|
-| Frontend（Nuxt / Three.js / PrimeVue） | ローカル |
+| Frontend（Nuxt / PrimeVue / 2D マップ） | ローカル |
 | Backend（FastAPI） | ローカル |
 | LLM | ローカル Ollama（発表時は外部 API に切替可） |
 | DB | Supabase CLI（`supabase start` → Docker 上の Postgres 等） |

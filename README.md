@@ -24,7 +24,7 @@
 ## MVP の完成ライン
 
 1. LLMエージェントが自律的に社会を形成すること
-2. その過程を Three.js で直感的に観測できること
+2. その過程を 2D マップで直感的に観測できること
 3. 結果を構造化して蓄積し、同条件で再実行できること
 
 「文明の相図」などの高度な比較 UI は発展機能とする。
@@ -35,7 +35,7 @@
 
 | 層 | 技術 |
 |----|------|
-| Frontend | Nuxt 4 / Three.js / PrimeVue |
+| Frontend | Nuxt 4 / PrimeVue / 2D マップ（Canvas または SVG） |
 | Backend | Python / FastAPI |
 | LLM | Ollama（ローカル） / OpenAI API（切替可） |
 | DB | Supabase CLI（Docker 上の PostgreSQL） |
@@ -49,7 +49,7 @@
 | 技術 | ドキュメント |
 |------|--------------|
 | Nuxt 4 | [Introduction](https://nuxt.com/docs/4.x/getting-started/introduction) |
-| Three.js | [Docs](https://threejs.org/docs/) |
+| Three.js（任意） | [Docs](https://threejs.org/docs/) |
 | Supabase CLI | [Getting started](https://supabase.com/docs/guides/local-development/cli/getting-started) |
 | FastAPI | [公式（日本語）](https://fastapi.tiangolo.com/ja/) |
 | PrimeVue 3 | [Setup](https://v3.primevue.org/setup/) |
@@ -73,6 +73,7 @@
 |----------|------|
 | [FeatureSpec.md](./docs/design/FeatureSpec.md) | 要件定義（背景・コンセプト・MVP・非ゴール） |
 | [Architecture.md](./docs/design/Architecture.md) | 技術スタック・構成・**実装手順** |
+| [DesignDoc.md](./docs/design/DesignDoc.md) | 技術別の使い方・**機能要件**・画面分担 |
 | [SimulationRules.md](./docs/design/SimulationRules.md) | 行動・ターン・状態の最小定義 |
 
 ---
@@ -85,7 +86,7 @@ docs/
 ├── updates/     # 進捗記録
 ├── guides/      # 手順書
 └── decisions/   # 設計判断
-frontend/        # Nuxt 4 + Three.js
+frontend/        # Nuxt 4 + PrimeVue + 2D マップ
 backend/         # FastAPI + シミュレーションエンジン
 ```
 

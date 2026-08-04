@@ -18,7 +18,7 @@ Civilization Explorer のドキュメント置き場。
 | 技術 | URL |
 |------|-----|
 | Nuxt 4 | https://nuxt.com/docs/4.x/getting-started/introduction |
-| Three.js | https://threejs.org/docs/ |
+| Three.js（任意） | https://threejs.org/docs/ |
 | Supabase CLI | https://supabase.com/docs/guides/local-development/cli/getting-started |
 | FastAPI | https://fastapi.tiangolo.com/ja/ |
 | PrimeVue 3 | https://v3.primevue.org/setup/ |
