@@ -42,17 +42,25 @@
 
 ### データベース
 
-**PostgreSQL**
+**PostgreSQL** ＋ **Drizzle ORM**
 
 理由は単なる保存ではない。文明を構造化して蓄積し、比較・再実行・分析できるようにする。
 
-運用の目安（現行方針: [ADR 0001](../decisions/0001-local-runtime-and-supabase.md)）
+| 項目 | 技術 |
+|------|------|
+| RDB | PostgreSQL（Supabase CLI / Docker） |
+| ORM | [Drizzle ORM](https://orm.drizzle.team/) |
+| マイグレーション | drizzle-kit |
+| スキーマ配置 | `frontend/server/db/`（TypeScript） |
+
+運用の目安（[ADR 0001](../decisions/0001-local-runtime-and-supabase.md) / [ADR 0003](../decisions/0003-drizzle-orm.md)）
 
 * Frontend / Backend / LLM はローカルで動かす
 * DB は [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started)（`supabase init` → `supabase start`、Docker 上）を使う
-* アプリは FastAPI 経由で Postgres に接続する
+* **永続化は Nuxt（Nitro）＋ Drizzle** が担当する。FastAPI はシミュレーション／LLM に専念し、Postgres へ直接接続しない
+* 接続はローカル Postgres の接続文字列（例: `postgres://...@127.0.0.1:54322/postgres`）を `.env` で渡す
 
-最低限のテーブル
+最低限のテーブル（Drizzle schema で定義）
 
 * Simulation
 * World
@@ -62,6 +70,13 @@
 * History
 * Relationship
 
+### Auth（将来・Web 公開時）
+
+* [Better Auth](https://www.better-auth.com/) ＋ Drizzle（`drizzleAdapter`）— [ADR 0004](../decisions/0004-better-auth.md)
+* ハッカソン MVP では **実装しない**（ローカル単一利用者）
+* Auth.js / Supabase Auth は採用しない
+* 公開時は `simulations.owner_id` で個人所有を表し、Nitro が session をゲートする
+
 ### 公式ドキュメント一覧
 
 | 技術 | URL |
@@ -69,6 +84,10 @@
 | Nuxt 4 | https://nuxt.com/docs/4.x/getting-started/introduction |
 | Three.js（任意・後追い） | https://threejs.org/docs/ |
 | Supabase CLI | https://supabase.com/docs/guides/local-development/cli/getting-started |
+| Drizzle ORM | https://orm.drizzle.team/ |
+| Drizzle × Supabase | https://orm.drizzle.team/docs/connect-supabase |
+| Better Auth | https://www.better-auth.com/ |
+| Better Auth × Nuxt | https://www.better-auth.com/docs/integrations/nuxt |
 | FastAPI | https://fastapi.tiangolo.com/ja/ |
 | PrimeVue 3 | https://v3.primevue.org/setup/ |
 
@@ -93,7 +112,10 @@ docs/
 frontend/
 ├── pages/
 ├── components/
-└── three/       # （任意）後追い 2.5D 用。MVP は components/map 等の 2D を優先
+├── server/
+│   └── db/          # Drizzle: schema / client / migrations
+├── drizzle.config.ts
+└── three/           # （任意）後追い 2.5D 用。MVP は components/map 等の 2D を優先
 
 backend/
 ├── api/
@@ -104,8 +126,7 @@ backend/
 │   ├── event.py
 │   ├── simulation.py
 │   └── metrics.py
-├── models/
-└── database/
+└── models/          # ドメイン／Pydantic（永続化スキーマは Drizzle 側）
 ```
 
 ---
@@ -182,12 +203,13 @@ LLM 依存部分は後から差し替え可能な薄い層として置く。
 
 ---
 
-### Phase 4 — 永続化
+### Phase 4 — 永続化（Drizzle）
 
-1. SQLAlchemy（または同等）でテーブルを定義する
-2. ターン終了時に Agent / Relationship / Event / History を保存する
-3. 同条件再実行用に初期パラメータ（seed 含む）を保存する
-4. 過去 Simulation の一覧・詳細取得 API を追加する
+1. `frontend/server/db/` に Drizzle schema を定義し、`drizzle-kit generate` / `migrate` で適用する
+2. Nuxt server API（または server util）から Postgres へ接続する（postgres.js 等）
+3. ターン終了時に Agent / Relationship / Event / History を保存する（FastAPI の応答を受けて Nitro 側で書く）
+4. 同条件再実行用に初期パラメータ（seed 含む）を保存する
+5. 過去 Simulation の一覧・詳細取得を Nuxt server 経由で追加する
 
 完了条件: 再起動後も結果を読み出せ、同条件で再実行できる
 
@@ -214,6 +236,20 @@ LLM 依存部分は後から差し替え可能な薄い層として置く。
 
 ---
 
+### Phase 7 — 認証（発展・Web 公開時）
+
+[ADR 0004](../decisions/0004-better-auth.md) に従う。ハッカソン MVP の完了条件には含めない。
+
+1. Better Auth + `drizzleAdapter(db, { provider: "pg" })` を導入する
+2. `server/api/auth/[...all].ts` と Vue client を置く
+3. `simulations.owner_id` をマイグレーションで追加し、一覧／作成を所有者でフィルタする
+4. 保護ルート middleware を入れる
+5. （任意）OAuth プロバイダを追加する
+
+完了条件: ログインした利用者だけが自分の Simulation を作成・閲覧できる
+
+---
+
 ## 実装上の制約（MVP）
 
 | 項目 | MVP の目安 |
@@ -224,6 +260,7 @@ LLM 依存部分は後から差し替え可能な薄い層として置く。
 | ターン進行 | 同期 tick（全 Agent が各ターン 1 回意思決定） |
 | LLM | 構造化 JSON 出力必須、失敗時フォールバックあり |
 | 相図 UI | 作らない（発展機能） |
+| 認証・認可 | 作らない（Phase 7 / Better Auth） |
 
 ---
 

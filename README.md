@@ -39,9 +39,11 @@ AI 文明そのものが目的ではなく、**人間社会の問い（格差・
 | 層 | 技術 |
 |----|------|
 | Frontend | Nuxt 4 / PrimeVue / 2D マップ（Canvas または SVG） |
-| Backend | Python / FastAPI |
+| Backend | Python / FastAPI（シミュレーション・LLM） |
 | LLM | Ollama（ローカル） / OpenAI API（切替可） |
 | DB | Supabase CLI（Docker 上の PostgreSQL） |
+| ORM | [Drizzle ORM](https://orm.drizzle.team/)（Nuxt Nitro 側で永続化） |
+| Auth（将来） | [Better Auth](https://www.better-auth.com/) + Drizzle（MVP では未実装） |
 
 詳細な実装手順は [docs/design/Architecture.md](./docs/design/Architecture.md) を参照。
 
@@ -54,6 +56,8 @@ AI 文明そのものが目的ではなく、**人間社会の問い（格差・
 | Nuxt 4 | [Introduction](https://nuxt.com/docs/4.x/getting-started/introduction) |
 | Three.js（任意） | [Docs](https://threejs.org/docs/) |
 | Supabase CLI | [Getting started](https://supabase.com/docs/guides/local-development/cli/getting-started) |
+| Drizzle ORM | [orm.drizzle.team](https://orm.drizzle.team/) |
+| Better Auth | [better-auth.com](https://www.better-auth.com/) |
 | FastAPI | [公式（日本語）](https://fastapi.tiangolo.com/ja/) |
 | PrimeVue 3 | [Setup](https://v3.primevue.org/setup/) |
 
@@ -92,7 +96,7 @@ docs/
 ├── guides/      # 手順書
 ├── hackathon/   # ハッカソン発表・デモ資料
 └── decisions/   # 設計判断
-frontend/        # Nuxt 4 + PrimeVue + 2D マップ
+frontend/        # Nuxt 4 + PrimeVue + 2D マップ + Drizzle（永続化）
 backend/         # FastAPI + シミュレーションエンジン
 ```
 

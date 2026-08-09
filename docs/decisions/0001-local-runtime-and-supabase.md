@@ -22,7 +22,8 @@
 方針の詳細:
 
 * 提出用の必須デプロイはしない（録画＋ローカル実演を主とする）
-* アプリは FastAPI 経由で Postgres に接続する（Supabase は主に DB 置き場）
+* Supabase は主に DB 置き場（マネージド Auth / Realtime には依存しない）
+* Postgres へのアプリ接続は **Drizzle ORM** 経由（[ADR 0003](./0003-drizzle-orm.md)）。FastAPI はシミュレーションに専念する
 * LLM はプロバイダ抽象を置き、開発は Ollama、必要時のみ外部 API
 
 ## Consequences

@@ -12,6 +12,7 @@
 | LLM に全部任せる？ | 意思決定のみ。数値解決はルール層 |
 | 再現性は？ | seed と初期パラメータを保存し同条件再実行。LLM 時は傾向観察 |
 | 何千回回すのか？ | 長期ビジョン。ハッカソンではループ成立と観測を優先 |
-| なぜ Supabase？ | ローカルで Postgres を Docker 起動しやすい。アプリは FastAPI 経由 |
+| なぜ Supabase？ | ローカルで Postgres を Docker 起動しやすい。ORM は Drizzle（Nuxt 側） |
+| なぜログインがない？ | MVP はローカル単一利用者。将来 Web 公開時は Better Auth + Drizzle |
 | スケールは？ | MVP は Agent 5〜20。大規模リアルタイム LLM は非ゴール |
 | チャットボットとの違いは？ | Agent 同士が社会を形成する。人間との対話 UI が主目的ではない |

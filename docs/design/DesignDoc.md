@@ -11,6 +11,8 @@ UI・API・データモデルの詳細設計と、**各技術が担う機能要�
 * [SimulationRules.md](./SimulationRules.md) — シミュレーション規則
 * [ADR 0001](../decisions/0001-local-runtime-and-supabase.md) — ローカル実行方針
 * [ADR 0002](../decisions/0002-2d-visualization.md) — 2D 可視化方針
+* [ADR 0003](../decisions/0003-drizzle-orm.md) — Drizzle ORM 方針
+* [ADR 0004](../decisions/0004-better-auth.md) — Better Auth（将来）方針
 
 ---
 
@@ -39,11 +41,15 @@ PrimeVue は「文明の世界そのもの」を描かない。
 │  │ ・Event 表   │  │ ・抽象背景（非地球）│  │
 │  └──────────────┘  └─────────────────────┘  │
 │           │  HTTP / SSE                     │
-│           ▼                                 │
-│        FastAPI ←→ Ollama / 外部 LLM         │
-│           │                                 │
-│           ▼                                 │
-│     Supabase (Postgres)                     │
+│           ├──────────────────────┐          │
+│           ▼                      ▼          │
+│        FastAPI              Nuxt Nitro      │
+│     （sim / LLM）           ＋ Drizzle      │
+│           │                      │          │
+│           └──────┐               │          │
+│                  ▼               ▼          │
+│            Ollama / 外部    Supabase        │
+│               LLM           (Postgres)      │
 └─────────────────────────────────────────────┘
 ```
 
@@ -65,9 +71,10 @@ Vue ベースの Web アプリフレームワーク。ページ構成・ルー�
 |--------|------|
 | ページ | `/` 観測メイン、`/simulations` 過去一覧 など file-based routing |
 | レイアウト | 左: 操作パネル / 右: **2D マップ** の 1 画面構成 |
-| データ取得 | FastAPI への `fetch` / `$fetch`（作成・tick・状態・Event） |
+| データ取得 | FastAPI への `fetch` / `$fetch`（作成・tick・状態）。永続化済み一覧等は Nitro＋Drizzle |
+| 永続化 | `server/db` の Drizzle client で Postgres を読み書き（[ADR 0003](../decisions/0003-drizzle-orm.md)） |
 | リアルタイム | SSE（またはポーリング）でターン更新を受け取り、画面と 2D マップを更新 |
-| 設定 | `.env` で API ベース URL を切替 |
+| 設定 | `.env` で API ベース URL・DB 接続文字列を切替 |
 
 **実現する機能要件**
 
@@ -79,7 +86,7 @@ Vue ベースの Web アプリフレームワーク。ページ構成・ルー�
 
 **やらないこと（MVP）**
 
-* 認証付きマルチユーザー
+* 認証付きマルチユーザー（将来は Better Auth。MVP では作らない）
 * 高度なダッシュボード／相図 UI
 
 ---
@@ -165,7 +172,8 @@ Three.js は MVP 必須ではない。どうしても使う場合も、斜め地
 
 **何をするか**
 
-Python の API フレームワーク。シミュレーションエンジン・LLM 呼び出し・DB アクセスを HTTP でフロントに公開する。
+Python の API フレームワーク。シミュレーションエンジン・LLM 呼び出しを HTTP でフロントに公開する。  
+**Postgres への永続化は持たない**（Drizzle 側。 [ADR 0003](../decisions/0003-drizzle-orm.md)）。
 
 **公式:** [FastAPI（日本語）](https://fastapi.tiangolo.com/ja/)
 
@@ -176,7 +184,7 @@ Python の API フレームワーク。シミュレーションエンジン・LL
 | シミュレーション制御 | 作成・開始・tick・状態取得 |
 | ルール層 | [SimulationRules.md](./SimulationRules.md) に沿った状態遷移・行動解決 |
 | LLM 層 | プロンプト送信・JSON パース・フォールバック |
-| 永続化 | SQLAlchemy 等で Postgres へ保存・読込 |
+| 永続化 | しない（応答 JSON を Nuxt / Drizzle が保存） |
 | 配信 | REST 必須、SSE/WebSocket は任意（ターン更新プッシュ） |
 
 **MVP API（機能要件に直結）**
@@ -238,19 +246,28 @@ Python の API フレームワーク。シミュレーションエンジン・LL
 
 ---
 
-### 2.6 Supabase CLI + PostgreSQL（構造化・蓄積）
+### 2.6 Supabase CLI + PostgreSQL + Drizzle（構造化・蓄積）
 
 **何をするか**
 
-文明シミュレーションの結果を **構造化して保存**する置き場。Supabase CLI はローカルで Postgres（＋ Studio）を Docker 起動する手段。
+文明シミュレーションの結果を **構造化して保存**する置き場。  
+Supabase CLI はローカル Postgres（＋ Studio）の起動手段。**ORM は Drizzle** でスキーマ・クエリ・マイグレーションを行う。
 
-**公式:** [Supabase CLI Getting started](https://supabase.com/docs/guides/local-development/cli/getting-started)
+**公式**
+
+* [Supabase CLI Getting started](https://supabase.com/docs/guides/local-development/cli/getting-started)
+* [Drizzle ORM](https://orm.drizzle.team/)
+* [Drizzle × Supabase](https://orm.drizzle.team/docs/connect-supabase)
 
 **このプロジェクトでの使い方**
 
-* `supabase init` / `supabase start` でローカル DB
-* FastAPI が接続文字列で読み書き（アプリロジックは FastAPI 側）
-* Studio（例: `http://127.0.0.1:54323`）でテーブル確認
+| 項目 | 内容 |
+|------|------|
+| DB 起動 | `supabase init` / `supabase start` |
+| ORM | `drizzle-orm`（テーブル定義・select/insert/update） |
+| マイグレーション | `drizzle-kit`（`drizzle.config.ts` → generate / migrate） |
+| 接続 | Nuxt Nitro の `server/db` から接続文字列で接続 |
+| 確認 | Supabase Studio（例: `http://127.0.0.1:54323`）または `drizzle-kit studio` |
 
 **最低限エンティティと機能要件**
 
@@ -266,16 +283,54 @@ Python の API フレームワーク。シミュレーションエンジン・LL
 
 **実現する機能要件**
 
+* [ ] Drizzle schema で上記エンティティを型付き定義できる
+* [ ] `drizzle-kit` でマイグレーションを生成・適用できる
 * [ ] ターン終了時に状態・Event を永続化できる
 * [ ] プロセス再起動後も過去 Simulation を読み出せる
 * [ ] 同条件（seed + 初期パラメータ）で再実行できる
 * [ ] メトリクス推移を History から復元できる
-* [ ] マイグレーションでスキーマを再現できる
 
 **やらないこと（MVP）**
 
-* Supabase Auth / Realtime への全面依存（必要なら後追い）
+* SQLAlchemy など Python ORM との二重管理
+* Supabase Auth / Realtime への全面依存（認証は [ADR 0004](../decisions/0004-better-auth.md) の Better Auth）
 * クラウド必須デプロイ
+
+---
+
+### 2.7 Better Auth（将来・Web 公開時）
+
+**何をするか**
+
+Web 公開後に「誰の実験か」を分離するための認証・セッション。DB は既存の Drizzle 接続を共有する。
+
+**公式:** [Better Auth](https://www.better-auth.com/) / [Nuxt 連携](https://www.better-auth.com/docs/integrations/nuxt)
+
+**このプロジェクトでの使い方（導入時）**
+
+| 項目 | 内容 |
+|------|------|
+| アダプタ | `drizzleAdapter(db, { provider: "pg" })` |
+| ハンドラ | `server/api/auth/[...all].ts` |
+| クライアント | `better-auth/vue` |
+| 所有 | `simulations.owner_id`（導入時マイグレーションで追加） |
+| ゲート | Nitro middleware が session を確認し、許可操作だけ FastAPI へ |
+| 初期スコープ | 個人所有のみ（組織・ロールは発展） |
+
+**実現する機能要件（将来）**
+
+* [ ] ログイン／ログアウトできる
+* [ ] 自分の Simulation だけ一覧・作成・読込できる
+* [ ] 未ログインでは保護ルートに入れない
+
+**やらないこと（MVP）**
+
+* ログイン UI、OAuth、保護 middleware
+* RLS 必須化
+* FastAPI への JWT 転送（必要なら別 ADR）
+* Auth.js / Supabase Auth の採用
+
+詳細は [ADR 0004](../decisions/0004-better-auth.md)。
 
 ---
 
@@ -303,16 +358,17 @@ Python の API フレームワーク。シミュレーションエンジン・LL
 
 ## 4. 機能要件マトリクス（技術 × MVP）
 
-| MVP 機能 | Nuxt | PrimeVue | 2D マップ | FastAPI | LLM | Supabase |
-|----------|:----:|:--------:|:---------:|:-------:|:---:|:--------:|
-| 初期条件の設定 | ○ | ○ | | ○ | | ○ |
-| シミュレーション進行 | ○ | ○ | | ○ | ○ | |
-| Agent 自律意思決定 | | | | ○ | ○ | |
-| 平面で文明を眺める | ○ | | ○ | | | |
-| Event / メトリクス観測 | ○ | ○ | | ○ | | ○ |
-| 構造化蓄積・再実行 | ○ | ○ | | ○ | | ○ |
+| MVP 機能 | Nuxt | PrimeVue | 2D マップ | FastAPI | LLM | Drizzle / Postgres | Better Auth |
+|----------|:----:|:--------:|:---------:|:-------:|:---:|:------------------:|:-----------:|
+| 初期条件の設定 | ○ | ○ | | ○ | | ○ | |
+| シミュレーション進行 | ○ | ○ | | ○ | ○ | | |
+| Agent 自律意思決定 | | | | ○ | ○ | | |
+| 平面で文明を眺める | ○ | | ○ | | | | |
+| Event / メトリクス観測 | ○ | ○ | | ○ | | ○ | |
+| 構造化蓄積・再実行 | ○ | ○ | | | | ○ | |
+| ログイン・所有分離（将来） | ○ | ○ | | | | ○ | ○ |
 
-○ = 主担当または必須の協力者
+○ = 主担当または必須の協力者。Better Auth 列は MVP では未実装（Phase 7）。
 
 ---
 
@@ -321,7 +377,7 @@ Python の API フレームワーク。シミュレーションエンジン・LL
 実装フェーズで以下を追記する。
 
 * 各エンドポイントのリクエスト・レスポンス JSON 例
-* テーブル DDL（カラム型・FK）
+* Drizzle schema（カラム型・FK）とマイグレーション方針
 * 2D マップの座標・描画レイヤ規則
 * PrimeVue テーマ設定（Nuxt モジュール）
 

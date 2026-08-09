@@ -10,6 +10,8 @@
 |----------|------|--------|
 | [0001-local-runtime-and-supabase.md](./0001-local-runtime-and-supabase.md) | ローカル実行＋DB は Supabase（Docker） | accepted |
 | [0002-2d-visualization.md](./0002-2d-visualization.md) | 可視化は 2D 中心（地球・本格 3D は不要） | accepted |
+| [0003-drizzle-orm.md](./0003-drizzle-orm.md) | DB ORM は Drizzle（永続化は Nuxt / TypeScript） | accepted |
+| [0004-better-auth.md](./0004-better-auth.md) | 認証は Better Auth + Drizzle（将来）。MVP は未実装 | accepted |
 
 ## テンプレート
 
