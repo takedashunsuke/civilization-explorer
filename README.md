@@ -45,7 +45,27 @@ AI 文明そのものが目的ではなく、**人間社会の問い（格差・
 | ORM | [Drizzle ORM](https://orm.drizzle.team/)（Nuxt Nitro 側で永続化） |
 | Auth（将来） | [Better Auth](https://www.better-auth.com/) + Drizzle（MVP では未実装） |
 
-詳細な実装手順は [docs/design/Architecture.md](./docs/design/Architecture.md) を参照。
+詳細な実装手順は [docs/design/Architecture.md](./docs/design/Architecture.md) を参照。  
+ローカル起動: [docs/guides/setup.md](./docs/guides/setup.md)
+
+### いま動くもの（スタブ）
+
+```powershell
+# 端末1
+cd backend
+.\.venv\Scripts\Activate.ps1   # 初回は venv + pip install -r requirements.txt
+uvicorn main:app --reload --host 127.0.0.1 --port 8000
+
+# 端末2
+cd frontend
+npm run dev -- --host 127.0.0.1 --port 3000
+```
+
+* UI: http://127.0.0.1:3000/
+* API docs: http://127.0.0.1:8000/docs
+
+Create → Tick でヒューリスティック意思決定の文明が回り、2D マップと Event が更新される。  
+LLM / Drizzle 永続化は未接続（Phase 2 / 4）。
 
 ---
 
@@ -87,7 +107,7 @@ AI 文明そのものが目的ではなく、**人間社会の問い（格差・
 
 ---
 
-## リポジトリ構成（予定）
+## リポジトリ構成
 
 ```text
 docs/
@@ -96,11 +116,11 @@ docs/
 ├── guides/      # 手順書
 ├── hackathon/   # ハッカソン発表・デモ資料
 └── decisions/   # 設計判断
-frontend/        # Nuxt 4 + PrimeVue + 2D マップ + Drizzle（永続化）
+frontend/        # Nuxt 4 + PrimeVue + 2D マップ（Drizzle は Phase 4）
 backend/         # FastAPI + シミュレーションエンジン
 ```
 
-現状はドキュメント整備フェーズ。実装は Architecture の Phase 0 から着手する。
+スタブ実装が動作中。次は LLM 接続（Phase 2）と永続化（Phase 4）。
 
 ---
 
