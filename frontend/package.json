@@ -10,6 +10,7 @@
     "postinstall": "nuxt prepare"
   },
   "dependencies": {
+    "@nuxtjs/i18n": "^10.6.0",
     "nuxt": "^4.5.2",
     "primeicons": "^8.0.0",
     "primevue": "^3.53.1",

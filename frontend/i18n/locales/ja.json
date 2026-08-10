@@ -1,0 +1,57 @@
+{
+  "brand": "Civilization Explorer",
+  "consoleTitle": "観測コンソール（スタブ）",
+  "language": "言語",
+  "locale": {
+    "ja": "日本語",
+    "en": "English"
+  },
+  "status": {
+    "created": "作成済み",
+    "running": "実行中",
+    "paused": "一時停止"
+  },
+  "turnStatus": "ターン {turn} · {status}",
+  "initialConditions": "初期条件",
+  "population": "人口",
+  "seed": "シード",
+  "taxRate": "税率",
+  "education": "教育",
+  "institution": "制度",
+  "institutions": {
+    "democracy": "民主主義",
+    "autocracy": "独裁制",
+    "anarchy": "無政府"
+  },
+  "actions": {
+    "create": "作成",
+    "tick": "1ターン進める",
+    "tick5": "5ターン進める"
+  },
+  "metrics": {
+    "title": "メトリクス",
+    "inequality": "格差",
+    "trust": "信頼",
+    "cooperationRate": "協力率",
+    "authority": "権威",
+    "happiness": "幸福"
+  },
+  "map": {
+    "title": "2D マップ"
+  },
+  "events": {
+    "title": "出来事",
+    "turn": "ターン",
+    "actor": "主体",
+    "action": "行動",
+    "detail": "詳細"
+  },
+  "actionTypes": {
+    "wait": "待機",
+    "cooperate": "協力",
+    "conflict": "争い",
+    "migrate": "移住",
+    "obey": "服従",
+    "resist": "抵抗"
+  }
+}

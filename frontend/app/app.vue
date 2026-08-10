@@ -49,6 +49,7 @@ type Simulation = {
   last_metrics: Metrics | null
 }
 
+const { t, locale, setLocale } = useI18n()
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
 
@@ -56,12 +57,14 @@ const population = ref(8)
 const seed = ref(42)
 const taxRate = ref(0.1)
 const education = ref(0.5)
+/** API には英語キーのまま送る */
 const institution = ref('democracy')
-const institutionOptions = [
-  { label: 'democracy', value: 'democracy' },
-  { label: 'autocracy', value: 'autocracy' },
-  { label: 'anarchy', value: 'anarchy' },
-]
+
+const institutionOptions = computed(() => [
+  { label: t('institutions.democracy'), value: 'democracy' },
+  { label: t('institutions.autocracy'), value: 'autocracy' },
+  { label: t('institutions.anarchy'), value: 'anarchy' },
+])
 
 const sim = ref<Simulation | null>(null)
 const busy = ref(false)
@@ -69,6 +72,29 @@ const error = ref('')
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 
 const recentEvents = computed(() => (sim.value?.events ?? []).slice(-30).reverse())
+
+const statusLabel = computed(() => {
+  if (!sim.value) return ''
+  const key = `status.${sim.value.status}` as const
+  const translated = t(key)
+  return translated === key ? sim.value.status : translated
+})
+
+const turnStatusLabel = computed(() => {
+  if (!sim.value) return ''
+  return t('turnStatus', { turn: sim.value.world.turn, status: statusLabel.value })
+})
+
+function actionLabel(action: string): string {
+  const key = `actionTypes.${action}`
+  const translated = t(key)
+  return translated === key ? action : translated
+}
+
+async function onLocaleChange(code: string) {
+  if (!code || code === locale.value) return
+  await setLocale(code)
+}
 
 async function api<T>(path: string, options?: Parameters<typeof $fetch<T>>[1]): Promise<T> {
   return await $fetch<T>(`${apiBase}${path}`, options)
@@ -180,59 +206,88 @@ watch(sim, async () => {
 <template>
   <div class="layout">
     <header class="header">
-      <div>
-        <p class="eyebrow">Civilization Explorer</p>
-        <h1>観測コンソール（スタブ）</h1>
+      <div class="header-left">
+        <p class="eyebrow">{{ t('brand') }}</p>
+        <h1>{{ t('consoleTitle') }}</h1>
       </div>
-      <Tag v-if="sim" :value="`turn ${sim.world.turn} · ${sim.status}`" severity="info" />
+      <div class="header-right">
+        <div class="lang" role="group" :aria-label="t('language')">
+          <button
+            type="button"
+            class="lang-btn"
+            :class="{ active: locale === 'ja' }"
+            :aria-pressed="locale === 'ja'"
+            @click="onLocaleChange('ja')"
+          >
+            JA
+          </button>
+          <span class="lang-sep" aria-hidden="true">/</span>
+          <button
+            type="button"
+            class="lang-btn"
+            :class="{ active: locale === 'en' }"
+            :aria-pressed="locale === 'en'"
+            @click="onLocaleChange('en')"
+          >
+            EN
+          </button>
+        </div>
+        <div class="status-slot">
+          <Tag v-if="sim" :value="turnStatusLabel" severity="info" />
+        </div>
+      </div>
     </header>
 
     <div class="grid">
-      <aside class="panel">
-        <h2>初期条件</h2>
-        <label>人口</label>
-        <InputNumber v-model="population" :min="2" :max="20" show-buttons class="w-full" />
-        <label>seed</label>
-        <InputNumber v-model="seed" show-buttons class="w-full" />
-        <label>税率</label>
-        <InputNumber v-model="taxRate" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="w-full" />
-        <label>教育</label>
-        <InputNumber v-model="education" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="w-full" />
-        <label>制度</label>
-        <Dropdown v-model="institution" :options="institutionOptions" option-label="label" option-value="value" class="w-full" />
+      <aside class="panel sidebar">
+        <h2>{{ t('initialConditions') }}</h2>
+        <label>{{ t('population') }}</label>
+        <InputNumber v-model="population" :min="2" :max="20" show-buttons class="field-control" />
+        <label>{{ t('seed') }}</label>
+        <InputNumber v-model="seed" show-buttons class="field-control" />
+        <label>{{ t('taxRate') }}</label>
+        <InputNumber v-model="taxRate" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+        <label>{{ t('education') }}</label>
+        <InputNumber v-model="education" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+        <label>{{ t('institution') }}</label>
+        <Dropdown v-model="institution" :options="institutionOptions" option-label="label" option-value="value" class="field-control" />
 
         <div class="actions">
-          <Button label="Create" icon="pi pi-plus" :loading="busy" @click="createSimulation" />
-          <Button label="Tick" icon="pi pi-play" :disabled="!sim" :loading="busy" severity="success" @click="tick(1)" />
-          <Button label="Tick ×5" icon="pi pi-forward" :disabled="!sim" :loading="busy" severity="help" @click="tick(5)" />
+          <Button :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy" @click="createSimulation" />
+          <Button :label="t('actions.tick')" icon="pi pi-play" class="action-btn" :disabled="!sim" :loading="busy" severity="success" @click="tick(1)" />
+          <Button :label="t('actions.tick5')" icon="pi pi-forward" class="action-btn" :disabled="!sim" :loading="busy" severity="help" @click="tick(5)" />
         </div>
 
         <p v-if="error" class="error">{{ error }}</p>
 
         <div v-if="sim?.last_metrics" class="metrics">
-          <h2>メトリクス</h2>
+          <h2>{{ t('metrics.title') }}</h2>
           <ul>
-            <li>格差 {{ sim.last_metrics.inequality.toFixed(3) }}</li>
-            <li>信頼 {{ sim.last_metrics.mean_trust.toFixed(3) }}</li>
-            <li>協力率 {{ sim.last_metrics.cooperation_rate.toFixed(3) }}</li>
-            <li>権威 {{ sim.last_metrics.authority.toFixed(3) }}</li>
-            <li>幸福 {{ sim.last_metrics.mean_happiness.toFixed(3) }}</li>
+            <li>{{ t('metrics.inequality') }} {{ sim.last_metrics.inequality.toFixed(3) }}</li>
+            <li>{{ t('metrics.trust') }} {{ sim.last_metrics.mean_trust.toFixed(3) }}</li>
+            <li>{{ t('metrics.cooperationRate') }} {{ sim.last_metrics.cooperation_rate.toFixed(3) }}</li>
+            <li>{{ t('metrics.authority') }} {{ sim.last_metrics.authority.toFixed(3) }}</li>
+            <li>{{ t('metrics.happiness') }} {{ sim.last_metrics.mean_happiness.toFixed(3) }}</li>
           </ul>
         </div>
       </aside>
 
       <main class="viewport panel">
-        <h2>2D マップ</h2>
+        <h2>{{ t('map.title') }}</h2>
         <canvas ref="canvasRef" width="720" height="520" class="map" />
       </main>
 
       <section class="panel events">
-        <h2>Event</h2>
+        <h2>{{ t('events.title') }}</h2>
         <DataTable :value="recentEvents" size="small" scrollable scroll-height="520px">
-          <Column field="turn" header="t" style="width: 3rem" />
-          <Column field="actor_id" header="actor" />
-          <Column field="action" header="action" />
-          <Column field="detail" header="detail" />
+          <Column field="turn" :header="t('events.turn')" style="width: 4rem" />
+          <Column field="actor_id" :header="t('events.actor')" />
+          <Column :header="t('events.action')">
+            <template #body="{ data }">
+              {{ actionLabel(data.action) }}
+            </template>
+          </Column>
+          <Column field="detail" :header="t('events.detail')" />
         </DataTable>
       </section>
     </div>
@@ -247,10 +302,74 @@ watch(sim, async () => {
 }
 
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: end;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 168px;
+  align-items: start;
+  gap: 1rem;
+  min-height: 4.5rem;
   margin-bottom: 1rem;
+}
+
+.header-left {
+  min-width: 0;
+}
+
+.header-right {
+  width: 168px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+
+.lang {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  line-height: 1;
+}
+
+.lang-btn {
+  margin: 0;
+  padding: 0.1rem 0.15rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.lang-btn:hover {
+  opacity: 1;
+  color: var(--text);
+}
+
+.lang-btn.active {
+  color: var(--text);
+  opacity: 1;
+}
+
+.lang-sep {
+  color: var(--muted);
+  font-size: 0.65rem;
+  opacity: 0.5;
+}
+
+.status-slot {
+  min-height: 1.6rem;
+  max-width: 168px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.status-slot :deep(.p-tag) {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .eyebrow {
@@ -265,6 +384,8 @@ h1 {
   margin: 0.2rem 0 0;
   font-size: 1.5rem;
   font-weight: 650;
+  line-height: 1.25;
+  min-height: 1.875rem;
 }
 
 h2 {
@@ -276,8 +397,9 @@ h2 {
 
 .grid {
   display: grid;
-  grid-template-columns: 260px 1fr 340px;
+  grid-template-columns: 280px minmax(0, 1fr) 340px;
   gap: 1rem;
+  align-items: start;
 }
 
 .panel {
@@ -285,6 +407,11 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 1rem;
+  min-width: 0;
+}
+
+.sidebar {
+  overflow: hidden;
 }
 
 label {
@@ -294,8 +421,53 @@ label {
   font-size: 0.8rem;
 }
 
-.w-full {
+.field-control {
   width: 100%;
+  max-width: 100%;
+}
+
+.sidebar :deep(.p-inputnumber),
+.sidebar :deep(.p-dropdown) {
+  width: 100%;
+  max-width: 100%;
+  display: inline-flex;
+  align-items: stretch;
+  height: 2.5rem;
+}
+
+.sidebar :deep(.p-inputnumber-input) {
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.sidebar :deep(.p-dropdown) {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.sidebar :deep(.p-dropdown .p-dropdown-label),
+.sidebar :deep(.p-dropdown .p-dropdown-trigger) {
+  display: flex;
+  align-items: center;
+}
+
+.sidebar :deep(.p-inputnumber-button-group) {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  height: 100%;
+}
+
+.sidebar :deep(.p-inputnumber-button) {
+  flex: 1 1 0;
+  width: 2rem;
+  margin: 0;
+  padding: 0;
+  height: auto !important;
+  min-height: 0;
 }
 
 .actions {
@@ -303,6 +475,16 @@ label {
   flex-direction: column;
   gap: 0.5rem;
   margin-top: 1rem;
+}
+
+.action-btn {
+  width: 100%;
+}
+
+.action-btn :deep(.p-button-label) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .metrics ul {
@@ -328,6 +510,10 @@ label {
 @media (max-width: 1100px) {
   .grid {
     grid-template-columns: 1fr;
+  }
+
+  .header {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }
 </style>

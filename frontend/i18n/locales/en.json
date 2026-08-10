@@ -1,0 +1,57 @@
+{
+  "brand": "Civilization Explorer",
+  "consoleTitle": "Observation Console (stub)",
+  "language": "Language",
+  "locale": {
+    "ja": "日本語",
+    "en": "English"
+  },
+  "status": {
+    "created": "created",
+    "running": "running",
+    "paused": "paused"
+  },
+  "turnStatus": "turn {turn} · {status}",
+  "initialConditions": "Initial conditions",
+  "population": "Population",
+  "seed": "Seed",
+  "taxRate": "Tax rate",
+  "education": "Education",
+  "institution": "Institution",
+  "institutions": {
+    "democracy": "Democracy",
+    "autocracy": "Autocracy",
+    "anarchy": "Anarchy"
+  },
+  "actions": {
+    "create": "Create",
+    "tick": "Tick",
+    "tick5": "Tick ×5"
+  },
+  "metrics": {
+    "title": "Metrics",
+    "inequality": "Inequality",
+    "trust": "Trust",
+    "cooperationRate": "Cooperation rate",
+    "authority": "Authority",
+    "happiness": "Happiness"
+  },
+  "map": {
+    "title": "2D map"
+  },
+  "events": {
+    "title": "Events",
+    "turn": "Turn",
+    "actor": "Actor",
+    "action": "Action",
+    "detail": "Detail"
+  },
+  "actionTypes": {
+    "wait": "Wait",
+    "cooperate": "Cooperate",
+    "conflict": "Conflict",
+    "migrate": "Migrate",
+    "obey": "Obey",
+    "resist": "Resist"
+  }
+}
