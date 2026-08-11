@@ -35,11 +35,26 @@
   "population": "Population",
   "populationHint": "Initial actors (2–100). Births can raise the count up to 100 when wealth and happiness are high.",
   "seed": "Seed",
-  "seedHint": "RNG seed. Same value reproduces initial positions, traits, and ties.",
+  "seedHint": "RNG seed. Same value reproduces terrain, positions, traits, and ties.",
   "taxRate": "Tax rate",
   "taxRateHint": "Fraction collected each turn (0–1).",
   "education": "Education",
   "educationHint": "0–1. Raises cooperation success chance and resource growth.",
+  "geography": "Geography",
+  "geographyHint": "Islands play on Japan, Britain, or SE Asia. Continents use East Asia, Europe, Africa, or North America. Seed picks the theater.",
+  "geographies": {
+    "island": "Island",
+    "continent": "Continent"
+  },
+  "theaters": {
+    "japan": "Japanese archipelago",
+    "britain": "British Isles",
+    "maritime_se_asia": "Maritime SE Asia",
+    "east_asia": "East Asia",
+    "europe": "Europe",
+    "africa": "Africa",
+    "north_america": "North America"
+  },
   "institution": "Institution",
   "institutions": {
     "democracy": "Democracy",
@@ -67,12 +82,16 @@
     "happinessHint": "Mean happiness of living actors (0–1)."
   },
   "map": {
-    "title": "2D map",
-    "legend": "Dots = living actors. Darker + ring = current leader (changes). ★ = charisma, ◆ = genius (can fade). Size = wealth.",
+    "title": "World map",
+    "legend": "Dots on Earth = living actors. Color matches the group. Size = wealth. Yellow box = this run's theater.",
     "alive": "Alive {alive} / {total}",
     "population": "Pop. {alive} (start {initial} {delta} / cap {cap})",
     "settlements": "Settlements {count}",
-    "resources": "Shared resources {value}"
+    "resources": "Shared resources {value}",
+    "zoomHint": "Drag to orbit, scroll to zoom. Works while turns play.",
+    "fit": "Groups",
+    "world": "Earth",
+    "reset": "Theater"
   },
   "events": {
     "title": "Events",

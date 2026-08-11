@@ -10,7 +10,7 @@ UI・API・データモデルの詳細設計と、**各技術が担う機能要�
 * [Architecture.md](./Architecture.md) — 技術と実装順
 * [SimulationRules.md](./SimulationRules.md) — シミュレーション規則
 * [ADR 0001](../decisions/0001-local-runtime-and-supabase.md) — ローカル実行方針
-* [ADR 0002](../decisions/0002-2d-visualization.md) — 2D 可視化方針
+* [ADR 0005](../decisions/0005-threejs-world-globe.md) — Three.js 世界地図
 * [ADR 0003](../decisions/0003-drizzle-orm.md) — Drizzle ORM 方針
 * [ADR 0004](../decisions/0004-better-auth.md) — Better Auth（将来）方針
 
@@ -18,27 +18,25 @@ UI・API・データモデルの詳細設計と、**各技術が担う機能要�
 
 ## 1. 画面の役割分担（まずここ）
 
-観測 UI は **2 層** に分ける（[ADR 0002](../decisions/0002-2d-visualization.md)）。
+観測 UI は **2 層** に分ける（[ADR 0005](../decisions/0005-threejs-world-globe.md)）。
 
 | 層 | 技術 | 担当 |
 |----|------|------|
 | 操作・一覧・数値 UI | **PrimeVue**（Nuxt 上） | フォーム、ボタン、表、タイムライン、メトリクス |
-| 世界の空間表現 | **2D マップ**（Canvas 2D または SVG） | Agent・集落・所属の平面可視化 |
+| 世界の空間表現 | **Three.js 地球儀** | Agent・集落を世界地図上に表示 |
 
 PrimeVue は「文明の世界そのもの」を描かない。  
 **人間がパラメータを変え、結果を読むための UI 部品ライブラリ**である。
-
-**背景について:** 地球の写真・イラスト・グローブは **不要**。薄いグリッドや穏やかな平面で十分。目的は「誰がどこにいて、集団がどう変わるか」であり、地球儀演出ではない。
 
 ```text
 ┌─────────────────────────────────────────────┐
 │  Nuxt ページ                                 │
 │  ┌──────────────┐  ┌─────────────────────┐  │
-│  │ PrimeVue     │  │ 2D マップ           │  │
-│  │ ・初期条件   │  │ ・Agent = 円        │  │
+│  │ PrimeVue     │  │ Three.js 地球儀     │  │
+│  │ ・初期条件   │  │ ・Agent = 地表の点  │  │
 │  │ ・開始/tick  │  │ ・所属色 / 集落     │  │
-│  │ ・メトリクス │  │ ・パン / ズーム     │  │
-│  │ ・Event 表   │  │ ・抽象背景（非地球）│  │
+│  │ ・メトリクス │  │ ・回転 / ズーム     │  │
+│  │ ・Event 表   │  │ ・舞台枠（島/大陸） │  │
 │  └──────────────┘  └─────────────────────┘  │
 │           │  HTTP / SSE                     │
 │           ├──────────────────────┐          │

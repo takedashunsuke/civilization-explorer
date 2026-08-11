@@ -5,6 +5,8 @@ import Dropdown from 'primevue/dropdown'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
+import { settlementColor } from '~/utils/groupColors'
+import WorldGlobe from '~/components/WorldGlobe.vue'
 
 type Agent = {
   id: string
@@ -45,6 +47,12 @@ type Settlement = {
   leader_id?: string | null
 }
 
+type Terrain = {
+  cols: number
+  rows: number
+  biomes: string[]
+}
+
 type Simulation = {
   id: string
   status: string
@@ -56,6 +64,8 @@ type Simulation = {
     institution: string
     resource_pool: number
     start_year: number
+    geography?: string
+    terrain?: Terrain
     initial_population?: number
     initial_total_wealth?: number
     population_cap?: number
@@ -75,9 +85,9 @@ const apiBase = config.public.apiBase as string
 const sim = ref<Simulation | null>(null)
 const busy = ref(false)
 const error = ref('')
-const canvasRef = ref<HTMLCanvasElement | null>(null)
 const autoPlaying = ref(false)
 let autoTimer: ReturnType<typeof setInterval> | null = null
+let tickInFlight = false
 
 const calendarEra = ref<'bc' | 'ad'>('ad')
 const calendarYear = ref(700)
@@ -87,11 +97,17 @@ const taxRate = ref(0.1)
 const education = ref(0.5)
 /** API には英語キーのまま送る */
 const institution = ref('democracy')
+const geography = ref('island')
 
 const institutionOptions = computed(() => [
   { label: t('institutions.democracy'), value: 'democracy' },
   { label: t('institutions.autocracy'), value: 'autocracy' },
   { label: t('institutions.anarchy'), value: 'anarchy' },
+])
+
+const geographyOptions = computed(() => [
+  { label: t('geographies.island'), value: 'island' },
+  { label: t('geographies.continent'), value: 'continent' },
 ])
 
 const calendarEraOptions = computed(() => [
@@ -197,6 +213,16 @@ function actorLabel(actorId: string): string {
   return agent?.name ?? actorId
 }
 
+function eventGroupId(actorId: string): string | null {
+  if (!actorId || actorId === 'world' || actorId === 'lone') return null
+  if (actorId.startsWith('s')) return actorId
+  return sim.value?.agents.find((a) => a.id === actorId)?.settlement_id ?? null
+}
+
+function eventActorColor(actorId: string): string {
+  return settlementColor(eventGroupId(actorId))
+}
+
 function isGroupId(id: string | null | undefined): boolean {
   return !id || id === 'world' || id === 'lone' || id.startsWith('s')
 }
@@ -272,11 +298,10 @@ async function createSimulation() {
         education_level: education.value,
         institution: institution.value,
         start_year: draftAstroYear.value,
+        geography: geography.value,
         resource_pool: 100,
       },
     })
-    await nextTick()
-    drawMap()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -284,22 +309,22 @@ async function createSimulation() {
   }
 }
 
-async function tick(n = 1) {
-  if (!sim.value) return
-  busy.value = true
+async function tick(n = 1, opts?: { silent?: boolean }) {
+  if (!sim.value || tickInFlight) return
+  tickInFlight = true
+  if (!opts?.silent) busy.value = true
   error.value = ''
   try {
     sim.value = await api<Simulation>(`/simulations/${sim.value.id}/tick`, {
       method: 'POST',
       body: { n },
     })
-    await nextTick()
-    drawMap()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
     stopAutoPlay()
   } finally {
-    busy.value = false
+    tickInFlight = false
+    if (!opts?.silent) busy.value = false
   }
 }
 
@@ -310,135 +335,16 @@ async function toggleAutoPlay() {
   }
   if (!sim.value) return
   autoPlaying.value = true
-  await tick(1)
+  await tick(1, { silent: true })
   if (!autoPlaying.value) return
   autoTimer = setInterval(() => {
-    if (busy.value || !sim.value || !autoPlaying.value) return
-    void tick(1)
+    if (!sim.value || !autoPlaying.value) return
+    void tick(1, { silent: true })
   }, AUTO_INTERVAL_MS)
 }
 
-const SETTLEMENT_HUES = [0, 207, 122, 48, 291, 174, 16, 231, 187, 88]
-
-function settlementHue(id: string | null): number {
-  if (!id) return 210
-  const match = id.match(/(\d+)$/)
-  const idx = match ? Number(match[1]) - 1 : 0
-  return SETTLEMENT_HUES[((idx % SETTLEMENT_HUES.length) + SETTLEMENT_HUES.length) % SETTLEMENT_HUES.length]
-}
-
-function settlementColor(id: string | null, role: 'base' | 'member' | 'leader' = 'base'): string {
-  const hue = settlementHue(id)
-  if (!id) return 'hsl(210 12% 52%)'
-  if (role === 'leader') return `hsl(${hue} 78% 38%)`
-  if (role === 'member') return `hsl(${hue} 52% 68%)`
-  return `hsl(${hue} 65% 56%)`
-}
-
-function agentFill(agent: Agent, isLeader: boolean): string {
-  if (agent.settlement_id) return settlementColor(agent.settlement_id, isLeader ? 'leader' : 'member')
-  let hash = 0
-  for (let i = 0; i < agent.id.length; i++) hash = (hash * 31 + agent.id.charCodeAt(i)) >>> 0
-  const sat = (agent.traits?.length ?? 0) > 0 ? 48 : 28
-  const light = (agent.traits?.length ?? 0) > 0 ? 46 : 58
-  return `hsl(${hash % 360} ${sat}% ${light}%)`
-}
-
-function agentMark(agent: Agent): string {
-  const traits = agent.traits ?? []
-  let mark = ''
-  if (traits.includes('charisma')) mark += '★'
-  if (traits.includes('genius')) mark += '◆'
-  return mark
-}
-
-function drawMap() {
-  const canvas = canvasRef.value
-  const current = sim.value
-  if (!canvas || !current) return
-  const ctx = canvas.getContext('2d')
-  if (!ctx) return
-
-  const w = canvas.width
-  const h = canvas.height
-  ctx.clearRect(0, 0, w, h)
-  ctx.fillStyle = '#101820'
-  ctx.fillRect(0, 0, w, h)
-
-  ctx.strokeStyle = '#243041'
-  ctx.lineWidth = 1
-  for (let i = 0; i <= 10; i++) {
-    const x = (i / 10) * w
-    const y = (i / 10) * h
-    ctx.beginPath()
-    ctx.moveTo(x, 0)
-    ctx.lineTo(x, h)
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.moveTo(0, y)
-    ctx.lineTo(w, y)
-    ctx.stroke()
-  }
-
-  // Axes labels for world coordinates
-  ctx.fillStyle = '#6b7c8f'
-  ctx.font = '10px sans-serif'
-  ctx.fillText('0', 4, h - 4)
-  ctx.fillText('100', w - 22, h - 4)
-  ctx.fillText('100', 4, 12)
-
-  for (const settlement of current.settlements ?? []) {
-    const sx = (settlement.position.x / 100) * w
-    const sy = (settlement.position.y / 100) * h
-    const color = settlementColor(settlement.id)
-    ctx.beginPath()
-    ctx.fillStyle = color
-    ctx.globalAlpha = 0.16
-    ctx.arc(sx, sy, 28 + settlement.member_ids.length * 2, 0, Math.PI * 2)
-    ctx.fill()
-    ctx.globalAlpha = 1
-    ctx.fillStyle = color
-    ctx.font = '11px sans-serif'
-    ctx.fillText(settlement.id, sx + 10, sy - 10)
-  }
-
-  const leaders = new Set(
-    (current.settlements ?? []).map((s) => s.leader_id).filter((id): id is string => Boolean(id)),
-  )
-
-  for (const agent of current.agents) {
-    if (!agent.alive) continue
-    const isLeader = leaders.has(agent.id)
-    const x = (agent.position.x / 100) * w
-    const y = (agent.position.y / 100) * h
-    const r = (isLeader ? 7 : 5) + Math.min(8, agent.wealth / 4)
-    ctx.beginPath()
-    ctx.fillStyle = agentFill(agent, isLeader)
-    ctx.arc(x, y, r, 0, Math.PI * 2)
-    ctx.fill()
-    if (agent.settlement_id) {
-      ctx.strokeStyle = isLeader ? '#f4f0d8' : settlementColor(agent.settlement_id, 'base')
-      ctx.lineWidth = isLeader ? 2.5 : 1.5
-      ctx.stroke()
-    }
-    const mark = agentMark(agent)
-    ctx.fillStyle = '#dce7f3'
-    ctx.font = isLeader ? 'bold 11px sans-serif' : '11px sans-serif'
-    ctx.fillText(`${agent.name}${mark}`, x + r + 2, y + 3)
-  }
-}
-
-onMounted(() => {
-  drawMap()
-})
-
 onBeforeUnmount(() => {
   stopAutoPlay()
-})
-
-watch(sim, async () => {
-  await nextTick()
-  drawMap()
 })
 </script>
 
@@ -565,6 +471,9 @@ watch(sim, async () => {
         <label>{{ t('education') }}</label>
         <InputNumber v-model="education" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
         <p class="hint">{{ t('educationHint') }}</p>
+        <label>{{ t('geography') }}</label>
+        <Dropdown v-model="geography" :options="geographyOptions" option-label="label" option-value="value" class="field-control" />
+        <p class="hint">{{ t('geographyHint') }}</p>
         <label>{{ t('institution') }}</label>
         <Dropdown v-model="institution" :options="institutionOptions" option-label="label" option-value="value" class="field-control" />
 
@@ -589,10 +498,12 @@ watch(sim, async () => {
             {{ t('map.settlements', { count: settlementCount }) }}
             ·
             {{ t('map.resources', { value: sim.world.resource_pool.toFixed(1) }) }}
+            ·
+            {{ t(`geographies.${sim.world.geography === 'continent' ? 'continent' : 'island'}`) }}
           </p>
         </div>
-        <p class="hint map-legend">{{ t('map.legend') }}</p>
-        <canvas ref="canvasRef" width="720" height="520" class="map" />
+        <p class="hint map-legend">{{ t('map.legend') }} {{ t('map.zoomHint') }}</p>
+        <WorldGlobe :sim="sim" :geography="geography" :seed="seed" />
         <div v-if="metricItems.length" class="metrics">
           <h2>{{ t('metrics.title') }}</h2>
           <ul>
@@ -616,17 +527,17 @@ watch(sim, async () => {
         <DataTable v-else :value="recentEvents" size="small" scrollable scroll-height="480px" class="events-table">
           <Column :header="t('events.actor')" style="width: 4.2rem">
             <template #body="{ data }">
-              {{ actorLabel(data.actor_id) }}
+              <span class="event-actor" :style="{ color: eventActorColor(data.actor_id) }">{{ actorLabel(data.actor_id) }}</span>
             </template>
           </Column>
           <Column :header="t('events.action')" style="width: 4.5rem">
             <template #body="{ data }">
-              {{ actionLabel(data.action) }}
+              <span class="event-text" :style="{ color: eventActorColor(data.actor_id) }">{{ actionLabel(data.action) }}</span>
             </template>
           </Column>
           <Column :header="t('events.detail')">
             <template #body="{ data }">
-              {{ eventDetail(data) }}
+              <span class="event-text" :style="{ color: eventActorColor(data.actor_id) }">{{ eventDetail(data) }}</span>
             </template>
           </Column>
         </DataTable>
@@ -1065,29 +976,20 @@ label {
   margin-bottom: 0.55rem;
 }
 
-.map {
-  width: 100%;
-  height: auto;
-  min-height: 0;
-  flex: 1 1 auto;
-  object-fit: contain;
-  border-radius: 8px;
-  border: 1px solid var(--line);
-  display: block;
-}
-
 .events-table :deep(.p-datatable-tbody > tr > td) {
   word-break: keep-all;
   overflow-wrap: anywhere;
   line-break: strict;
   vertical-align: top;
-  color: var(--text-color, #212529);
 }
 
 .events-table :deep(.p-datatable-tbody > tr > td:last-child) {
   font-size: 0.7rem;
   line-height: 1.4;
-  color: inherit;
+}
+
+.event-actor {
+  font-weight: 700;
 }
 
 .events-table :deep(.p-datatable-thead > tr > th) {

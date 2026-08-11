@@ -6,13 +6,13 @@
 
 * Nuxt 4 — [Introduction](https://nuxt.com/docs/4.x/getting-started/introduction)
 * PrimeVue 3 — [Setup](https://v3.primevue.org/setup/)
-* 2D マップ（Canvas 2D または SVG）。Three.js は任意（[ADR 0002](../decisions/0002-2d-visualization.md)）
+* Three.js 地球儀（世界地図）。操作 UI は PrimeVue（[ADR 0005](../decisions/0005-threejs-world-globe.md)）
 
 役割
 
 * アプリの枠（ページ・ルーティング・API 連携）: **Nuxt 4**
 * 操作・一覧・数値 UI: **PrimeVue**（フォーム、表、タイムライン、メトリクス）
-* 空間可視化: **2D マップ**（Agent = 円、所属色、集落。地球背景は使わない）
+* 空間可視化: **Three.js 地球儀**（Agent = 地表の点、所属色、舞台枠）
 
 > PrimeVue は世界マップを描かない。パラメータ変更や Event 閲覧など「実験操作 UI」を担当する。  
 > 技術ごとの機能要件の詳細は [DesignDoc.md](./DesignDoc.md) を参照。

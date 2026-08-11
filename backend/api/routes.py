@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from simulation import create_simulation, tick
 from simulation.llm import describe_provider
-from simulation.models import InitialValues, InstitutionType, SimulationState, WorldParams
+from simulation.models import GeographyType, InitialValues, InstitutionType, SimulationState, WorldParams
 
 router = APIRouter()
 
@@ -23,6 +23,7 @@ class CreateSimulationRequest(BaseModel):
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     institution: str = "democracy"
     start_year: int = Field(default=700, ge=-50000, le=3000)
+    geography: str = "island"
     initial_values: dict[str, float] | None = None
 
 
@@ -45,6 +46,10 @@ def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
         institution = InstitutionType(body.institution)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"invalid institution: {body.institution}") from exc
+    try:
+        geography = GeographyType(body.geography)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"invalid geography: {body.geography}") from exc
 
     initial = InitialValues()
     if body.initial_values:
@@ -63,6 +68,7 @@ def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
         tax_rate=body.tax_rate,
         institution=institution,
         start_year=body.start_year,
+        geography=geography,
         initial_values=initial,
     )
     sim_id = str(uuid.uuid4())
@@ -152,5 +158,6 @@ def get_replay(sim_id: str) -> dict[str, Any]:
         "tax_rate": sim.world.tax_rate,
         "institution": sim.world.institution.value,
         "start_year": sim.world.start_year,
+        "geography": sim.world.geography.value,
         "initial_values": sim.world.initial_values.model_dump(),
     }

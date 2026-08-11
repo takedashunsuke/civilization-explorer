@@ -1,7 +1,8 @@
 # 0002. 可視化は 2D 中心（地球画像・本格 3D は不要）
 
-- Status: accepted
+- Status: superseded
 - Date: 2026-08-04
+- Superseded by: [0005](./0005-threejs-world-globe.md)
 
 ## Context
 

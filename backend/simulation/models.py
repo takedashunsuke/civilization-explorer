@@ -12,6 +12,17 @@ class InstitutionType(str, Enum):
     democracy = "democracy"
 
 
+class GeographyType(str, Enum):
+    island = "island"
+    continent = "continent"
+
+
+class TerrainState(BaseModel):
+    cols: int = 48
+    rows: int = 48
+    biomes: list[str] = Field(default_factory=list)
+
+
 class Allegiance(str, Enum):
     obey = "obey"
     resist = "resist"
@@ -56,6 +67,7 @@ class WorldParams(BaseModel):
     institution: InstitutionType = InstitutionType.democracy
     # Astronomical year: AD 1 = 1, BC 1 = 0, BC 44 = -43
     start_year: int = Field(default=700, ge=-50000, le=3000)
+    geography: GeographyType = GeographyType.island
     initial_values: InitialValues = Field(default_factory=InitialValues)
 
 
@@ -107,6 +119,8 @@ class WorldState(BaseModel):
     tax_rate: float
     institution: InstitutionType
     start_year: int = 700
+    geography: GeographyType = GeographyType.island
+    terrain: TerrainState = Field(default_factory=TerrainState)
     initial_values: InitialValues
     institution_runtime: InstitutionState = Field(default_factory=InstitutionState)
 

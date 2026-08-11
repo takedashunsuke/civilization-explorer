@@ -21,6 +21,7 @@ from simulation.models import (
     WorldParams,
     WorldState,
 )
+from simulation.terrain import generate_terrain, random_land_position, snap_to_land
 
 
 SETTLEMENT_DISTANCE = 10.0
@@ -81,6 +82,7 @@ def leadership_score(agent: AgentState, rng: random.Random | None = None) -> flo
 
 def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
     rng = random.Random(params.seed)
+    terrain = generate_terrain(params.geography, params.seed)
     agents: list[AgentState] = []
     for i in range(params.population):
         coop = clamp(params.initial_values.cooperation + rng.uniform(-0.2, 0.2))
@@ -96,7 +98,7 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
             AgentState(
                 id=f"a{i + 1}",
                 name=f"a{i + 1}",
-                position=Position(x=rng.uniform(5, 95), y=rng.uniform(5, 95)),
+                position=random_land_position(terrain, rng, params.geography),
                 wealth=wealth,
                 energy=clamp(0.7 + rng.uniform(-0.2, 0.2)),
                 happiness=clamp(0.5 + rng.uniform(-0.15, 0.15)),
@@ -130,6 +132,8 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
         tax_rate=params.tax_rate,
         institution=params.institution,
         start_year=params.start_year,
+        geography=params.geography,
+        terrain=terrain,
         initial_values=params.initial_values,
         institution_runtime=InstitutionState(
             authority=0.4 + 0.3 * params.initial_values.authority_acceptance
@@ -394,7 +398,7 @@ def resolve_actions(
             else:
                 nx += rng.uniform(-10, 10)
                 ny += rng.uniform(-10, 10)
-            actor.position = Position(x=clamp(nx, 0, 100), y=clamp(ny, 0, 100))
+            actor.position = snap_to_land(sim.world.terrain, nx, ny)
             actor.energy = clamp(actor.energy - 0.2)
             detail = f"migrated to ({actor.position.x:.1f},{actor.position.y:.1f})"
             events.append(
@@ -508,9 +512,10 @@ def apply_births(sim: SimulationState, rng: random.Random) -> None:
     child = AgentState(
         id=child_id,
         name=child_id,
-        position=Position(
-            x=clamp(parent.position.x + rng.uniform(-4, 4), 0, 100),
-            y=clamp(parent.position.y + rng.uniform(-4, 4), 0, 100),
+        position=snap_to_land(
+            sim.world.terrain,
+            parent.position.x + rng.uniform(-4, 4),
+            parent.position.y + rng.uniform(-4, 4),
         ),
         wealth=wealth,
         energy=clamp(0.65 + rng.uniform(-0.1, 0.1)),
