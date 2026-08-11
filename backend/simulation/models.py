@@ -25,6 +25,10 @@ class ActionType(str, Enum):
     migrate = "migrate"
     obey = "obey"
     resist = "resist"
+    birth = "birth"
+    death = "death"
+    lead = "lead"
+    trait = "trait"
 
 
 class Position(BaseModel):
@@ -68,6 +72,8 @@ class AgentState(BaseModel):
     settlement_id: str | None = None
     allegiance: Allegiance = Allegiance.neutral
     alive: bool = True
+    traits: list[str] = Field(default_factory=list)
+    age: int = 20
 
 
 class RelationshipState(BaseModel):
@@ -82,6 +88,7 @@ class SettlementState(BaseModel):
     position: Position
     member_ids: list[str] = Field(default_factory=list)
     shared_wealth: float = 0.0
+    leader_id: str | None = None
 
 
 class InstitutionState(BaseModel):
@@ -92,6 +99,8 @@ class InstitutionState(BaseModel):
 class WorldState(BaseModel):
     turn: int = 0
     seed: int
+    initial_population: int = 8
+    initial_total_wealth: float = 0.0
     population_cap: int
     resource_pool: float
     education_level: float
@@ -108,6 +117,7 @@ class EventRecord(BaseModel):
     action: ActionType
     target_id: str | None = None
     success: bool | None = None
+    detail_key: str = "wait"
     detail: str
     deltas: dict[str, float] = Field(default_factory=dict)
 

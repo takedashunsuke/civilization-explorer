@@ -38,7 +38,8 @@ MVP 向けの最小ルール。
 |------------|----------|------|
 | `turn` | int | 現在ターン |
 | `seed` | int | 再現用シード |
-| `population_cap` | int | 人口上限（初期生成数の目安） |
+| `population_cap` | int | 人口上限（出生で増える上限。初期人数とは別） |
+| `initial_population` | int | 開始時の人数 |
 | `resource_pool` | number | 世界全体の利用可能資源 |
 | `education_level` | number (0–1) | 教育水準。協力成功率などに影響 |
 | `tax_rate` | number (0–1) | 税率。従う選択時の徴収率 |
@@ -61,6 +62,8 @@ MVP 向けの最小ルール。
 | `settlement_id` | string \| null | 所属集落 |
 | `allegiance` | `obey` / `resist` / `neutral` | 制度への態度 |
 | `alive` | bool | 生存フラグ |
+| `traits` | string[] | 稀少特性。`charisma` / `genius`（生涯で得たり失ったりする） |
+| `age` | int | 年齢。1ターンで +1。高齢で死亡し世代が入れ替わる |
 
 ### 2.3 Relationship
 
@@ -82,6 +85,7 @@ Agent 間は向き付きで持たず、**無向 + スカラー** の最小形と
 | `position` | `{x, y}` | 中心座標 |
 | `member_ids` | string[] | 所属 Agent |
 | `shared_wealth` | number | 共有資源 |
+| `leader_id` | string \| null | 集落リーダー（富・野心・特性で決定） |
 
 Agent の `position` が近い同士は、ターン末に自動で同一集落へマージしてよい（距離閾値は定数）。
 
@@ -114,6 +118,7 @@ World の `institution` に加え、実行時に次を持つ。
 | `conflict` | 他 Agent 1 | 争い。勝者が資源を奪う |
 | `migrate` | 座標または集落 | 移動する |
 | `obey` | 制度 | 制度に従い納税・忠誠を示す |
+| `birth` | 新生 Agent | ターン末の世界処理。親の近くに子が生まれる |
 | `resist` | 制度 | 制度に反抗し、納税拒否・権威低下 |
 
 ### 3.1 意思決定（LLM）
@@ -247,9 +252,12 @@ power(x) = x.wealth * 0.4 + x.energy * 0.3 + x.aggression * 0.3 + noise()
 1. 集落の再編成（距離閾値）
 2. `resource_pool` の自然回復（定数、または education に比例）
 3. `authority` を 0–1 にクランプ
-4. `alive` 判定: `wealth <= 0` かつ `energy <= 0` が連続 N ターンで離脱（MVP では非死亡・離脱でも可）
-5. メトリクス更新
-6. History 記録
+4. 加齢（+1歳）と死亡（高齢・困窮。最低2人は残す）。遺産は同集落へ
+5. 特性の獲得／喪失（カリスマ・天才は固定ではない）
+6. 出生: 生存数が `population_cap` 未満で、繁殖適齢かつ富・幸福が高い親がいれば低確率で 1 人追加
+7. 集落リーダー再選（富・野心・特性・年齢ゆらぎ。交代イベントを出す）
+8. メトリクス更新
+9. History 記録
 
 ### メトリクス（最小）
 
@@ -283,7 +291,7 @@ power(x) = x.wealth * 0.4 + x.energy * 0.3 + x.aggression * 0.3 + noise()
 
 * 多段戦闘・地形・補給
 * 言語ゲームとしての長期交渉（必要なら Event ログに reason を残す程度）
-* 遺伝・世代交代
+* 本格的な遺伝・世代交代（簡易な出生のみ）
 * 複雑な法制度ツリー
 * 連続時間シミュレーション
 
