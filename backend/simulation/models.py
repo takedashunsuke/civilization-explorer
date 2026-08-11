@@ -45,11 +45,13 @@ class InitialValues(BaseModel):
 
 class WorldParams(BaseModel):
     seed: int = 42
-    population: int = Field(default=8, ge=2, le=20)
+    population: int = Field(default=8, ge=2, le=100)
     resource_pool: float = 100.0
     education_level: float = Field(default=0.5, ge=0, le=1)
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     institution: InstitutionType = InstitutionType.democracy
+    # Astronomical year: AD 1 = 1, BC 1 = 0, BC 44 = -43
+    start_year: int = Field(default=700, ge=-50000, le=3000)
     initial_values: InitialValues = Field(default_factory=InitialValues)
 
 
@@ -95,6 +97,7 @@ class WorldState(BaseModel):
     education_level: float
     tax_rate: float
     institution: InstitutionType
+    start_year: int = 700
     initial_values: InitialValues
     institution_runtime: InstitutionState = Field(default_factory=InstitutionState)
 

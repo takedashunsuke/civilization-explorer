@@ -12,11 +12,28 @@
     "paused": "一時停止"
   },
   "turnStatus": "ターン {turn} · {status}",
+  "turnLabel": "ターン {turn}",
   "initialConditions": "初期条件",
+  "calendarYear": "開始年",
+  "calendarYearHint": "西暦を BC / AD で指定。1ターン＝1年進みます。",
+  "calendarEra": {
+    "bc": "BC（紀元前）",
+    "ad": "AD（紀元後）"
+  },
+  "eraPreview": {
+    "title": "時代の目安",
+    "japan": "日本",
+    "world": "世界",
+    "year": "{label}"
+  },
   "population": "人口",
+  "populationHint": "初期の主体数（2〜100）。多いほど処理が重くなります。",
   "seed": "シード",
+  "seedHint": "乱数の種。同じ値なら初期配置・性格・関係が再現されます。",
   "taxRate": "税率",
+  "taxRateHint": "毎ターン徴収される割合（0〜1）。",
   "education": "教育",
+  "educationHint": "0〜1。協力の成功しやすさと資源の増え方に影響します。",
   "institution": "制度",
   "institutions": {
     "democracy": "民主主義",
@@ -26,22 +43,33 @@
   "actions": {
     "create": "作成",
     "tick": "1ターン進める",
-    "tick5": "5ターン進める"
+    "tick5": "5ターン進める",
+    "autoPlay": "自動再生",
+    "autoStop": "停止"
   },
+  "autoPlayHint": "約0.8秒ごとに1ターン進めます。",
   "metrics": {
     "title": "メトリクス",
     "inequality": "格差",
+    "inequalityHint": "富のばらつき（標準偏差÷平均）。高いほど貧富の差が大きい。",
     "trust": "信頼",
+    "trustHint": "主体間の信頼の平均（-1〜1）。高いほど協力しやすい。",
     "cooperationRate": "協力率",
+    "cooperationRateHint": "直前ターンで協力が成功した割合（0〜1）。",
     "authority": "権威",
-    "happiness": "幸福"
+    "authorityHint": "制度の権威度（0付近〜1）。高いほど服従しやすい。",
+    "happiness": "幸福",
+    "happinessHint": "生存主体の幸福度の平均（0〜1）。"
   },
   "map": {
-    "title": "2D マップ"
+    "title": "2D マップ",
+    "legend": "点＝主体（a1…）。色＝同じ集落。大きさ＝富。座標は世界空間 0〜100。",
+    "alive": "生存 {alive} / {total}",
+    "resources": "共有資源 {value}"
   },
   "events": {
     "title": "出来事",
-    "turn": "ターン",
+    "empty": "まだ出来事がありません。作成してターンを進めてください。",
     "actor": "主体",
     "action": "行動",
     "detail": "詳細"
@@ -53,5 +81,41 @@
     "migrate": "移住",
     "obey": "服従",
     "resist": "抵抗"
+  },
+  "yearLabel": {
+    "bc": "BC {year}",
+    "ad": "AD {year}"
+  },
+  "eras": {
+    "japan": {
+      "paleolithic": "旧石器時代",
+      "jomon": "縄文時代",
+      "yayoi": "弥生時代",
+      "kofun": "古墳時代",
+      "asuka": "飛鳥時代",
+      "nara": "奈良時代",
+      "heian": "平安時代",
+      "kamakura": "鎌倉時代",
+      "muromachi": "室町時代",
+      "azuchiMomoyama": "安土桃山時代",
+      "edo": "江戸時代",
+      "meiji": "明治",
+      "taisho": "大正",
+      "showa": "昭和",
+      "heisei": "平成",
+      "reiwa": "令和"
+    },
+    "world": {
+      "paleolithic": "旧石器時代",
+      "neolithic": "新石器時代",
+      "bronzeAge": "青銅器時代",
+      "ironAge": "鉄器時代",
+      "classical": "古典古代",
+      "earlyMiddleAges": "初期中世",
+      "middleAges": "中世",
+      "earlyModern": "近世",
+      "modern": "近代",
+      "contemporary": "現代"
+    }
   }
 }

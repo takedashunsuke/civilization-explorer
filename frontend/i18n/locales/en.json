@@ -12,11 +12,28 @@
     "paused": "paused"
   },
   "turnStatus": "turn {turn} · {status}",
+  "turnLabel": "Turn {turn}",
   "initialConditions": "Initial conditions",
+  "calendarYear": "Start year",
+  "calendarYearHint": "Set a Gregorian year as BC or AD. Each turn advances one year.",
+  "calendarEra": {
+    "bc": "BC",
+    "ad": "AD"
+  },
+  "eraPreview": {
+    "title": "Era snapshot",
+    "japan": "Japan",
+    "world": "World",
+    "year": "{label}"
+  },
   "population": "Population",
+  "populationHint": "Initial number of actors (2–100). Larger values slow ticks.",
   "seed": "Seed",
+  "seedHint": "RNG seed. Same value reproduces initial positions, traits, and ties.",
   "taxRate": "Tax rate",
+  "taxRateHint": "Fraction collected each turn (0–1).",
   "education": "Education",
+  "educationHint": "0–1. Raises cooperation success chance and resource growth.",
   "institution": "Institution",
   "institutions": {
     "democracy": "Democracy",
@@ -26,22 +43,33 @@
   "actions": {
     "create": "Create",
     "tick": "Tick",
-    "tick5": "Tick ×5"
+    "tick5": "Tick ×5",
+    "autoPlay": "Auto-play",
+    "autoStop": "Stop"
   },
+  "autoPlayHint": "Advances one turn about every 0.8s.",
   "metrics": {
     "title": "Metrics",
     "inequality": "Inequality",
+    "inequalityHint": "Wealth spread (stddev ÷ mean). Higher = wider gap.",
     "trust": "Trust",
+    "trustHint": "Mean pairwise trust (−1 to 1). Higher favors cooperation.",
     "cooperationRate": "Cooperation rate",
+    "cooperationRateHint": "Share of successful cooperate actions last turn (0–1).",
     "authority": "Authority",
-    "happiness": "Happiness"
+    "authorityHint": "Institutional authority (near 0–1). Higher favors obedience.",
+    "happiness": "Happiness",
+    "happinessHint": "Mean happiness of living actors (0–1)."
   },
   "map": {
-    "title": "2D map"
+    "title": "2D map",
+    "legend": "Dots = actors (a1…). Color = settlement. Size = wealth. World space 0–100.",
+    "alive": "Alive {alive} / {total}",
+    "resources": "Shared resources {value}"
   },
   "events": {
     "title": "Events",
-    "turn": "Turn",
+    "empty": "No events yet. Create a simulation and advance turns.",
     "actor": "Actor",
     "action": "Action",
     "detail": "Detail"
@@ -53,5 +81,41 @@
     "migrate": "Migrate",
     "obey": "Obey",
     "resist": "Resist"
+  },
+  "yearLabel": {
+    "bc": "BC {year}",
+    "ad": "AD {year}"
+  },
+  "eras": {
+    "japan": {
+      "paleolithic": "Paleolithic Japan",
+      "jomon": "Jōmon",
+      "yayoi": "Yayoi",
+      "kofun": "Kofun",
+      "asuka": "Asuka",
+      "nara": "Nara",
+      "heian": "Heian",
+      "kamakura": "Kamakura",
+      "muromachi": "Muromachi",
+      "azuchiMomoyama": "Azuchi–Momoyama",
+      "edo": "Edo",
+      "meiji": "Meiji",
+      "taisho": "Taishō",
+      "showa": "Shōwa",
+      "heisei": "Heisei",
+      "reiwa": "Reiwa"
+    },
+    "world": {
+      "paleolithic": "Paleolithic",
+      "neolithic": "Neolithic",
+      "bronzeAge": "Bronze Age",
+      "ironAge": "Iron Age",
+      "classical": "Classical antiquity",
+      "earlyMiddleAges": "Early Middle Ages",
+      "middleAges": "Middle Ages",
+      "earlyModern": "Early modern",
+      "modern": "Modern",
+      "contemporary": "Contemporary"
+    }
   }
 }

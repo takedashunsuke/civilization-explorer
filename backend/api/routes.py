@@ -17,11 +17,12 @@ _STORE: dict[str, SimulationState] = {}
 
 class CreateSimulationRequest(BaseModel):
     seed: int = 42
-    population: int = Field(default=8, ge=2, le=20)
+    population: int = Field(default=8, ge=2, le=100)
     resource_pool: float = 100.0
     education_level: float = Field(default=0.5, ge=0, le=1)
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     institution: str = "democracy"
+    start_year: int = Field(default=700, ge=-50000, le=3000)
     initial_values: dict[str, float] | None = None
 
 
@@ -61,6 +62,7 @@ def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
         education_level=body.education_level,
         tax_rate=body.tax_rate,
         institution=institution,
+        start_year=body.start_year,
         initial_values=initial,
     )
     sim_id = str(uuid.uuid4())
@@ -149,5 +151,6 @@ def get_replay(sim_id: str) -> dict[str, Any]:
         "education_level": sim.world.education_level,
         "tax_rate": sim.world.tax_rate,
         "institution": sim.world.institution.value,
+        "start_year": sim.world.start_year,
         "initial_values": sim.world.initial_values.model_dump(),
     }

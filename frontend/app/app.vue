@@ -43,16 +43,28 @@ type Simulation = {
     education_level: number
     institution: string
     resource_pool: number
+    start_year: number
   }
   agents: Agent[]
   events: EventRow[]
   last_metrics: Metrics | null
 }
 
+const AUTO_INTERVAL_MS = 800
+
 const { t, locale, setLocale } = useI18n()
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
 
+const sim = ref<Simulation | null>(null)
+const busy = ref(false)
+const error = ref('')
+const canvasRef = ref<HTMLCanvasElement | null>(null)
+const autoPlaying = ref(false)
+let autoTimer: ReturnType<typeof setInterval> | null = null
+
+const calendarEra = ref<'bc' | 'ad'>('ad')
+const calendarYear = ref(700)
 const population = ref(8)
 const seed = ref(42)
 const taxRate = ref(0.1)
@@ -66,12 +78,45 @@ const institutionOptions = computed(() => [
   { label: t('institutions.anarchy'), value: 'anarchy' },
 ])
 
-const sim = ref<Simulation | null>(null)
-const busy = ref(false)
-const error = ref('')
-const canvasRef = ref<HTMLCanvasElement | null>(null)
+const calendarEraOptions = computed(() => [
+  { label: t('calendarEra.bc'), value: 'bc' as const },
+  { label: t('calendarEra.ad'), value: 'ad' as const },
+])
 
-const recentEvents = computed(() => (sim.value?.events ?? []).slice(-30).reverse())
+const draftAstroYear = computed(() => toAstronomicalYear(calendarEra.value, calendarYear.value))
+
+const currentAstroYear = computed(() => {
+  if (!sim.value) return draftAstroYear.value
+  const start = sim.value.world.start_year ?? draftAstroYear.value
+  return start + sim.value.world.turn
+})
+
+function formatYearLabel(astro: number): string {
+  const { era, year } = fromAstronomicalYear(astro)
+  return t(`yearLabel.${era}`, { year })
+}
+
+function japanEraName(astro: number): string {
+  const periodLabel = t(`eras.japan.${japanPeriodKey(astro)}`)
+  return formatJapanEraLabel(astro, periodLabel, locale.value)
+}
+
+function worldEraName(astro: number): string {
+  return t(`eras.world.${worldPeriodKey(astro)}`)
+}
+
+const draftYearLabel = computed(() => formatYearLabel(draftAstroYear.value))
+const draftJapanEra = computed(() => japanEraName(draftAstroYear.value))
+const draftWorldEra = computed(() => worldEraName(draftAstroYear.value))
+
+const liveYearLabel = computed(() => formatYearLabel(currentAstroYear.value))
+const liveJapanEra = computed(() => japanEraName(currentAstroYear.value))
+const liveWorldEra = computed(() => worldEraName(currentAstroYear.value))
+
+const recentEvents = computed(() => (sim.value?.events ?? []).slice(-40).reverse())
+
+const aliveCount = computed(() => (sim.value?.agents ?? []).filter((a) => a.alive).length)
+const totalAgents = computed(() => sim.value?.agents.length ?? 0)
 
 const statusLabel = computed(() => {
   if (!sim.value) return ''
@@ -84,6 +129,28 @@ const turnStatusLabel = computed(() => {
   if (!sim.value) return ''
   return t('turnStatus', { turn: sim.value.world.turn, status: statusLabel.value })
 })
+
+const turnOnlyLabel = computed(() => {
+  if (!sim.value) return ''
+  return t('turnLabel', { turn: sim.value.world.turn })
+})
+
+const metricItems = computed(() => {
+  const m = sim.value?.last_metrics
+  if (!m) return []
+  return [
+    { key: 'inequality', value: m.inequality, hint: 'metrics.inequalityHint' },
+    { key: 'trust', value: m.mean_trust, hint: 'metrics.trustHint' },
+    { key: 'cooperationRate', value: m.cooperation_rate, hint: 'metrics.cooperationRateHint' },
+    { key: 'authority', value: m.authority, hint: 'metrics.authorityHint' },
+    { key: 'happiness', value: m.mean_happiness, hint: 'metrics.happinessHint' },
+  ] as const
+})
+
+function actorLabel(actorId: string): string {
+  const agent = sim.value?.agents.find((a) => a.id === actorId)
+  return agent?.name ?? actorId
+}
 
 function actionLabel(action: string): string {
   const key = `actionTypes.${action}`
@@ -100,7 +167,16 @@ async function api<T>(path: string, options?: Parameters<typeof $fetch<T>>[1]): 
   return await $fetch<T>(`${apiBase}${path}`, options)
 }
 
+function stopAutoPlay() {
+  autoPlaying.value = false
+  if (autoTimer != null) {
+    clearInterval(autoTimer)
+    autoTimer = null
+  }
+}
+
 async function createSimulation() {
+  stopAutoPlay()
   busy.value = true
   error.value = ''
   try {
@@ -112,6 +188,7 @@ async function createSimulation() {
         tax_rate: taxRate.value,
         education_level: education.value,
         institution: institution.value,
+        start_year: draftAstroYear.value,
         resource_pool: 100,
       },
     })
@@ -137,9 +214,25 @@ async function tick(n = 1) {
     drawMap()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
+    stopAutoPlay()
   } finally {
     busy.value = false
   }
+}
+
+async function toggleAutoPlay() {
+  if (autoPlaying.value) {
+    stopAutoPlay()
+    return
+  }
+  if (!sim.value) return
+  autoPlaying.value = true
+  await tick(1)
+  if (!autoPlaying.value) return
+  autoTimer = setInterval(() => {
+    if (busy.value || !sim.value || !autoPlaying.value) return
+    void tick(1)
+  }, AUTO_INTERVAL_MS)
 }
 
 function settlementColor(id: string | null): string {
@@ -178,6 +271,13 @@ function drawMap() {
     ctx.stroke()
   }
 
+  // Axes labels for world coordinates
+  ctx.fillStyle = '#6b7c8f'
+  ctx.font = '10px sans-serif'
+  ctx.fillText('0', 4, h - 4)
+  ctx.fillText('100', w - 22, h - 4)
+  ctx.fillText('100', 4, 12)
+
   for (const agent of current.agents) {
     if (!agent.alive) continue
     const x = (agent.position.x / 100) * w
@@ -197,6 +297,10 @@ onMounted(() => {
   drawMap()
 })
 
+onBeforeUnmount(() => {
+  stopAutoPlay()
+})
+
 watch(sim, async () => {
   await nextTick()
   drawMap()
@@ -209,6 +313,13 @@ watch(sim, async () => {
       <div class="header-left">
         <p class="eyebrow">{{ t('brand') }}</p>
         <h1>{{ t('consoleTitle') }}</h1>
+      </div>
+      <div v-if="sim" class="header-era" aria-live="polite">
+        <span class="era-banner-year">{{ liveYearLabel }}</span>
+        <span class="header-era-sep" aria-hidden="true">·</span>
+        <span><span class="era-k">{{ t('eraPreview.japan') }}</span>{{ liveJapanEra }}</span>
+        <span class="header-era-sep" aria-hidden="true">·</span>
+        <span><span class="era-k">{{ t('eraPreview.world') }}</span>{{ liveWorldEra }}</span>
       </div>
       <div class="header-right">
         <div class="lang" role="group" :aria-label="t('language')">
@@ -241,48 +352,96 @@ watch(sim, async () => {
     <div class="grid">
       <aside class="panel sidebar">
         <h2>{{ t('initialConditions') }}</h2>
+        <label>{{ t('calendarYear') }}</label>
+        <div class="year-row">
+          <Dropdown
+            v-model="calendarEra"
+            :options="calendarEraOptions"
+            option-label="label"
+            option-value="value"
+            class="era-select"
+          />
+          <InputNumber v-model="calendarYear" :min="1" :max="50000" show-buttons class="year-input" />
+        </div>
+        <p class="hint">{{ t('calendarYearHint') }}</p>
+        <div class="era-preview">
+          <p class="era-preview-title">{{ t('eraPreview.title') }}</p>
+          <p><span class="era-k">{{ t('eraPreview.year', { label: draftYearLabel }) }}</span></p>
+          <p><span class="era-k">{{ t('eraPreview.japan') }}</span> {{ draftJapanEra }}</p>
+          <p><span class="era-k">{{ t('eraPreview.world') }}</span> {{ draftWorldEra }}</p>
+        </div>
         <label>{{ t('population') }}</label>
-        <InputNumber v-model="population" :min="2" :max="20" show-buttons class="field-control" />
+        <InputNumber v-model="population" :min="2" :max="100" show-buttons class="field-control" />
+        <p class="hint">{{ t('populationHint') }}</p>
         <label>{{ t('seed') }}</label>
         <InputNumber v-model="seed" show-buttons class="field-control" />
+        <p class="hint">{{ t('seedHint') }}</p>
         <label>{{ t('taxRate') }}</label>
         <InputNumber v-model="taxRate" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+        <p class="hint">{{ t('taxRateHint') }}</p>
         <label>{{ t('education') }}</label>
         <InputNumber v-model="education" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+        <p class="hint">{{ t('educationHint') }}</p>
         <label>{{ t('institution') }}</label>
         <Dropdown v-model="institution" :options="institutionOptions" option-label="label" option-value="value" class="field-control" />
 
         <div class="actions">
-          <Button :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy" @click="createSimulation" />
-          <Button :label="t('actions.tick')" icon="pi pi-play" class="action-btn" :disabled="!sim" :loading="busy" severity="success" @click="tick(1)" />
-          <Button :label="t('actions.tick5')" icon="pi pi-forward" class="action-btn" :disabled="!sim" :loading="busy" severity="help" @click="tick(5)" />
+          <Button :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy && !autoPlaying" @click="createSimulation" />
+          <Button :label="t('actions.tick')" icon="pi pi-step-forward" class="action-btn" :disabled="!sim || autoPlaying" :loading="busy && !autoPlaying" severity="success" @click="tick(1)" />
+          <Button :label="t('actions.tick5')" icon="pi pi-forward" class="action-btn" :disabled="!sim || autoPlaying" :loading="busy && !autoPlaying" severity="help" @click="tick(5)" />
+          <Button
+            :label="autoPlaying ? t('actions.autoStop') : t('actions.autoPlay')"
+            :icon="autoPlaying ? 'pi pi-stop' : 'pi pi-play'"
+            class="action-btn"
+            :disabled="!sim"
+            :severity="autoPlaying ? 'danger' : 'secondary'"
+            @click="toggleAutoPlay"
+          />
         </div>
+        <p class="hint">{{ t('autoPlayHint') }}</p>
 
         <p v-if="error" class="error">{{ error }}</p>
 
-        <div v-if="sim?.last_metrics" class="metrics">
+        <div v-if="metricItems.length" class="metrics">
           <h2>{{ t('metrics.title') }}</h2>
           <ul>
-            <li>{{ t('metrics.inequality') }} {{ sim.last_metrics.inequality.toFixed(3) }}</li>
-            <li>{{ t('metrics.trust') }} {{ sim.last_metrics.mean_trust.toFixed(3) }}</li>
-            <li>{{ t('metrics.cooperationRate') }} {{ sim.last_metrics.cooperation_rate.toFixed(3) }}</li>
-            <li>{{ t('metrics.authority') }} {{ sim.last_metrics.authority.toFixed(3) }}</li>
-            <li>{{ t('metrics.happiness') }} {{ sim.last_metrics.mean_happiness.toFixed(3) }}</li>
+            <li v-for="item in metricItems" :key="item.key">
+              <div class="metric-row">
+                <span class="metric-name">{{ t(`metrics.${item.key}`) }}</span>
+                <span class="metric-value">{{ item.value.toFixed(3) }}</span>
+              </div>
+              <p class="hint">{{ t(item.hint) }}</p>
+            </li>
           </ul>
         </div>
       </aside>
 
       <main class="viewport panel">
-        <h2>{{ t('map.title') }}</h2>
+        <div class="panel-heading">
+          <h2>{{ t('map.title') }}</h2>
+          <p v-if="sim" class="map-stats">
+            {{ t('map.alive', { alive: aliveCount, total: totalAgents }) }}
+            ·
+            {{ t('map.resources', { value: sim.world.resource_pool.toFixed(1) }) }}
+          </p>
+        </div>
+        <p class="hint map-legend">{{ t('map.legend') }}</p>
         <canvas ref="canvasRef" width="720" height="520" class="map" />
       </main>
 
       <section class="panel events">
-        <h2>{{ t('events.title') }}</h2>
-        <DataTable :value="recentEvents" size="small" scrollable scroll-height="520px">
-          <Column field="turn" :header="t('events.turn')" style="width: 4rem" />
-          <Column field="actor_id" :header="t('events.actor')" />
-          <Column :header="t('events.action')">
+        <div class="panel-heading events-heading">
+          <h2>{{ t('events.title') }}</h2>
+          <Tag v-if="sim" :value="turnOnlyLabel" severity="secondary" />
+        </div>
+        <p v-if="!recentEvents.length" class="hint">{{ t('events.empty') }}</p>
+        <DataTable v-else :value="recentEvents" size="small" scrollable scroll-height="480px" class="events-table">
+          <Column :header="t('events.actor')" style="width: 3.5rem">
+            <template #body="{ data }">
+              {{ actorLabel(data.actor_id) }}
+            </template>
+          </Column>
+          <Column :header="t('events.action')" style="width: 4.5rem">
             <template #body="{ data }">
               {{ actionLabel(data.action) }}
             </template>
@@ -296,22 +455,77 @@ watch(sim, async () => {
 
 <style scoped>
 .layout {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 1.25rem;
+  max-width: none;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0 0.75rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  line-break: strict;
 }
 
 .header {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 168px;
-  align-items: start;
-  gap: 1rem;
-  min-height: 4.5rem;
-  margin-bottom: 1rem;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.5rem 1rem;
+  min-height: 0;
+  padding-top: 0.25rem;
+  margin-bottom: 0.6rem;
+  flex: 0 0 auto;
 }
 
 .header-left {
   min-width: 0;
+}
+
+.header-era {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: baseline;
+  gap: 0.35rem 0.55rem;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 85%, #1e2a38);
+  font-size: 0.8rem;
+  line-height: 1.3;
+  color: var(--text);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.header-era > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-era-sep {
+  color: var(--muted);
+  opacity: 0.55;
+  flex: 0 0 auto;
+}
+
+.era-banner-year {
+  flex: 0 0 auto;
+  font-size: 0.88rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.era-k {
+  color: var(--muted);
+  font-size: 0.72rem;
+  margin-right: 0.25rem;
 }
 
 .header-right {
@@ -320,6 +534,40 @@ watch(sim, async () => {
   flex-direction: column;
   align-items: flex-end;
   gap: 0.45rem;
+  flex: 0 0 auto;
+}
+
+.year-row {
+  display: grid;
+  grid-template-columns: minmax(7.5rem, 0.9fr) minmax(0, 1.1fr);
+  gap: 0.45rem;
+  align-items: stretch;
+}
+
+.era-select,
+.year-input {
+  width: 100%;
+}
+
+.era-preview {
+  margin-top: 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  border: 1px dashed var(--line);
+  background: color-mix(in srgb, var(--panel) 70%, #121820);
+}
+
+.era-preview-title {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.era-preview p {
+  margin: 0.15rem 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .lang {
@@ -397,9 +645,12 @@ h2 {
 
 .grid {
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 340px;
-  gap: 1rem;
-  align-items: start;
+  grid-template-columns: minmax(400px, 440px) minmax(0, 1fr) minmax(360px, 400px);
+  gap: 0.75rem;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .panel {
@@ -408,10 +659,31 @@ h2 {
   border-radius: 12px;
   padding: 1rem;
   min-width: 0;
+  min-height: 0;
 }
 
 .sidebar {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  align-self: stretch;
+  max-height: 100%;
+}
+
+.panel-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.35rem;
+}
+
+.panel-heading h2 {
+  margin: 0;
+}
+
+.events-heading {
+  margin-bottom: 0.75rem;
 }
 
 label {
@@ -419,6 +691,14 @@ label {
   margin: 0.7rem 0 0.25rem;
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.hint {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  opacity: 0.9;
 }
 
 .field-control {
@@ -432,6 +712,12 @@ label {
   max-width: 100%;
   display: inline-flex;
   align-items: stretch;
+  height: 2.5rem;
+}
+
+.year-row :deep(.p-dropdown),
+.year-row :deep(.p-inputnumber) {
+  width: 100%;
   height: 2.5rem;
 }
 
@@ -487,11 +773,56 @@ label {
   white-space: nowrap;
 }
 
+.metrics {
+  margin-top: 1.25rem;
+}
+
 .metrics ul {
   margin: 0;
-  padding-left: 1rem;
+  padding: 0;
+  list-style: none;
   color: var(--text);
-  line-height: 1.7;
+}
+
+.metrics li {
+  margin-bottom: 0.85rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.metrics li:last-child {
+  border-bottom: 0;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+}
+
+.metric-name {
+  font-weight: 600;
+  font-size: 0.88rem;
+}
+
+.metric-value {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.map-stats {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.map-legend {
+  margin-bottom: 0.55rem;
 }
 
 .map {
@@ -502,6 +833,17 @@ label {
   display: block;
 }
 
+.events-table :deep(.p-datatable-tbody > tr > td) {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  line-break: strict;
+  vertical-align: top;
+}
+
+.events-table :deep(.p-datatable-thead > tr > th) {
+  white-space: nowrap;
+}
+
 .error {
   color: #ff8f8f;
   font-size: 0.85rem;
@@ -510,10 +852,24 @@ label {
 @media (max-width: 1100px) {
   .grid {
     grid-template-columns: 1fr;
+    overflow-y: auto;
+  }
+
+  .sidebar {
+    max-height: none;
+    overflow-y: visible;
   }
 
   .header {
     grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+  }
+
+  .header-era {
+    grid-column: 1 / -1;
+    order: 3;
+    flex-wrap: wrap;
+    white-space: normal;
   }
 }
 </style>

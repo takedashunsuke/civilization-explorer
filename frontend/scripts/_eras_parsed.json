@@ -1,0 +1,1382 @@
+[
+  {
+    "ja": "大化",
+    "reading": "たいか",
+    "en": "Taika",
+    "from": 645
+  },
+  {
+    "ja": "白雉",
+    "reading": "はくち",
+    "en": "Hakuchi",
+    "from": 650
+  },
+  {
+    "ja": "朱鳥",
+    "reading": "しゅちょう",
+    "en": "Shuchou",
+    "from": 686
+  },
+  {
+    "ja": "大宝",
+    "reading": "たいほう",
+    "en": "Taihou",
+    "from": 701
+  },
+  {
+    "ja": "慶雲",
+    "reading": "けいうん",
+    "en": "Keiun",
+    "from": 704
+  },
+  {
+    "ja": "和銅",
+    "reading": "わどう",
+    "en": "Wadou",
+    "from": 708
+  },
+  {
+    "ja": "霊亀",
+    "reading": "れいき",
+    "en": "Reiki",
+    "from": 715
+  },
+  {
+    "ja": "養老",
+    "reading": "ようろう",
+    "en": "Yourou",
+    "from": 717
+  },
+  {
+    "ja": "神亀",
+    "reading": "じんき",
+    "en": "Jinki",
+    "from": 724
+  },
+  {
+    "ja": "天平",
+    "reading": "てんぴょう",
+    "en": "Tenpyou",
+    "from": 729
+  },
+  {
+    "ja": "天平勝宝",
+    "reading": "てんぴょうしょうほう",
+    "en": "Tenpyoushouhou",
+    "from": 749
+  },
+  {
+    "ja": "天平宝字",
+    "reading": "てんぴょうほうじ",
+    "en": "Tenpyouhouji",
+    "from": 757
+  },
+  {
+    "ja": "天平神護",
+    "reading": "てんぴょうじんご",
+    "en": "Tenpyoujingo",
+    "from": 765
+  },
+  {
+    "ja": "神護景雲",
+    "reading": "じんごけいうん",
+    "en": "Jingokeiun",
+    "from": 767
+  },
+  {
+    "ja": "宝亀",
+    "reading": "ほうき",
+    "en": "Houki",
+    "from": 770
+  },
+  {
+    "ja": "天応",
+    "reading": "てんおう",
+    "en": "Tenou",
+    "from": 781
+  },
+  {
+    "ja": "延暦",
+    "reading": "えんりゃく",
+    "en": "Enryaku",
+    "from": 782
+  },
+  {
+    "ja": "大同",
+    "reading": "だいどう",
+    "en": "Daidou",
+    "from": 806
+  },
+  {
+    "ja": "弘仁",
+    "reading": "こうにん",
+    "en": "Kounin",
+    "from": 810
+  },
+  {
+    "ja": "天長",
+    "reading": "てんちょう",
+    "en": "Tenchou",
+    "from": 824
+  },
+  {
+    "ja": "承和",
+    "reading": "じょうわ",
+    "en": "Jouwa",
+    "from": 834
+  },
+  {
+    "ja": "嘉祥",
+    "reading": "かしょう",
+    "en": "Kashou",
+    "from": 848
+  },
+  {
+    "ja": "仁寿",
+    "reading": "にんじゅ",
+    "en": "Ninju",
+    "from": 851
+  },
+  {
+    "ja": "斉衡",
+    "reading": "さいこう",
+    "en": "Saikou",
+    "from": 854
+  },
+  {
+    "ja": "天安",
+    "reading": "てんあん",
+    "en": "Tenan",
+    "from": 857
+  },
+  {
+    "ja": "貞観",
+    "reading": "じょうがん",
+    "en": "Jougan",
+    "from": 859
+  },
+  {
+    "ja": "元慶",
+    "reading": "がんぎょう",
+    "en": "Gangyou",
+    "from": 877
+  },
+  {
+    "ja": "仁和",
+    "reading": "にんな",
+    "en": "Ninna",
+    "from": 885
+  },
+  {
+    "ja": "寛平",
+    "reading": "かんぴょう",
+    "en": "Kanpyou",
+    "from": 889
+  },
+  {
+    "ja": "昌泰",
+    "reading": "しょうたい",
+    "en": "Shoutai",
+    "from": 898
+  },
+  {
+    "ja": "延喜",
+    "reading": "えんぎ",
+    "en": "Engi",
+    "from": 901
+  },
+  {
+    "ja": "延長",
+    "reading": "えんちょう",
+    "en": "Enchou",
+    "from": 923
+  },
+  {
+    "ja": "承平",
+    "reading": "じょうへい",
+    "en": "Jouhei",
+    "from": 931
+  },
+  {
+    "ja": "天慶",
+    "reading": "てんぎょう",
+    "en": "Tengyou",
+    "from": 938
+  },
+  {
+    "ja": "天暦",
+    "reading": "てんりゃく",
+    "en": "Tenryaku",
+    "from": 947
+  },
+  {
+    "ja": "天徳",
+    "reading": "てんとく",
+    "en": "Tentoku",
+    "from": 957
+  },
+  {
+    "ja": "応和",
+    "reading": "おうわ",
+    "en": "Ouwa",
+    "from": 961
+  },
+  {
+    "ja": "康保",
+    "reading": "こうほう",
+    "en": "Kouhou",
+    "from": 964
+  },
+  {
+    "ja": "安和",
+    "reading": "あんな",
+    "en": "Anna",
+    "from": 968
+  },
+  {
+    "ja": "天禄",
+    "reading": "てんろく",
+    "en": "Tenroku",
+    "from": 970
+  },
+  {
+    "ja": "天延",
+    "reading": "てんえん",
+    "en": "Tenen",
+    "from": 974
+  },
+  {
+    "ja": "貞元",
+    "reading": "じょうげん",
+    "en": "Jougen",
+    "from": 976
+  },
+  {
+    "ja": "天元",
+    "reading": "てんげん",
+    "en": "Tengen",
+    "from": 978
+  },
+  {
+    "ja": "永観",
+    "reading": "えいかん",
+    "en": "Eikan",
+    "from": 983
+  },
+  {
+    "ja": "寛和",
+    "reading": "かんな",
+    "en": "Kanna",
+    "from": 985
+  },
+  {
+    "ja": "永延",
+    "reading": "えいえん",
+    "en": "Eien",
+    "from": 987
+  },
+  {
+    "ja": "永祚",
+    "reading": "えいそ",
+    "en": "Eiso",
+    "from": 989
+  },
+  {
+    "ja": "正暦",
+    "reading": "しょうりゃく",
+    "en": "Shouryaku",
+    "from": 990
+  },
+  {
+    "ja": "長徳",
+    "reading": "ちょうとく",
+    "en": "Choutoku",
+    "from": 995
+  },
+  {
+    "ja": "長保",
+    "reading": "ちょうほう",
+    "en": "Chouhou",
+    "from": 999
+  },
+  {
+    "ja": "寛弘",
+    "reading": "かんこう",
+    "en": "Kankou",
+    "from": 1004
+  },
+  {
+    "ja": "長和",
+    "reading": "ちょうわ",
+    "en": "Chouwa",
+    "from": 1013
+  },
+  {
+    "ja": "寛仁",
+    "reading": "かんにん",
+    "en": "Kannin",
+    "from": 1017
+  },
+  {
+    "ja": "治安",
+    "reading": "じあん",
+    "en": "Jian",
+    "from": 1021
+  },
+  {
+    "ja": "万寿",
+    "reading": "まんじゅ",
+    "en": "Manju",
+    "from": 1024
+  },
+  {
+    "ja": "長元",
+    "reading": "ちょうげん",
+    "en": "Chougen",
+    "from": 1028
+  },
+  {
+    "ja": "長暦",
+    "reading": "ちょうりゃく",
+    "en": "Chouryaku",
+    "from": 1037
+  },
+  {
+    "ja": "長久",
+    "reading": "ちょうきゅう",
+    "en": "Choukyuu",
+    "from": 1040
+  },
+  {
+    "ja": "寛徳",
+    "reading": "かんとく",
+    "en": "Kantoku",
+    "from": 1044
+  },
+  {
+    "ja": "永承",
+    "reading": "えいしょう",
+    "en": "Eishou",
+    "from": 1046
+  },
+  {
+    "ja": "天喜",
+    "reading": "てんぎ",
+    "en": "Tengi",
+    "from": 1053
+  },
+  {
+    "ja": "康平",
+    "reading": "こうへい",
+    "en": "Kouhei",
+    "from": 1058
+  },
+  {
+    "ja": "治暦",
+    "reading": "じりゃく",
+    "en": "Jiryaku",
+    "from": 1065
+  },
+  {
+    "ja": "延久",
+    "reading": "えんきゅう",
+    "en": "Enkyuu",
+    "from": 1069
+  },
+  {
+    "ja": "承保",
+    "reading": "じょうほう",
+    "en": "Jouhou",
+    "from": 1074
+  },
+  {
+    "ja": "承暦",
+    "reading": "じょうりゃく",
+    "en": "Jouryaku",
+    "from": 1077
+  },
+  {
+    "ja": "永保",
+    "reading": "えいほう",
+    "en": "Eihou",
+    "from": 1081
+  },
+  {
+    "ja": "応徳",
+    "reading": "おうとく",
+    "en": "Outoku",
+    "from": 1084
+  },
+  {
+    "ja": "寛治",
+    "reading": "かんじ",
+    "en": "Kanji",
+    "from": 1087
+  },
+  {
+    "ja": "嘉保",
+    "reading": "かほう",
+    "en": "Kahou",
+    "from": 1095
+  },
+  {
+    "ja": "永長",
+    "reading": "えいちょう",
+    "en": "Eichou",
+    "from": 1097
+  },
+  {
+    "ja": "康和",
+    "reading": "こうわ",
+    "en": "Kouwa",
+    "from": 1099
+  },
+  {
+    "ja": "長治",
+    "reading": "ちょうじ",
+    "en": "Chouji",
+    "from": 1104
+  },
+  {
+    "ja": "嘉承",
+    "reading": "かしょう",
+    "en": "Kashou",
+    "from": 1106
+  },
+  {
+    "ja": "天仁",
+    "reading": "てんにん",
+    "en": "Tennin",
+    "from": 1108
+  },
+  {
+    "ja": "天永",
+    "reading": "てんえい",
+    "en": "Tenei",
+    "from": 1110
+  },
+  {
+    "ja": "永久",
+    "reading": "えいきゅう",
+    "en": "Eikyuu",
+    "from": 1113
+  },
+  {
+    "ja": "元永",
+    "reading": "げんえい",
+    "en": "Genei",
+    "from": 1118
+  },
+  {
+    "ja": "保安",
+    "reading": "ほうあん",
+    "en": "Houan",
+    "from": 1120
+  },
+  {
+    "ja": "天治",
+    "reading": "てんじ",
+    "en": "Tenji",
+    "from": 1124
+  },
+  {
+    "ja": "大治",
+    "reading": "だいじ",
+    "en": "Daiji",
+    "from": 1126
+  },
+  {
+    "ja": "天承",
+    "reading": "てんしょう",
+    "en": "Tenshou",
+    "from": 1131
+  },
+  {
+    "ja": "長承",
+    "reading": "ちょうしょう",
+    "en": "Choushou",
+    "from": 1132
+  },
+  {
+    "ja": "保延",
+    "reading": "ほうえん",
+    "en": "Houen",
+    "from": 1135
+  },
+  {
+    "ja": "永治",
+    "reading": "えいじ",
+    "en": "Eiji",
+    "from": 1141
+  },
+  {
+    "ja": "康治",
+    "reading": "こうじ",
+    "en": "Kouji",
+    "from": 1142
+  },
+  {
+    "ja": "天養",
+    "reading": "てんよう",
+    "en": "Tenyou",
+    "from": 1144
+  },
+  {
+    "ja": "久安",
+    "reading": "きゅうあん",
+    "en": "Kyuuan",
+    "from": 1145
+  },
+  {
+    "ja": "仁平",
+    "reading": "にんぺい",
+    "en": "Ninpei",
+    "from": 1151
+  },
+  {
+    "ja": "久寿",
+    "reading": "きゅうじゅ",
+    "en": "Kyuuju",
+    "from": 1154
+  },
+  {
+    "ja": "保元",
+    "reading": "ほうげん",
+    "en": "Hougen",
+    "from": 1156
+  },
+  {
+    "ja": "平治",
+    "reading": "へいじ",
+    "en": "Heiji",
+    "from": 1159
+  },
+  {
+    "ja": "永暦",
+    "reading": "えいりゃく",
+    "en": "Eiryaku",
+    "from": 1160
+  },
+  {
+    "ja": "応保",
+    "reading": "おうほう",
+    "en": "Ouhou",
+    "from": 1161
+  },
+  {
+    "ja": "長寛",
+    "reading": "ちょうかん",
+    "en": "Choukan",
+    "from": 1163
+  },
+  {
+    "ja": "永万",
+    "reading": "えいまん",
+    "en": "Eiman",
+    "from": 1165
+  },
+  {
+    "ja": "仁安",
+    "reading": "にんあん",
+    "en": "Ninan",
+    "from": 1166
+  },
+  {
+    "ja": "嘉応",
+    "reading": "かおう",
+    "en": "Kaou",
+    "from": 1169
+  },
+  {
+    "ja": "承安",
+    "reading": "じょうあん",
+    "en": "Jouan",
+    "from": 1171
+  },
+  {
+    "ja": "安元",
+    "reading": "あんげん",
+    "en": "Angen",
+    "from": 1175
+  },
+  {
+    "ja": "治承",
+    "reading": "じしょう",
+    "en": "Jishou",
+    "from": 1177
+  },
+  {
+    "ja": "養和",
+    "reading": "ようわ",
+    "en": "Youwa",
+    "from": 1181
+  },
+  {
+    "ja": "寿永",
+    "reading": "じゅえい",
+    "en": "Juei",
+    "from": 1182
+  },
+  {
+    "ja": "元暦",
+    "reading": "げんりゃく",
+    "en": "Genryaku",
+    "from": 1184
+  },
+  {
+    "ja": "文治",
+    "reading": "ぶんじ",
+    "en": "Bunji",
+    "from": 1185
+  },
+  {
+    "ja": "建久",
+    "reading": "けんきゅう",
+    "en": "Kenkyuu",
+    "from": 1190
+  },
+  {
+    "ja": "正治",
+    "reading": "しょうじ",
+    "en": "Shouji",
+    "from": 1199
+  },
+  {
+    "ja": "建仁",
+    "reading": "けんにん",
+    "en": "Kennin",
+    "from": 1201
+  },
+  {
+    "ja": "元久",
+    "reading": "げんきゅう",
+    "en": "Genkyuu",
+    "from": 1204
+  },
+  {
+    "ja": "建永",
+    "reading": "けんえい",
+    "en": "Kenei",
+    "from": 1206
+  },
+  {
+    "ja": "承元",
+    "reading": "じょうげん",
+    "en": "Jougen",
+    "from": 1207
+  },
+  {
+    "ja": "建暦",
+    "reading": "けんりゃく",
+    "en": "Kenryaku",
+    "from": 1211
+  },
+  {
+    "ja": "建保",
+    "reading": "けんぽう",
+    "en": "Kenpou",
+    "from": 1214
+  },
+  {
+    "ja": "承久",
+    "reading": "じょうきゅう",
+    "en": "Joukyuu",
+    "from": 1219
+  },
+  {
+    "ja": "貞応",
+    "reading": "じょうおう",
+    "en": "Jouou",
+    "from": 1222
+  },
+  {
+    "ja": "元仁",
+    "reading": "げんにん",
+    "en": "Gennin",
+    "from": 1224
+  },
+  {
+    "ja": "嘉禄",
+    "reading": "かろく",
+    "en": "Karoku",
+    "from": 1225
+  },
+  {
+    "ja": "安貞",
+    "reading": "あんてい",
+    "en": "Antei",
+    "from": 1228
+  },
+  {
+    "ja": "寛喜",
+    "reading": "かんぎ",
+    "en": "Kangi",
+    "from": 1229
+  },
+  {
+    "ja": "貞永",
+    "reading": "じょうえい",
+    "en": "Jouei",
+    "from": 1232
+  },
+  {
+    "ja": "天福",
+    "reading": "てんぷく",
+    "en": "Tenpuku",
+    "from": 1233
+  },
+  {
+    "ja": "文暦",
+    "reading": "ぶんりゃく",
+    "en": "Bunryaku",
+    "from": 1234
+  },
+  {
+    "ja": "嘉禎",
+    "reading": "かてい",
+    "en": "Katei",
+    "from": 1235
+  },
+  {
+    "ja": "暦仁",
+    "reading": "りゃくにん",
+    "en": "Ryakunin",
+    "from": 1238
+  },
+  {
+    "ja": "延応",
+    "reading": "えんおう",
+    "en": "Enou",
+    "from": 1239
+  },
+  {
+    "ja": "仁治",
+    "reading": "にんじ",
+    "en": "Ninji",
+    "from": 1240
+  },
+  {
+    "ja": "寛元",
+    "reading": "かんげん",
+    "en": "Kangen",
+    "from": 1243
+  },
+  {
+    "ja": "宝治",
+    "reading": "ほうじ",
+    "en": "Houji",
+    "from": 1247
+  },
+  {
+    "ja": "建長",
+    "reading": "けんちょう",
+    "en": "Kenchou",
+    "from": 1249
+  },
+  {
+    "ja": "康元",
+    "reading": "こうげん",
+    "en": "Kougen",
+    "from": 1256
+  },
+  {
+    "ja": "正嘉",
+    "reading": "しょうか",
+    "en": "Shouka",
+    "from": 1257
+  },
+  {
+    "ja": "正元",
+    "reading": "しょうげん",
+    "en": "Shougen",
+    "from": 1259
+  },
+  {
+    "ja": "文応",
+    "reading": "ぶんおう",
+    "en": "Bunou",
+    "from": 1260
+  },
+  {
+    "ja": "弘長",
+    "reading": "こうちょう",
+    "en": "Kouchou",
+    "from": 1261
+  },
+  {
+    "ja": "文永",
+    "reading": "ぶんえい",
+    "en": "Bunei",
+    "from": 1264
+  },
+  {
+    "ja": "建治",
+    "reading": "けんじ",
+    "en": "Kenji",
+    "from": 1275
+  },
+  {
+    "ja": "弘安",
+    "reading": "こうあん",
+    "en": "Kouan",
+    "from": 1278
+  },
+  {
+    "ja": "正応",
+    "reading": "しょうおう",
+    "en": "Shouou",
+    "from": 1288
+  },
+  {
+    "ja": "永仁",
+    "reading": "えいにん",
+    "en": "Einin",
+    "from": 1293
+  },
+  {
+    "ja": "正安",
+    "reading": "しょうあん",
+    "en": "Shouan",
+    "from": 1299
+  },
+  {
+    "ja": "乾元",
+    "reading": "けんげん",
+    "en": "Kengen",
+    "from": 1302
+  },
+  {
+    "ja": "嘉元",
+    "reading": "かげん",
+    "en": "Kagen",
+    "from": 1303
+  },
+  {
+    "ja": "徳治",
+    "reading": "とくじ",
+    "en": "Tokuji",
+    "from": 1307
+  },
+  {
+    "ja": "延慶",
+    "reading": "えんきょう",
+    "en": "Enkyou",
+    "from": 1308
+  },
+  {
+    "ja": "応長",
+    "reading": "おうちょう",
+    "en": "Ouchou",
+    "from": 1311
+  },
+  {
+    "ja": "正和",
+    "reading": "しょうわ",
+    "en": "Shouwa",
+    "from": 1312
+  },
+  {
+    "ja": "文保",
+    "reading": "ぶんぽう",
+    "en": "Bunpou",
+    "from": 1317
+  },
+  {
+    "ja": "元応",
+    "reading": "げんおう",
+    "en": "Genou",
+    "from": 1319
+  },
+  {
+    "ja": "元亨",
+    "reading": "げんこう",
+    "en": "Genkou",
+    "from": 1321
+  },
+  {
+    "ja": "正中",
+    "reading": "しょうちゅう",
+    "en": "Shouchuu",
+    "from": 1324
+  },
+  {
+    "ja": "嘉暦",
+    "reading": "かりゃく",
+    "en": "Karyaku",
+    "from": 1326
+  },
+  {
+    "ja": "元徳",
+    "reading": "げんとく",
+    "en": "Gentoku",
+    "from": 1329
+  },
+  {
+    "ja": "元弘",
+    "reading": "げんこう",
+    "en": "Genkou",
+    "from": 1331
+  },
+  {
+    "ja": "建武",
+    "reading": "けんむ",
+    "en": "Kenmu",
+    "from": 1334
+  },
+  {
+    "ja": "延元",
+    "reading": "えんげん",
+    "en": "Engen",
+    "from": 1336
+  },
+  {
+    "ja": "興国",
+    "reading": "こうこく",
+    "en": "Koukoku",
+    "from": 1340
+  },
+  {
+    "ja": "正平",
+    "reading": "しょうへい",
+    "en": "Shouhei",
+    "from": 1347
+  },
+  {
+    "ja": "建徳",
+    "reading": "けんとく",
+    "en": "Kentoku",
+    "from": 1370
+  },
+  {
+    "ja": "文中",
+    "reading": "ぶんちゅう",
+    "en": "Bunchuu",
+    "from": 1372
+  },
+  {
+    "ja": "天授",
+    "reading": "てんじゅ",
+    "en": "Tenju",
+    "from": 1375
+  },
+  {
+    "ja": "弘和",
+    "reading": "こうわ",
+    "en": "Kouwa",
+    "from": 1381
+  },
+  {
+    "ja": "元中",
+    "reading": "げんちゅう",
+    "en": "Genchuu",
+    "from": 1384
+  },
+  {
+    "ja": "明徳",
+    "reading": "めいとく",
+    "en": "Meitoku",
+    "from": 1392
+  },
+  {
+    "ja": "応永",
+    "reading": "おうえい",
+    "en": "Ouei",
+    "from": 1394
+  },
+  {
+    "ja": "正長",
+    "reading": "しょうちょう",
+    "en": "Shouchou",
+    "from": 1428
+  },
+  {
+    "ja": "永享",
+    "reading": "えいきょう",
+    "en": "Eikyou",
+    "from": 1429
+  },
+  {
+    "ja": "嘉吉",
+    "reading": "かきつ",
+    "en": "Kakitsu",
+    "from": 1441
+  },
+  {
+    "ja": "文安",
+    "reading": "ぶんあん",
+    "en": "Bunan",
+    "from": 1444
+  },
+  {
+    "ja": "宝徳",
+    "reading": "ほうとく",
+    "en": "Houtoku",
+    "from": 1449
+  },
+  {
+    "ja": "享徳",
+    "reading": "きょうとく",
+    "en": "Kyoutoku",
+    "from": 1452
+  },
+  {
+    "ja": "康正",
+    "reading": "こうしょう",
+    "en": "Koushou",
+    "from": 1455
+  },
+  {
+    "ja": "長禄",
+    "reading": "ちょうろく",
+    "en": "Chouroku",
+    "from": 1457
+  },
+  {
+    "ja": "寛正",
+    "reading": "かんしょう",
+    "en": "Kanshou",
+    "from": 1461
+  },
+  {
+    "ja": "文正",
+    "reading": "ぶんしょう",
+    "en": "Bunshou",
+    "from": 1466
+  },
+  {
+    "ja": "応仁",
+    "reading": "おうにん",
+    "en": "Ounin",
+    "from": 1467
+  },
+  {
+    "ja": "文明",
+    "reading": "ぶんめい",
+    "en": "Bunmei",
+    "from": 1469
+  },
+  {
+    "ja": "長享",
+    "reading": "ちょうきょう",
+    "en": "Choukyou",
+    "from": 1487
+  },
+  {
+    "ja": "延徳",
+    "reading": "えんとく",
+    "en": "Entoku",
+    "from": 1489
+  },
+  {
+    "ja": "明応",
+    "reading": "めいおう",
+    "en": "Meiou",
+    "from": 1492
+  },
+  {
+    "ja": "文亀",
+    "reading": "ぶんき",
+    "en": "Bunki",
+    "from": 1501
+  },
+  {
+    "ja": "永正",
+    "reading": "えいしょう",
+    "en": "Eishou",
+    "from": 1504
+  },
+  {
+    "ja": "大永",
+    "reading": "たいえい",
+    "en": "Taiei",
+    "from": 1521
+  },
+  {
+    "ja": "享禄",
+    "reading": "きょうろく",
+    "en": "Kyouroku",
+    "from": 1528
+  },
+  {
+    "ja": "天文",
+    "reading": "てんぶん",
+    "en": "Tenbun",
+    "from": 1532
+  },
+  {
+    "ja": "弘治",
+    "reading": "こうじ",
+    "en": "Kouji",
+    "from": 1555
+  },
+  {
+    "ja": "永禄",
+    "reading": "えいろく",
+    "en": "Eiroku",
+    "from": 1558
+  },
+  {
+    "ja": "元亀",
+    "reading": "げんき",
+    "en": "Genki",
+    "from": 1570
+  },
+  {
+    "ja": "天正",
+    "reading": "てんしょう",
+    "en": "Tenshou",
+    "from": 1573
+  },
+  {
+    "ja": "文禄",
+    "reading": "ぶんろく",
+    "en": "Bunroku",
+    "from": 1593
+  },
+  {
+    "ja": "慶長",
+    "reading": "けいちょう",
+    "en": "Keichou",
+    "from": 1596
+  },
+  {
+    "ja": "元和",
+    "reading": "げんな",
+    "en": "Genna",
+    "from": 1615
+  },
+  {
+    "ja": "寛永",
+    "reading": "かんえい",
+    "en": "Kanei",
+    "from": 1624
+  },
+  {
+    "ja": "正保",
+    "reading": "しょうほう",
+    "en": "Shouhou",
+    "from": 1645
+  },
+  {
+    "ja": "慶安",
+    "reading": "けいあん",
+    "en": "Keian",
+    "from": 1648
+  },
+  {
+    "ja": "承応",
+    "reading": "じょうおう",
+    "en": "Jouou",
+    "from": 1652
+  },
+  {
+    "ja": "明暦",
+    "reading": "めいれき",
+    "en": "Meireki",
+    "from": 1655
+  },
+  {
+    "ja": "万治",
+    "reading": "まんじ",
+    "en": "Manji",
+    "from": 1658
+  },
+  {
+    "ja": "寛文",
+    "reading": "かんぶん",
+    "en": "Kanbun",
+    "from": 1661
+  },
+  {
+    "ja": "延宝",
+    "reading": "えんぽう",
+    "en": "Enpou",
+    "from": 1673
+  },
+  {
+    "ja": "天和",
+    "reading": "てんな",
+    "en": "Tenna",
+    "from": 1681
+  },
+  {
+    "ja": "貞享",
+    "reading": "じょうきょう",
+    "en": "Joukyou",
+    "from": 1684
+  },
+  {
+    "ja": "元禄",
+    "reading": "げんろく",
+    "en": "Genroku",
+    "from": 1688
+  },
+  {
+    "ja": "宝永",
+    "reading": "ほうえい",
+    "en": "Houei",
+    "from": 1704
+  },
+  {
+    "ja": "正徳",
+    "reading": "しょうとく",
+    "en": "Shoutoku",
+    "from": 1711
+  },
+  {
+    "ja": "享保",
+    "reading": "きょうほう",
+    "en": "Kyouhou",
+    "from": 1716
+  },
+  {
+    "ja": "元文",
+    "reading": "げんぶん",
+    "en": "Genbun",
+    "from": 1736
+  },
+  {
+    "ja": "寛保",
+    "reading": "かんぽう",
+    "en": "Kanpou",
+    "from": 1741
+  },
+  {
+    "ja": "延享",
+    "reading": "えんきょう",
+    "en": "Enkyou",
+    "from": 1744
+  },
+  {
+    "ja": "寛延",
+    "reading": "かんえん",
+    "en": "Kanen",
+    "from": 1748
+  },
+  {
+    "ja": "宝暦",
+    "reading": "ほうれき",
+    "en": "Houreki",
+    "from": 1751
+  },
+  {
+    "ja": "明和",
+    "reading": "めいわ",
+    "en": "Meiwa",
+    "from": 1764
+  },
+  {
+    "ja": "安永",
+    "reading": "あんえい",
+    "en": "Anei",
+    "from": 1772
+  },
+  {
+    "ja": "天明",
+    "reading": "てんめい",
+    "en": "Tenmei",
+    "from": 1781
+  },
+  {
+    "ja": "寛政",
+    "reading": "かんせい",
+    "en": "Kansei",
+    "from": 1789
+  },
+  {
+    "ja": "享和",
+    "reading": "きょうわ",
+    "en": "Kyouwa",
+    "from": 1801
+  },
+  {
+    "ja": "文化",
+    "reading": "ぶんか",
+    "en": "Bunka",
+    "from": 1804
+  },
+  {
+    "ja": "文政",
+    "reading": "ぶんせい",
+    "en": "Bunsei",
+    "from": 1818
+  },
+  {
+    "ja": "天保",
+    "reading": "てんぽう",
+    "en": "Tenpou",
+    "from": 1831
+  },
+  {
+    "ja": "弘化",
+    "reading": "こうか",
+    "en": "Kouka",
+    "from": 1845
+  },
+  {
+    "ja": "嘉永",
+    "reading": "かえい",
+    "en": "Kaei",
+    "from": 1848
+  },
+  {
+    "ja": "安政",
+    "reading": "あんせい",
+    "en": "Ansei",
+    "from": 1855
+  },
+  {
+    "ja": "万延",
+    "reading": "まんえん",
+    "en": "Manen",
+    "from": 1860
+  },
+  {
+    "ja": "文久",
+    "reading": "ぶんきゅう",
+    "en": "Bunkyuu",
+    "from": 1861
+  },
+  {
+    "ja": "元治",
+    "reading": "げんじ",
+    "en": "Genji",
+    "from": 1864
+  },
+  {
+    "ja": "慶応",
+    "reading": "けいおう",
+    "en": "Keiou",
+    "from": 1865
+  },
+  {
+    "ja": "明治",
+    "reading": "めいじ",
+    "en": "Meiji",
+    "from": 1868
+  },
+  {
+    "ja": "大正",
+    "reading": "たいしょう",
+    "en": "Taishou",
+    "from": 1912
+  },
+  {
+    "ja": "昭和",
+    "reading": "しょうわ",
+    "en": "Shouwa",
+    "from": 1926
+  },
+  {
+    "ja": "平成",
+    "reading": "へいせい",
+    "en": "Heisei",
+    "from": 1989
+  },
+  {
+    "ja": "令和",
+    "reading": "れいわ",
+    "en": "Reiwa",
+    "from": 2019
+  }
+]

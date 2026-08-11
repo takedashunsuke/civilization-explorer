@@ -53,8 +53,8 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
         ambi = clamp(0.4 + rng.uniform(-0.25, 0.25))
         agents.append(
             AgentState(
-                id=f"agent_{i}",
-                name=f"A{i}",
+                id=f"a{i + 1}",
+                name=f"a{i + 1}",
                 position=Position(x=rng.uniform(5, 95), y=rng.uniform(5, 95)),
                 wealth=rng.uniform(8, 20),
                 energy=clamp(0.7 + rng.uniform(-0.2, 0.2)),
@@ -84,6 +84,7 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
         education_level=params.education_level,
         tax_rate=params.tax_rate,
         institution=params.institution,
+        start_year=params.start_year,
         initial_values=params.initial_values,
         institution_runtime=InstitutionState(
             authority=0.4 + 0.3 * params.initial_values.authority_acceptance

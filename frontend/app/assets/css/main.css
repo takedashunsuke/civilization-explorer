@@ -15,10 +15,15 @@ html,
 body,
 #__nuxt {
   margin: 0;
+  height: 100%;
   min-height: 100%;
+  overflow: hidden;
   background: radial-gradient(1200px 600px at 20% -10%, #1b2838, var(--bg));
   color: var(--text);
   font-family: "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+  line-break: strict;
 }
 
 button,
