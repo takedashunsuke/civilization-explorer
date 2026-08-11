@@ -1081,12 +1081,13 @@ label {
   overflow-wrap: anywhere;
   line-break: strict;
   vertical-align: top;
+  color: var(--text-color, #212529);
 }
 
 .events-table :deep(.p-datatable-tbody > tr > td:last-child) {
   font-size: 0.7rem;
   line-height: 1.4;
-  color: var(--text);
+  color: inherit;
 }
 
 .events-table :deep(.p-datatable-thead > tr > th) {
