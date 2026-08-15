@@ -2,12 +2,25 @@
 
 ## 前提
 
-* Node.js 18+
-* Python 3.12+
+* Node.js 22.19+（Nuxt 4 の engines 要件）
+* Python 3.12+（macOS では `python` ではなく `python3` のことが多い）
 * （任意）Docker / Supabase CLI — 永続化 Phase 4 以降
 * （任意）Ollama — LLM Phase 2 以降。現状はヒューリスティック
 
 ## Backend
+
+### macOS / Linux
+
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+uvicorn main:app --reload --host 127.0.0.1 --port 8000
+```
+
+### Windows (PowerShell)
 
 ```powershell
 cd backend
@@ -22,6 +35,17 @@ uvicorn main:app --reload --host 127.0.0.1 --port 8000
 * ヘルス: http://127.0.0.1:8000/health
 
 ## Frontend
+
+### macOS / Linux
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev -- --host 127.0.0.1 --port 3000
+```
+
+### Windows (PowerShell)
 
 ```powershell
 cd frontend
