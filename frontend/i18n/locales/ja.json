@@ -41,19 +41,20 @@
   "education": "教育",
   "educationHint": "0〜1。協力の成功しやすさと資源の増え方に影響します。",
   "geography": "地理",
-  "geographyHint": "島国は日本・イギリスなどの列島、大陸は東アジア・欧州・アフリカ・北米の広い内陸に舞台を置きます。シードで場所が決まります。",
+  "geographyHint": "実験の舞台を広域で選びます。主体はその枠の中に投影されます。",
   "geographies": {
-    "island": "島国",
-    "continent": "大陸"
+    "asia": "アジア",
+    "europe": "ヨーロッパ",
+    "middle_east": "中東",
+    "america": "アメリカ",
+    "island": "アジア",
+    "continent": "ヨーロッパ"
   },
   "theaters": {
-    "japan": "日本列島",
-    "britain": "イギリス",
-    "maritime_se_asia": "東南アジア諸島",
-    "east_asia": "東アジア",
+    "asia": "アジア",
     "europe": "ヨーロッパ",
-    "africa": "アフリカ",
-    "north_america": "北アメリカ"
+    "middle_east": "中東",
+    "america": "アメリカ"
   },
   "institution": "制度",
   "institutions": {
@@ -81,17 +82,36 @@
     "happiness": "幸福",
     "happinessHint": "生存主体の幸福度の平均（0〜1）。"
   },
+  "layout": {
+    "resizeLeft": "左パネルの幅を調整",
+    "showConditions": "初期条件",
+    "hideConditions": "条件を閉じる",
+    "closeEvents": "出来事を閉じる"
+  },
   "map": {
     "title": "世界地図",
-    "legend": "地球上の点＝生存中の主体。色は集落と同じ。大きさ＝富。黄色い枠が実験の舞台。",
+    "legend": "色面＝集団の領域。人数で集団／都市／国家と表示。赤の破線＝集団間の争い。点の色は所属集団。",
     "alive": "生存 {alive} / {total}",
     "population": "人口 {alive}（初期 {initial} {delta} / 上限 {cap}）",
     "settlements": "集落 {count}",
     "resources": "共有資源 {value}",
-    "zoomHint": "ドラッグで地球を回し、スクロールで拡大。再生中も操作できます。",
+    "zoomHintFlat": "ドラッグで移動、スクロールまたはダブルクリックで拡大。",
+    "zoomHintGlobe": "ドラッグで地球を回し、スクロールまたはダブルクリックで拡大。",
     "fit": "集団",
-    "world": "地球",
-    "reset": "舞台"
+    "world": "全体",
+    "reset": "舞台",
+    "zoomIn": "拡大",
+    "zoomOut": "縮小",
+    "fitAll": "全画面に戻す",
+    "modes": {
+      "flat": "平面",
+      "globe": "地球儀"
+    },
+    "polity": {
+      "band": "集団",
+      "city": "都市",
+      "nation": "国家"
+    }
   },
   "events": {
     "title": "出来事",

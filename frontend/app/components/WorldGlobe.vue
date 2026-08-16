@@ -5,10 +5,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import { agentFill, settlementColor } from '~/utils/groupColors'
 import {
   createEarthCanvases,
-  paintTheater,
+  ensureElevation,
   pickTheater,
   simToLatLon,
   theaterCenter,
+  theaterOutline,
   theaterSpan,
   type Theater,
 } from '~/utils/earthMap'
@@ -46,7 +47,7 @@ const { t } = useI18n()
 const wrapRef = ref<HTMLElement | null>(null)
 const panning = ref(false)
 const zoomPct = ref(100)
-const theaterId = ref('japan')
+const theaterId = ref('asia')
 
 const MAX_MARKERS = 128
 const EARTH_R = 1
@@ -59,6 +60,7 @@ let controls: OrbitControls | null = null
 let earth: THREE.Mesh | null = null
 let earthMap: THREE.CanvasTexture | null = null
 let roughMap: THREE.CanvasTexture | null = null
+let theaterLine: THREE.Line | null = null
 let agentsMesh: InstancedMesh | null = null
 let halosMesh: InstancedMesh | null = null
 let raf = 0
@@ -91,6 +93,44 @@ function setZoomPct() {
   zoomPct.value = Math.round(THREE.MathUtils.clamp(((4.8 - d) / (4.8 - 1.28)) * 160, 40, 220))
 }
 
+function zoomToward(clientX: number, clientY: number, factor: number) {
+  if (!camera || !controls || !renderer) return
+  const rect = renderer.domElement.getBoundingClientRect()
+  const ndc = new THREE.Vector2(
+    ((clientX - rect.left) / rect.width) * 2 - 1,
+    -((clientY - rect.top) / rect.height) * 2 + 1,
+  )
+  const ray = new THREE.Raycaster()
+  ray.setFromCamera(ndc, camera)
+  const hit = earth ? ray.intersectObject(earth, false)[0] : undefined
+  const dir = hit ? hit.point.clone().normalize() : camera.position.clone().normalize()
+  const next = THREE.MathUtils.clamp(camera.position.length() * factor, controls.minDistance, controls.maxDistance)
+  camera.position.copy(dir.multiplyScalar(next))
+  controls.target.set(0, 0, 0)
+  camera.lookAt(0, 0, 0)
+  controls.update()
+  setZoomPct()
+}
+
+function onGlobeDblClick(ev: MouseEvent) {
+  ev.preventDefault()
+  zoomToward(ev.clientX, ev.clientY, ev.shiftKey ? 1.45 : 0.62)
+}
+
+function zoomCenter(factor: number) {
+  if (!renderer) return
+  const rect = renderer.domElement.getBoundingClientRect()
+  zoomToward(rect.left + rect.width / 2, rect.top + rect.height / 2, factor)
+}
+
+function zoomIn() {
+  zoomCenter(0.72)
+}
+
+function zoomOut() {
+  zoomCenter(1.38)
+}
+
 function lookAtLatLon(lat: number, lon: number, distance: number) {
   if (!camera || !controls) return
   const pos = latLonToVec(lat, lon, distance)
@@ -104,18 +144,42 @@ function lookAtLatLon(lat: number, lon: number, distance: number) {
 function applyEarth(theater: Theater) {
   if (!earth) return
   const { color: colorCanvas, rough } = createEarthCanvases()
-  paintTheater(colorCanvas, theater)
   earthMap?.dispose()
   roughMap?.dispose()
   earthMap = new THREE.CanvasTexture(colorCanvas)
   roughMap = new THREE.CanvasTexture(rough)
   earthMap.colorSpace = THREE.SRGBColorSpace
+  earthMap.wrapS = THREE.RepeatWrapping
+  roughMap.wrapS = THREE.RepeatWrapping
   earthMap.anisotropy = renderer?.capabilities.getMaxAnisotropy() ?? 8
+  earthMap.minFilter = THREE.LinearMipmapLinearFilter
+  earthMap.magFilter = THREE.LinearFilter
+  earthMap.generateMipmaps = true
+  roughMap.anisotropy = earthMap.anisotropy
   const mat = earth.material as THREE.MeshStandardMaterial
   mat.map = earthMap
   mat.roughnessMap = roughMap
   mat.needsUpdate = true
   theaterId.value = theater.id
+  updateTheaterLine(theater)
+}
+
+function updateTheaterLine(theater: Theater) {
+  if (!scene) return
+  if (theaterLine) {
+    scene.remove(theaterLine)
+    theaterLine.geometry.dispose()
+    const mat = theaterLine.material
+    if (!Array.isArray(mat)) mat.dispose()
+    theaterLine = null
+  }
+  const pts = theaterOutline(theater).map(([lon, lat]) => latLonToVec(lat, lon, 1.006))
+  const geo = new THREE.BufferGeometry().setFromPoints(pts)
+  theaterLine = new THREE.LineLoop(
+    geo,
+    new THREE.LineBasicMaterial({ color: 0xffd678, transparent: true, opacity: 0.7 }),
+  )
+  scene.add(theaterLine)
 }
 
 function focusTheater(animateFit = false) {
@@ -226,10 +290,12 @@ function tickFrame() {
   raf = requestAnimationFrame(tickFrame)
 }
 
-function init() {
+async function init() {
   const el = wrapRef.value
   if (!el) return
   disposed = false
+  await ensureElevation()
+  if (disposed || !wrapRef.value) return
   scene = new THREE.Scene()
   scene.fog = new THREE.FogExp2(0x04070c, 0.045)
 
@@ -240,14 +306,19 @@ function init() {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.setClearColor(0x04070c, 1)
   renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.28
   renderer.domElement.className = 'globe-canvas'
   el.appendChild(renderer.domElement)
 
-  scene.add(new THREE.AmbientLight(0x6f88a8, 0.55))
-  const key = new THREE.DirectionalLight(0xfff4e5, 1.35)
+  scene.add(new THREE.AmbientLight(0x8aa3c0, 0.62))
+  const key = new THREE.DirectionalLight(0xfff6ea, 1.7)
   key.position.set(4, 2.2, 3)
   scene.add(key)
-  scene.add(new THREE.HemisphereLight(0x9ec9ff, 0x1a2a22, 0.45))
+  const rim = new THREE.DirectionalLight(0x9ec8ff, 0.48)
+  rim.position.set(-3.2, 0.4, -2.4)
+  scene.add(rim)
+  scene.add(new THREE.HemisphereLight(0xb6d6ff, 0x243830, 0.52))
 
   const starGeo = new THREE.BufferGeometry()
   const starPos = new Float32Array(2400 * 3)
@@ -266,25 +337,20 @@ function init() {
   earthMap = new THREE.CanvasTexture(colorCanvas)
   roughMap = new THREE.CanvasTexture(rough)
   earthMap.colorSpace = THREE.SRGBColorSpace
+  earthMap.wrapS = THREE.RepeatWrapping
+  roughMap.wrapS = THREE.RepeatWrapping
   earth = new THREE.Mesh(
-    new THREE.SphereGeometry(EARTH_R, 96, 64),
+    new THREE.SphereGeometry(EARTH_R, 192, 128),
     new THREE.MeshStandardMaterial({
       map: earthMap,
       roughnessMap: roughMap,
-      roughness: 0.92,
-      metalness: 0.04,
+      roughness: 1,
+      metalness: 0,
     }),
   )
   scene.add(earth)
 
-  const atmos = new THREE.Mesh(
-    new THREE.SphereGeometry(1.045, 64, 48),
-    new THREE.ShaderMaterial({
-      side: THREE.BackSide,
-      transparent: true,
-      depthWrite: false,
-      uniforms: {},
-      vertexShader: `
+  const atmosVert = `
         varying vec3 vNormal;
         varying vec3 vView;
         void main() {
@@ -293,18 +359,45 @@ function init() {
           vView = normalize(-mv.xyz);
           gl_Position = projectionMatrix * mv;
         }
-      `,
-      fragmentShader: `
+      `
+  scene.add(
+    new THREE.Mesh(
+      new THREE.SphereGeometry(1.048, 64, 48),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        transparent: true,
+        depthWrite: false,
+        vertexShader: atmosVert,
+        fragmentShader: `
         varying vec3 vNormal;
         varying vec3 vView;
         void main() {
-          float f = pow(0.72 - dot(vNormal, vView), 2.4);
-          gl_FragColor = vec4(0.35, 0.62, 1.0, clamp(f, 0.0, 0.7));
+          float f = pow(0.62 - dot(vNormal, vView), 3.2);
+          gl_FragColor = vec4(0.40, 0.64, 1.0, clamp(f * 0.35, 0.0, 0.22));
         }
       `,
-    }),
+      }),
+    ),
   )
-  scene.add(atmos)
+  scene.add(
+    new THREE.Mesh(
+      new THREE.SphereGeometry(1.012, 64, 48),
+      new THREE.ShaderMaterial({
+        side: THREE.FrontSide,
+        transparent: true,
+        depthWrite: false,
+        vertexShader: atmosVert,
+        fragmentShader: `
+        varying vec3 vNormal;
+        varying vec3 vView;
+        void main() {
+          float f = pow(1.0 - max(dot(vNormal, vView), 0.0), 5.0);
+          gl_FragColor = vec4(0.50, 0.74, 1.0, clamp(f * 0.14, 0.0, 0.1));
+        }
+      `,
+      }),
+    ),
+  )
 
   agentsMesh = new InstancedMesh(
     new THREE.SphereGeometry(1, 12, 10),
@@ -316,7 +409,7 @@ function init() {
 
   halosMesh = new InstancedMesh(
     new THREE.SphereGeometry(1, 16, 12),
-    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.28, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.38, depthWrite: false }),
     MAX_MARKERS,
   )
   halosMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
@@ -343,6 +436,7 @@ function init() {
   renderer.domElement.addEventListener('pointerdown', () => {
     panning.value = true
   })
+  renderer.domElement.addEventListener('dblclick', onGlobeDblClick)
   window.addEventListener('pointerup', () => {
     panning.value = false
   })
@@ -363,6 +457,7 @@ function dispose() {
   controls?.dispose()
   earthMap?.dispose()
   roughMap?.dispose()
+  renderer?.domElement.removeEventListener('dblclick', onGlobeDblClick)
   renderer?.dispose()
   renderer?.domElement.remove()
   scene?.clear()
@@ -371,11 +466,14 @@ function dispose() {
   camera = null
   controls = null
   earth = null
+  theaterLine = null
   agentsMesh = null
   halosMesh = null
 }
 
-onMounted(init)
+onMounted(() => {
+  void init()
+})
 onBeforeUnmount(dispose)
 
 watch(
@@ -409,6 +507,9 @@ defineExpose({ fitToAgents, resetView, showWholeEarth })
       <button type="button" class="map-zoom-btn" @click="fitToAgents">{{ t('map.fit') }}</button>
       <button type="button" class="map-zoom-btn" @click="showWholeEarth">{{ t('map.world') }}</button>
       <button type="button" class="map-zoom-btn" @click="resetView">{{ t('map.reset') }}</button>
+      <button type="button" class="map-zoom-pm" :aria-label="t('map.zoomOut')" @click="zoomOut">−</button>
+      <button type="button" class="map-zoom-pm" :aria-label="t('map.zoomIn')" @click="zoomIn">+</button>
+      <button type="button" class="map-zoom-pm" :aria-label="t('map.fitAll')" @click="showWholeEarth">⛶</button>
     </div>
   </div>
 </template>
@@ -474,5 +575,22 @@ defineExpose({ fitToAgents, resetView, showWholeEarth })
 .map-zoom-btn:hover {
   color: var(--text);
   background: color-mix(in srgb, var(--line) 55%, transparent);
+}
+
+.map-zoom-pm {
+  margin: 0;
+  min-width: 1.45rem;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--line) 35%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  padding: 0.08rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  line-height: 1.1;
+}
+
+.map-zoom-pm:hover {
+  background: color-mix(in srgb, var(--line) 60%, transparent);
 }
 </style>

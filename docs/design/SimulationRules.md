@@ -44,7 +44,7 @@ MVP 向けの最小ルール。
 | `education_level` | number (0–1) | 教育水準。協力成功率などに影響 |
 | `tax_rate` | number (0–1) | 税率。従う選択時の徴収率 |
 | `institution` | enum | `anarchy` / `autocracy` / `democracy` |
-| `geography` | enum | `island`（島国） / `continent`（大陸）。陸地マスクの型 |
+| `geography` | enum | `asia` / `europe` / `middle_east` / `america`。地球儀上の広域舞台。地形タイルは大陸型で生成 |
 | `terrain` | object | 粗いタイル（既定 48×48）。各マスの biome は `ocean` / `coast` / `river` / `plain` / `mountain` |
 | `initial_values` | object | 初期価値観（例: 協力傾向・権威受容） |
 
@@ -277,9 +277,9 @@ power(x) = x.wealth * 0.4 + x.energy * 0.3 + x.aggression * 0.3 + noise()
 
 1. `seed` から RNG を初期化
 2. World パラメータを適用
-3. `geography` と `seed` から地形タイルを生成。観測 UI では同じ条件で地球儀上の舞台（日本／イギリス／東南アジア、または東アジア／欧州／アフリカ／北米）に投影する
+3. `geography` でアジア／ヨーロッパ／中東／アメリカの広域舞台を選び、観測 UI の地球儀に投影する
 4. Agent を `population` 人生成  
-   * position は陸タイル上（島国は海岸・川寄り）  
+   * position は陸タイル上（平野・川・海岸寄り）  
    * personality / wealth / goal を初期価値観からサンプリング  
    * 移動・出生も海には出さない（最も近い陸へスナップ） 
 5. Relationship は空（接触後に生成）で開始してよい

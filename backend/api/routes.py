@@ -23,7 +23,7 @@ class CreateSimulationRequest(BaseModel):
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     institution: str = "democracy"
     start_year: int = Field(default=700, ge=-50000, le=3000)
-    geography: str = "island"
+    geography: str = "asia"
     initial_values: dict[str, float] | None = None
 
 

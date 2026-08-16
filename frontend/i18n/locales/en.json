@@ -41,19 +41,20 @@
   "education": "Education",
   "educationHint": "0–1. Raises cooperation success chance and resource growth.",
   "geography": "Geography",
-  "geographyHint": "Islands play on Japan, Britain, or SE Asia. Continents use East Asia, Europe, Africa, or North America. Seed picks the theater.",
+  "geographyHint": "Choose a wide theater. Actors are projected inside this frame.",
   "geographies": {
-    "island": "Island",
-    "continent": "Continent"
+    "asia": "Asia",
+    "europe": "Europe",
+    "middle_east": "Middle East",
+    "america": "Americas",
+    "island": "Asia",
+    "continent": "Europe"
   },
   "theaters": {
-    "japan": "Japanese archipelago",
-    "britain": "British Isles",
-    "maritime_se_asia": "Maritime SE Asia",
-    "east_asia": "East Asia",
+    "asia": "Asia",
     "europe": "Europe",
-    "africa": "Africa",
-    "north_america": "North America"
+    "middle_east": "Middle East",
+    "america": "Americas"
   },
   "institution": "Institution",
   "institutions": {
@@ -81,17 +82,36 @@
     "happiness": "Happiness",
     "happinessHint": "Mean happiness of living actors (0–1)."
   },
+  "layout": {
+    "resizeLeft": "Resize left panel",
+    "showConditions": "Conditions",
+    "hideConditions": "Hide conditions",
+    "closeEvents": "Close events"
+  },
   "map": {
     "title": "World map",
-    "legend": "Dots on Earth = living actors. Color matches the group. Size = wealth. Yellow box = this run's theater.",
+    "legend": "Color fill = group territory. Labels scale from band to city to nation. Red dashes = clashes. Dot color matches the group.",
     "alive": "Alive {alive} / {total}",
     "population": "Pop. {alive} (start {initial} {delta} / cap {cap})",
     "settlements": "Settlements {count}",
     "resources": "Shared resources {value}",
-    "zoomHint": "Drag to orbit, scroll to zoom. Works while turns play.",
+    "zoomHintFlat": "Drag to pan. Scroll or double-click to zoom.",
+    "zoomHintGlobe": "Drag to orbit. Scroll or double-click to zoom.",
     "fit": "Groups",
-    "world": "Earth",
-    "reset": "Theater"
+    "world": "World",
+    "reset": "Theater",
+    "zoomIn": "Zoom in",
+    "zoomOut": "Zoom out",
+    "fitAll": "Fit full map",
+    "modes": {
+      "flat": "Flat",
+      "globe": "Globe"
+    },
+    "polity": {
+      "band": "Band",
+      "city": "City",
+      "nation": "Nation"
+    }
   },
   "events": {
     "title": "Events",

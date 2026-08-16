@@ -2,11 +2,10 @@
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
-import DataTable from 'primevue/datatable'
-import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import { settlementColor } from '~/utils/groupColors'
 import WorldGlobe from '~/components/WorldGlobe.vue'
+import WorldMap2D from '~/components/WorldMap2D.vue'
 
 type Agent = {
   id: string
@@ -79,6 +78,58 @@ type Simulation = {
 const AUTO_INTERVAL_MS = 800
 
 const { t, locale, setLocale } = useI18n()
+
+useHead(() => ({
+  title: t('brand'),
+}))
+
+const SIDE_MIN = 240
+const CENTER_MIN = 280
+const LEFT_DEFAULT = 360
+
+const gridEl = ref<HTMLElement | null>(null)
+const leftOpen = ref(true)
+const eventsOpen = ref(false)
+const leftWidth = ref(LEFT_DEFAULT)
+const resizing = ref(false)
+let resizeStartX = 0
+let resizeStartLeft = LEFT_DEFAULT
+
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n))
+}
+
+function startResize(event: PointerEvent) {
+  const handle = event.currentTarget as HTMLElement
+  resizing.value = true
+  resizeStartX = event.clientX
+  resizeStartLeft = leftWidth.value
+  handle.setPointerCapture(event.pointerId)
+}
+
+function onResizeMove(event: PointerEvent) {
+  if (!resizing.value || !gridEl.value) return
+  const dx = event.clientX - resizeStartX
+  const gridWidth = gridEl.value.getBoundingClientRect().width
+  const maxLeft = gridWidth - 12 - CENTER_MIN
+  leftWidth.value = Math.round(clamp(resizeStartLeft + dx, SIDE_MIN, Math.max(SIDE_MIN, maxLeft)))
+}
+
+function endResize() {
+  resizing.value = false
+}
+
+function nudgeSplitter(event: KeyboardEvent) {
+  const step = event.shiftKey ? 48 : 16
+  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+  event.preventDefault()
+  const delta = event.key === 'ArrowLeft' ? -step : step
+  if (!gridEl.value) return
+  const gridWidth = gridEl.value.getBoundingClientRect().width
+  const maxLeft = gridWidth - 12 - CENTER_MIN
+  leftWidth.value = Math.round(clamp(leftWidth.value + delta, SIDE_MIN, Math.max(SIDE_MIN, maxLeft)))
+}
+
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
 
@@ -97,7 +148,9 @@ const taxRate = ref(0.1)
 const education = ref(0.5)
 /** API には英語キーのまま送る */
 const institution = ref('democracy')
-const geography = ref('island')
+const geography = ref('asia')
+const mapMode = ref<'flat' | 'globe'>('flat')
+const globeReady = ref(false)
 
 const institutionOptions = computed(() => [
   { label: t('institutions.democracy'), value: 'democracy' },
@@ -106,8 +159,10 @@ const institutionOptions = computed(() => [
 ])
 
 const geographyOptions = computed(() => [
-  { label: t('geographies.island'), value: 'island' },
-  { label: t('geographies.continent'), value: 'continent' },
+  { label: t('geographies.asia'), value: 'asia' },
+  { label: t('geographies.europe'), value: 'europe' },
+  { label: t('geographies.middle_east'), value: 'middle_east' },
+  { label: t('geographies.america'), value: 'america' },
 ])
 
 const calendarEraOptions = computed(() => [
@@ -302,6 +357,7 @@ async function createSimulation() {
         resource_pool: 100,
       },
     })
+    leftOpen.value = false
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -343,13 +399,18 @@ async function toggleAutoPlay() {
   }, AUTO_INTERVAL_MS)
 }
 
+watch(mapMode, (mode) => {
+  if (mode === 'globe') globeReady.value = true
+})
+
 onBeforeUnmount(() => {
   stopAutoPlay()
+  endResize()
 })
 </script>
 
 <template>
-  <div class="layout">
+  <div class="layout" :class="{ 'is-resizing': resizing }">
     <div class="lang" role="group" :aria-label="t('language')">
       <button
         type="button"
@@ -408,6 +469,21 @@ onBeforeUnmount(() => {
       <div class="header-right">
         <div class="header-controls">
           <Button
+            :label="leftOpen ? t('layout.hideConditions') : t('layout.showConditions')"
+            :icon="leftOpen ? 'pi pi-angle-left' : 'pi pi-sliders-h'"
+            class="header-btn"
+            severity="secondary"
+            text
+            @click="leftOpen = !leftOpen"
+          />
+          <Button
+            :label="t('events.title')"
+            icon="pi pi-comments"
+            class="header-btn"
+            :severity="eventsOpen ? 'info' : 'secondary'"
+            @click="eventsOpen = !eventsOpen"
+          />
+          <Button
             :label="t('actions.tick')"
             icon="pi pi-step-forward"
             class="header-btn"
@@ -438,8 +514,13 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <div class="grid">
-      <aside class="panel sidebar">
+    <div
+      ref="gridEl"
+      class="grid"
+      :class="{ 'left-collapsed': !leftOpen }"
+      :style="{ '--left-w': `${leftWidth}px` }"
+    >
+      <aside v-show="leftOpen" class="panel sidebar">
         <h2>{{ t('initialConditions') }}</h2>
         <label>{{ t('calendarYear') }}</label>
         <div class="year-row">
@@ -484,9 +565,48 @@ onBeforeUnmount(() => {
         <p v-if="error" class="error">{{ error }}</p>
       </aside>
 
+      <div
+        v-show="leftOpen"
+        class="splitter"
+        role="separator"
+        aria-orientation="vertical"
+        :aria-label="t('layout.resizeLeft')"
+        :aria-valuenow="leftWidth"
+        tabindex="0"
+        @pointerdown="startResize($event)"
+        @pointermove="onResizeMove"
+        @pointerup="endResize"
+        @pointercancel="endResize"
+        @keydown="nudgeSplitter($event)"
+      />
+
       <main class="viewport panel">
         <div class="panel-heading">
-          <h2>{{ t('map.title') }}</h2>
+          <div class="map-heading">
+            <h2>{{ t('map.title') }}</h2>
+            <div class="map-tabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                class="map-tab"
+                :aria-selected="mapMode === 'flat'"
+                :class="{ active: mapMode === 'flat' }"
+                @click="mapMode = 'flat'"
+              >
+                {{ t('map.modes.flat') }}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                class="map-tab"
+                :aria-selected="mapMode === 'globe'"
+                :class="{ active: mapMode === 'globe' }"
+                @click="mapMode = 'globe'"
+              >
+                {{ t('map.modes.globe') }}
+              </button>
+            </div>
+          </div>
           <p v-if="sim" class="map-stats">
             {{ t('map.population', {
               alive: aliveCount,
@@ -499,11 +619,14 @@ onBeforeUnmount(() => {
             ·
             {{ t('map.resources', { value: sim.world.resource_pool.toFixed(1) }) }}
             ·
-            {{ t(`geographies.${sim.world.geography === 'continent' ? 'continent' : 'island'}`) }}
+            {{ t(`geographies.${sim.world.geography}`) }}
           </p>
         </div>
-        <p class="hint map-legend">{{ t('map.legend') }} {{ t('map.zoomHint') }}</p>
-        <WorldGlobe :sim="sim" :geography="geography" :seed="seed" />
+        <p class="hint map-legend">{{ t('map.legend') }} {{ mapMode === 'globe' ? t('map.zoomHintGlobe') : t('map.zoomHintFlat') }}</p>
+        <div class="map-stage">
+          <WorldMap2D v-show="mapMode === 'flat'" :sim="sim" :geography="geography" :seed="seed" />
+          <WorldGlobe v-if="globeReady" v-show="mapMode === 'globe'" :sim="sim" :geography="geography" :seed="seed" />
+        </div>
         <div v-if="metricItems.length" class="metrics">
           <h2>{{ t('metrics.title') }}</h2>
           <ul>
@@ -517,32 +640,27 @@ onBeforeUnmount(() => {
           </ul>
         </div>
       </main>
-
-      <section class="panel events">
-        <div class="panel-heading events-heading">
-          <h2>{{ t('events.title') }}</h2>
-          <Tag v-if="sim" :value="turnOnlyLabel" severity="secondary" />
-        </div>
-        <p v-if="!recentEvents.length" class="hint">{{ t('events.empty') }}</p>
-        <DataTable v-else :value="recentEvents" size="small" scrollable scroll-height="480px" class="events-table">
-          <Column :header="t('events.actor')" style="width: 4.2rem">
-            <template #body="{ data }">
-              <span class="event-actor" :style="{ color: eventActorColor(data.actor_id) }">{{ actorLabel(data.actor_id) }}</span>
-            </template>
-          </Column>
-          <Column :header="t('events.action')" style="width: 4.5rem">
-            <template #body="{ data }">
-              <span class="event-text" :style="{ color: eventActorColor(data.actor_id) }">{{ actionLabel(data.action) }}</span>
-            </template>
-          </Column>
-          <Column :header="t('events.detail')">
-            <template #body="{ data }">
-              <span class="event-text" :style="{ color: eventActorColor(data.actor_id) }">{{ eventDetail(data) }}</span>
-            </template>
-          </Column>
-        </DataTable>
-      </section>
     </div>
+
+    <aside v-if="eventsOpen" class="events-modal panel" role="dialog" :aria-label="t('events.title')">
+      <div class="panel-heading events-heading">
+        <h2>{{ t('events.title') }}</h2>
+        <div class="events-heading-actions">
+          <Tag v-if="sim" :value="turnOnlyLabel" severity="secondary" />
+          <button type="button" class="events-close" :aria-label="t('layout.closeEvents')" @click="eventsOpen = false">×</button>
+        </div>
+      </div>
+      <p v-if="!recentEvents.length" class="hint">{{ t('events.empty') }}</p>
+      <ol v-else class="event-chat">
+        <li v-for="(row, idx) in recentEvents" :key="`${row.turn}-${row.actor_id}-${row.action}-${idx}`" class="event-bubble">
+          <div class="event-bubble-meta">
+            <span class="event-actor" :style="{ color: eventActorColor(row.actor_id) }">{{ actorLabel(row.actor_id) }}</span>
+            <span class="event-action" :style="{ color: eventActorColor(row.actor_id) }">{{ actionLabel(row.action) }}</span>
+          </div>
+          <p class="event-text">{{ eventDetail(row) }}</p>
+        </li>
+      </ol>
+    </aside>
   </div>
 </template>
 
@@ -777,13 +895,52 @@ h2 {
 }
 
 .grid {
+  --left-w: 360px;
   display: grid;
-  grid-template-columns: minmax(400px, 440px) minmax(0, 1fr) minmax(360px, 400px);
-  gap: 0.75rem;
+  grid-template-columns: var(--left-w) 12px minmax(0, 1fr);
+  gap: 0;
   align-items: stretch;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+}
+
+.grid.left-collapsed {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.splitter {
+  width: 12px;
+  justify-self: stretch;
+  cursor: col-resize;
+  touch-action: none;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.splitter::after {
+  content: '';
+  display: block;
+  width: 3px;
+  height: 100%;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.splitter:hover::after,
+.splitter:focus-visible::after,
+.layout.is-resizing .splitter::after {
+  background: color-mix(in srgb, var(--accent) 70%, var(--line));
+}
+
+.layout.is-resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+.layout.is-resizing :deep(canvas) {
+  pointer-events: none;
 }
 
 .panel {
@@ -818,12 +975,102 @@ h2 {
   margin-bottom: 0.35rem;
 }
 
+.map-heading {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  min-width: 0;
+}
+
+.map-tabs {
+  display: flex;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.map-tab {
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 0.18rem 0.55rem;
+  cursor: pointer;
+}
+
+.map-tab.active {
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+  color: var(--text);
+}
+
 .panel-heading h2 {
   margin: 0;
 }
 
 .events-heading {
   margin-bottom: 0.75rem;
+}
+
+.events-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.events-modal {
+  position: fixed;
+  right: 0.85rem;
+  bottom: 0.85rem;
+  z-index: 30;
+  width: min(24rem, calc(100vw - 1.7rem));
+  height: min(70vh, 36rem);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+}
+
+.events-close {
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.1rem 0.35rem;
+}
+
+.event-chat {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.event-bubble {
+  padding: 0.45rem 0.55rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 70%, #0b1218);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.event-bubble-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.event-bubble .event-text {
+  margin: 0.25rem 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
 }
 
 label {
@@ -976,24 +1223,22 @@ label {
   margin-bottom: 0.55rem;
 }
 
-.events-table :deep(.p-datatable-tbody > tr > td) {
-  word-break: keep-all;
-  overflow-wrap: anywhere;
-  line-break: strict;
-  vertical-align: top;
+.map-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 280px;
 }
 
-.events-table :deep(.p-datatable-tbody > tr > td:last-child) {
-  font-size: 0.7rem;
-  line-height: 1.4;
+.map-stage :deep(.map-wrap) {
+  position: absolute;
+  inset: 0;
+  flex: none;
+  min-height: 0;
+  height: auto;
 }
 
 .event-actor {
   font-weight: 700;
-}
-
-.events-table :deep(.p-datatable-thead > tr > th) {
-  white-space: nowrap;
 }
 
 .error {
@@ -1002,9 +1247,14 @@ label {
 }
 
 @media (max-width: 1100px) {
-  .grid {
+  .grid,
+  .grid.left-collapsed {
     grid-template-columns: 1fr;
     overflow-y: auto;
+  }
+
+  .splitter {
+    display: none;
   }
 
   .sidebar {

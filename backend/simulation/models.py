@@ -13,6 +13,11 @@ class InstitutionType(str, Enum):
 
 
 class GeographyType(str, Enum):
+    asia = "asia"
+    europe = "europe"
+    middle_east = "middle_east"
+    america = "america"
+    # legacy values still accepted by the API
     island = "island"
     continent = "continent"
 
@@ -67,7 +72,7 @@ class WorldParams(BaseModel):
     institution: InstitutionType = InstitutionType.democracy
     # Astronomical year: AD 1 = 1, BC 1 = 0, BC 44 = -43
     start_year: int = Field(default=700, ge=-50000, le=3000)
-    geography: GeographyType = GeographyType.island
+    geography: GeographyType = GeographyType.asia
     initial_values: InitialValues = Field(default_factory=InitialValues)
 
 
@@ -119,7 +124,7 @@ class WorldState(BaseModel):
     tax_rate: float
     institution: InstitutionType
     start_year: int = 700
-    geography: GeographyType = GeographyType.island
+    geography: GeographyType = GeographyType.asia
     terrain: TerrainState = Field(default_factory=TerrainState)
     initial_values: InitialValues
     institution_runtime: InstitutionState = Field(default_factory=InstitutionState)

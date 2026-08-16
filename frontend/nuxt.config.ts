@@ -3,6 +3,11 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   // MVP の観測 UI はクライアント描画で十分（PrimeVue 3 の SSR を避ける）
   ssr: false,
+  app: {
+    head: {
+      title: 'Civilization Explorer',
+    },
+  },
   devtools: { enabled: true },
   modules: ['@nuxtjs/i18n'],
   css: [
