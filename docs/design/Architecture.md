@@ -6,13 +6,13 @@
 
 * Nuxt 4 — [Introduction](https://nuxt.com/docs/4.x/getting-started/introduction)
 * PrimeVue 3 — [Setup](https://v3.primevue.org/setup/)
-* Three.js 地球儀（世界地図）。操作 UI は PrimeVue（[ADR 0005](../decisions/0005-threejs-world-globe.md)）
+* Three.js 地球儀（補助タブ）。主画面は Canvas 2D の平面世界地図。操作 UI は PrimeVue（[ADR 0006](../decisions/0006-flat-map-primary.md)）
 
 役割
 
 * アプリの枠（ページ・ルーティング・API 連携）: **Nuxt 4**
 * 操作・一覧・数値 UI: **PrimeVue**（フォーム、表、タイムライン、メトリクス）
-* 空間可視化: **Three.js 地球儀**（Agent = 地表の点、所属色、舞台枠）
+* 空間可視化: **平面世界地図が既定**（領域・衝突・所属色）。地球儀は同一データの補助表示
 
 > PrimeVue は世界マップを描かない。パラメータ変更や Event 閲覧など「実験操作 UI」を担当する。  
 > 技術ごとの機能要件の詳細は [DesignDoc.md](./DesignDoc.md) を参照。
@@ -219,7 +219,7 @@ LLM 依存部分は後から差し替え可能な薄い層として置く。
 
 1. パラメータ入力画面（人口・資源・税率・制度など）
 2. シミュレーション開始 / 一時停止 / 1ターン進行
-3. **2D マップ**で Agent・集落の最小可視化（円＋位置＋所属色。地球背景なし）
+3. **平面世界地図**で Agent・集団領域・争いを可視化（Natural Earth。地球儀はタブ）
 4. タイムライン（Event の時系列）と簡易メトリクス表示
 5. 過去 Simulation の読み込み
 
@@ -256,7 +256,7 @@ LLM 依存部分は後から差し替え可能な薄い層として置く。
 |------|------------|
 | Agent 数 | 5〜20 |
 | 行動空間 | 協力 / 争う / 移住 / 従う（＋待機） |
-| 地図 | 簡易 2D 平面（円とクラスタ）。地球・本格 3D は作らない |
+| 地図 | Natural Earth の平面世界地図（既定）＋地球儀タブ。衛星写真・建物 3D は作らない |
 | ターン進行 | 同期 tick（全 Agent が各ターン 1 回意思決定） |
 | LLM | 構造化 JSON 出力必須、失敗時フォールバックあり |
 | 相図 UI | 作らない（発展機能） |

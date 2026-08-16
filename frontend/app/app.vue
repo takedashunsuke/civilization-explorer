@@ -3,7 +3,7 @@ import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Tag from 'primevue/tag'
-import { settlementColor } from '~/utils/groupColors'
+import { polityKind, settlementColor } from '~/utils/groupColors'
 import WorldGlobe from '~/components/WorldGlobe.vue'
 import WorldMap2D from '~/components/WorldMap2D.vue'
 
@@ -83,52 +83,8 @@ useHead(() => ({
   title: t('brand'),
 }))
 
-const SIDE_MIN = 240
-const CENTER_MIN = 280
-const LEFT_DEFAULT = 360
-
-const gridEl = ref<HTMLElement | null>(null)
-const leftOpen = ref(true)
+const conditionsOpen = ref(true)
 const eventsOpen = ref(false)
-const leftWidth = ref(LEFT_DEFAULT)
-const resizing = ref(false)
-let resizeStartX = 0
-let resizeStartLeft = LEFT_DEFAULT
-
-function clamp(n: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, n))
-}
-
-function startResize(event: PointerEvent) {
-  const handle = event.currentTarget as HTMLElement
-  resizing.value = true
-  resizeStartX = event.clientX
-  resizeStartLeft = leftWidth.value
-  handle.setPointerCapture(event.pointerId)
-}
-
-function onResizeMove(event: PointerEvent) {
-  if (!resizing.value || !gridEl.value) return
-  const dx = event.clientX - resizeStartX
-  const gridWidth = gridEl.value.getBoundingClientRect().width
-  const maxLeft = gridWidth - 12 - CENTER_MIN
-  leftWidth.value = Math.round(clamp(resizeStartLeft + dx, SIDE_MIN, Math.max(SIDE_MIN, maxLeft)))
-}
-
-function endResize() {
-  resizing.value = false
-}
-
-function nudgeSplitter(event: KeyboardEvent) {
-  const step = event.shiftKey ? 48 : 16
-  if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
-  event.preventDefault()
-  const delta = event.key === 'ArrowLeft' ? -step : step
-  if (!gridEl.value) return
-  const gridWidth = gridEl.value.getBoundingClientRect().width
-  const maxLeft = gridWidth - 12 - CENTER_MIN
-  leftWidth.value = Math.round(clamp(leftWidth.value + delta, SIDE_MIN, Math.max(SIDE_MIN, maxLeft)))
-}
 
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
@@ -210,26 +166,33 @@ const initialPopulation = computed(
 const populationCap = computed(() => sim.value?.world.population_cap ?? 100)
 const populationDelta = computed(() => aliveCount.value - initialPopulation.value)
 const settlementCount = computed(() => sim.value?.settlements?.length ?? 0)
-const totalWealth = computed(() =>
-  (sim.value?.agents ?? []).filter((a) => a.alive).reduce((sum, a) => sum + a.wealth, 0),
+const polityCounts = computed(() => {
+  let band = 0
+  let city = 0
+  let nation = 0
+  for (const settlement of sim.value?.settlements ?? []) {
+    if (settlement.member_ids.length < 2) continue
+    const kind = polityKind(settlement.member_ids.length)
+    if (kind === 'nation') nation += 1
+    else if (kind === 'city') city += 1
+    else band += 1
+  }
+  return { band, city, nation, groups: band + city + nation }
+})
+const loneCount = computed(() =>
+  (sim.value?.agents ?? []).filter((a) => a.alive && !a.settlement_id).length,
 )
-const initialWealth = computed(() => sim.value?.world.initial_total_wealth ?? totalWealth.value)
-const wealthDelta = computed(() => totalWealth.value - initialWealth.value)
-const meanHappiness = computed(() => {
-  const alive = (sim.value?.agents ?? []).filter((a) => a.alive)
-  if (!alive.length) return 0
-  return alive.reduce((sum, a) => sum + a.happiness, 0) / alive.length
+const turnActionCounts = computed(() => {
+  const turn = sim.value?.world.turn
+  const events = (sim.value?.events ?? []).filter((e) => e.turn === turn)
+  return {
+    conflict: events.filter((e) => e.action === 'conflict').length,
+    cooperate: events.filter((e) => e.action === 'cooperate').length,
+  }
 })
 const notableCount = computed(
   () => (sim.value?.agents ?? []).filter((a) => a.alive && (a.traits?.length ?? 0) > 0).length,
 )
-
-function formatDelta(value: number, digits = 0): string {
-  const n = Number(value.toFixed(digits))
-  if (n > 0) return `+${digits ? n.toFixed(digits) : n}`
-  if (n < 0) return digits ? n.toFixed(digits) : String(n)
-  return digits ? n.toFixed(digits) : '0'
-}
 
 const statusLabel = computed(() => {
   if (!sim.value) return ''
@@ -357,7 +320,7 @@ async function createSimulation() {
         resource_pool: 100,
       },
     })
-    leftOpen.value = false
+    conditionsOpen.value = false
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -405,12 +368,11 @@ watch(mapMode, (mode) => {
 
 onBeforeUnmount(() => {
   stopAutoPlay()
-  endResize()
 })
 </script>
 
 <template>
-  <div class="layout" :class="{ 'is-resizing': resizing }">
+  <div class="layout">
     <div class="lang" role="group" :aria-label="t('language')">
       <button
         type="button"
@@ -433,48 +395,19 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <header class="header">
-      <div class="header-left">
-        <p class="eyebrow">{{ t('brand') }}</p>
-        <h1>{{ t('consoleTitle') }}</h1>
-      </div>
-      <div v-if="sim" class="header-era" aria-live="polite">
-        <span class="era-banner-year">{{ liveYearLabel }}</span>
-        <span class="header-era-sep" aria-hidden="true">·</span>
-        <span><span class="era-k">{{ t('eraPreview.japan') }}</span>{{ liveJapanEra }}</span>
-        <span class="header-era-sep" aria-hidden="true">·</span>
-        <span><span class="era-k">{{ t('eraPreview.world') }}</span>{{ liveWorldEra }}</span>
-        <span class="header-era-sep" aria-hidden="true">·</span>
-        <span>
-          <span class="era-k">{{ t('headerStats.population') }}</span>
-          {{ aliveCount }}
-          <span class="stat-delta" :class="populationDelta >= 0 ? 'up' : 'down'">{{ formatDelta(populationDelta) }}</span>
-        </span>
-        <span class="header-era-sep" aria-hidden="true">·</span>
-        <span>
-          <span class="era-k">{{ t('headerStats.wealth') }}</span>
-          {{ totalWealth.toFixed(0) }}
-          <span class="stat-delta" :class="wealthDelta >= 0 ? 'up' : 'down'">{{ formatDelta(wealthDelta, 0) }}</span>
-        </span>
-        <span class="header-era-sep" aria-hidden="true">·</span>
-        <span>
-          <span class="era-k">{{ t('headerStats.happiness') }}</span>
-          {{ meanHappiness.toFixed(2) }}
-        </span>
-        <span class="header-era-sep" aria-hidden="true">·</span>
-        <span>
-          <span class="era-k">{{ t('headerStats.notables') }}</span>
-          {{ notableCount }}
-        </span>
-      </div>
-      <div class="header-right">
+      <div class="header-top">
+        <div class="header-left">
+          <p class="eyebrow">{{ t('brand') }}</p>
+          <h1>{{ t('consoleTitle') }}</h1>
+        </div>
+        <div class="header-right">
         <div class="header-controls">
           <Button
-            :label="leftOpen ? t('layout.hideConditions') : t('layout.showConditions')"
-            :icon="leftOpen ? 'pi pi-angle-left' : 'pi pi-sliders-h'"
+            :label="conditionsOpen ? t('layout.hideConditions') : t('layout.showConditions')"
+            icon="pi pi-sliders-h"
             class="header-btn"
-            severity="secondary"
-            text
-            @click="leftOpen = !leftOpen"
+            :severity="conditionsOpen ? 'info' : 'secondary'"
+            @click="conditionsOpen = !conditionsOpen"
           />
           <Button
             :label="t('events.title')"
@@ -511,75 +444,35 @@ onBeforeUnmount(() => {
           />
         </div>
         <Tag v-if="sim" :value="turnStatusLabel" severity="info" />
+        </div>
+      </div>
+      <div v-if="sim" class="header-era" aria-live="polite">
+        <div class="header-era-row">
+          <span class="era-banner-year">{{ liveYearLabel }}</span>
+          <span class="header-era-sep" aria-hidden="true">·</span>
+          <span><span class="era-k">{{ t('eraPreview.japan') }}</span>{{ liveJapanEra }}</span>
+          <span class="header-era-sep" aria-hidden="true">·</span>
+          <span><span class="era-k">{{ t('eraPreview.world') }}</span>{{ liveWorldEra }}</span>
+        </div>
+        <div class="header-era-row">
+          <span><span class="era-k">{{ t('headerStats.groups') }}</span>{{ polityCounts.groups }}</span>
+          <span class="header-era-sep" aria-hidden="true">·</span>
+          <span><span class="era-k">{{ t('headerStats.cities') }}</span>{{ polityCounts.city }}</span>
+          <span class="header-era-sep" aria-hidden="true">·</span>
+          <span><span class="era-k">{{ t('headerStats.nations') }}</span>{{ polityCounts.nation }}</span>
+          <span class="header-era-sep" aria-hidden="true">·</span>
+          <span><span class="era-k">{{ t('headerStats.lone') }}</span>{{ loneCount }}</span>
+          <span class="header-era-sep" aria-hidden="true">·</span>
+          <span><span class="era-k">{{ t('headerStats.clashes') }}</span>{{ turnActionCounts.conflict }}</span>
+          <span class="header-era-sep" aria-hidden="true">·</span>
+          <span><span class="era-k">{{ t('headerStats.coops') }}</span>{{ turnActionCounts.cooperate }}</span>
+          <span class="header-era-sep" aria-hidden="true">·</span>
+          <span><span class="era-k">{{ t('headerStats.notables') }}</span>{{ notableCount }}</span>
+        </div>
       </div>
     </header>
 
-    <div
-      ref="gridEl"
-      class="grid"
-      :class="{ 'left-collapsed': !leftOpen }"
-      :style="{ '--left-w': `${leftWidth}px` }"
-    >
-      <aside v-show="leftOpen" class="panel sidebar">
-        <h2>{{ t('initialConditions') }}</h2>
-        <label>{{ t('calendarYear') }}</label>
-        <div class="year-row">
-          <Dropdown
-            v-model="calendarEra"
-            :options="calendarEraOptions"
-            option-label="label"
-            option-value="value"
-            class="era-select"
-          />
-          <InputNumber v-model="calendarYear" :min="1" :max="50000" show-buttons class="year-input" />
-        </div>
-        <p class="hint">{{ t('calendarYearHint') }}</p>
-        <div class="era-preview">
-          <p class="era-preview-title">{{ t('eraPreview.title') }}</p>
-          <p><span class="era-k">{{ t('eraPreview.year', { label: draftYearLabel }) }}</span></p>
-          <p><span class="era-k">{{ t('eraPreview.japan') }}</span> {{ draftJapanEra }}</p>
-          <p><span class="era-k">{{ t('eraPreview.world') }}</span> {{ draftWorldEra }}</p>
-        </div>
-        <label>{{ t('population') }}</label>
-        <InputNumber v-model="population" :min="2" :max="100" show-buttons class="field-control" />
-        <p class="hint">{{ t('populationHint') }}</p>
-        <label>{{ t('seed') }}</label>
-        <InputNumber v-model="seed" show-buttons class="field-control" />
-        <p class="hint">{{ t('seedHint') }}</p>
-        <label>{{ t('taxRate') }}</label>
-        <InputNumber v-model="taxRate" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
-        <p class="hint">{{ t('taxRateHint') }}</p>
-        <label>{{ t('education') }}</label>
-        <InputNumber v-model="education" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
-        <p class="hint">{{ t('educationHint') }}</p>
-        <label>{{ t('geography') }}</label>
-        <Dropdown v-model="geography" :options="geographyOptions" option-label="label" option-value="value" class="field-control" />
-        <p class="hint">{{ t('geographyHint') }}</p>
-        <label>{{ t('institution') }}</label>
-        <Dropdown v-model="institution" :options="institutionOptions" option-label="label" option-value="value" class="field-control" />
-
-        <div class="actions">
-          <Button :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy && !autoPlaying" @click="createSimulation" />
-        </div>
-
-        <p v-if="error" class="error">{{ error }}</p>
-      </aside>
-
-      <div
-        v-show="leftOpen"
-        class="splitter"
-        role="separator"
-        aria-orientation="vertical"
-        :aria-label="t('layout.resizeLeft')"
-        :aria-valuenow="leftWidth"
-        tabindex="0"
-        @pointerdown="startResize($event)"
-        @pointermove="onResizeMove"
-        @pointerup="endResize"
-        @pointercancel="endResize"
-        @keydown="nudgeSplitter($event)"
-      />
-
+    <div class="grid">
       <main class="viewport panel">
         <div class="panel-heading">
           <div class="map-heading">
@@ -642,6 +535,75 @@ onBeforeUnmount(() => {
       </main>
     </div>
 
+    <div v-if="conditionsOpen" class="modal-backdrop" @click="conditionsOpen = false" />
+    <aside
+      v-if="conditionsOpen"
+      class="conditions-modal panel"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('initialConditions')"
+    >
+      <div class="panel-heading events-heading">
+        <h2>{{ t('initialConditions') }}</h2>
+        <button type="button" class="events-close" :aria-label="t('layout.closeConditions')" @click="conditionsOpen = false">×</button>
+      </div>
+      <div class="conditions-form">
+        <div class="conditions-field">
+          <label>{{ t('calendarYear') }}</label>
+          <div class="year-row">
+            <Dropdown
+              v-model="calendarEra"
+              :options="calendarEraOptions"
+              option-label="label"
+              option-value="value"
+              class="era-select"
+            />
+            <InputNumber v-model="calendarYear" :min="1" :max="50000" show-buttons class="year-input" />
+          </div>
+          <p class="hint">{{ t('calendarYearHint') }}</p>
+        </div>
+        <div class="era-preview">
+          <p class="era-preview-title">{{ t('eraPreview.title') }}</p>
+          <p><span class="era-k">{{ t('eraPreview.year', { label: draftYearLabel }) }}</span></p>
+          <p><span class="era-k">{{ t('eraPreview.japan') }}</span> {{ draftJapanEra }}</p>
+          <p><span class="era-k">{{ t('eraPreview.world') }}</span> {{ draftWorldEra }}</p>
+        </div>
+        <div class="conditions-field">
+          <label>{{ t('population') }}</label>
+          <InputNumber v-model="population" :min="2" :max="100" show-buttons class="field-control" />
+          <p class="hint">{{ t('populationHint') }}</p>
+        </div>
+        <div class="conditions-field">
+          <label>{{ t('seed') }}</label>
+          <InputNumber v-model="seed" show-buttons class="field-control" />
+          <p class="hint">{{ t('seedHint') }}</p>
+        </div>
+        <div class="conditions-field">
+          <label>{{ t('taxRate') }}</label>
+          <InputNumber v-model="taxRate" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+          <p class="hint">{{ t('taxRateHint') }}</p>
+        </div>
+        <div class="conditions-field">
+          <label>{{ t('education') }}</label>
+          <InputNumber v-model="education" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+          <p class="hint">{{ t('educationHint') }}</p>
+        </div>
+        <div class="conditions-field">
+          <label>{{ t('geography') }}</label>
+          <Dropdown v-model="geography" :options="geographyOptions" option-label="label" option-value="value" class="field-control" />
+          <p class="hint">{{ t('geographyHint') }}</p>
+        </div>
+        <div class="conditions-field">
+          <label>{{ t('institution') }}</label>
+          <Dropdown v-model="institution" :options="institutionOptions" option-label="label" option-value="value" class="field-control" />
+        </div>
+        <div class="actions">
+          <Button :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy && !autoPlaying" @click="createSimulation" />
+        </div>
+        <p v-if="error" class="error">{{ error }}</p>
+      </div>
+    </aside>
+
     <aside v-if="eventsOpen" class="events-modal panel" role="dialog" :aria-label="t('events.title')">
       <div class="panel-heading events-heading">
         <h2>{{ t('events.title') }}</h2>
@@ -682,15 +644,22 @@ onBeforeUnmount(() => {
 
 .header {
   --header-bar-h: 2.25rem;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 0.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
   min-height: 0;
   padding-top: 0.25rem;
   padding-right: 4.25rem;
   margin-bottom: 0.6rem;
   flex: 0 0 auto;
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-width: 0;
 }
 
 .header-left {
@@ -699,48 +668,30 @@ onBeforeUnmount(() => {
 
 .header-era {
   display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: 0.35rem 0.55rem;
-  height: var(--header-bar-h);
+  flex-direction: column;
+  gap: 0.28rem;
   min-width: 0;
-  overflow: hidden;
-  padding: 0 0.7rem;
+  padding: 0.4rem 0.7rem;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: color-mix(in srgb, var(--panel) 85%, #1e2a38);
   font-size: 0.8rem;
-  line-height: 1;
+  line-height: 1.2;
   color: var(--text);
-  white-space: nowrap;
-  text-overflow: ellipsis;
   box-sizing: border-box;
 }
 
-.header-era > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.header-era-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem 0.55rem;
 }
 
 .header-era-sep {
   color: var(--muted);
   opacity: 0.55;
   flex: 0 0 auto;
-}
-
-.stat-delta {
-  margin-left: 0.2rem;
-  font-variant-numeric: tabular-nums;
-  font-size: 0.72rem;
-}
-
-.stat-delta.up {
-  color: #7dcea0;
-}
-
-.stat-delta.down {
-  color: #f1948a;
 }
 
 .era-banner-year {
@@ -895,52 +846,13 @@ h2 {
 }
 
 .grid {
-  --left-w: 360px;
   display: grid;
-  grid-template-columns: var(--left-w) 12px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 0;
   align-items: stretch;
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
-}
-
-.grid.left-collapsed {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.splitter {
-  width: 12px;
-  justify-self: stretch;
-  cursor: col-resize;
-  touch-action: none;
-  border-radius: 999px;
-  background: transparent;
-}
-
-.splitter::after {
-  content: '';
-  display: block;
-  width: 3px;
-  height: 100%;
-  margin: 0 auto;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--line) 80%, transparent);
-}
-
-.splitter:hover::after,
-.splitter:focus-visible::after,
-.layout.is-resizing .splitter::after {
-  background: color-mix(in srgb, var(--accent) 70%, var(--line));
-}
-
-.layout.is-resizing {
-  cursor: col-resize;
-  user-select: none;
-}
-
-.layout.is-resizing :deep(canvas) {
-  pointer-events: none;
 }
 
 .panel {
@@ -952,12 +864,43 @@ h2 {
   min-height: 0;
 }
 
-.sidebar {
-  overflow-x: hidden;
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 35;
+  background: rgba(4, 8, 14, 0.55);
+}
+
+.conditions-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 40;
+  width: min(44rem, calc(100vw - 2rem));
+  max-height: min(86vh, 40rem);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+}
+
+.conditions-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 1.1rem;
   overflow-y: auto;
-  overscroll-behavior: contain;
-  align-self: stretch;
-  max-height: 100%;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding-right: 0.15rem;
+}
+
+.conditions-form .actions,
+.conditions-form .error {
+  grid-column: 1 / -1;
+}
+
+.conditions-field label {
+  margin-top: 0.45rem;
 }
 
 .viewport {
@@ -1093,8 +1036,8 @@ label {
   max-width: 100%;
 }
 
-.sidebar :deep(.p-inputnumber),
-.sidebar :deep(.p-dropdown) {
+.conditions-modal :deep(.p-inputnumber),
+.conditions-modal :deep(.p-dropdown) {
   width: 100%;
   max-width: 100%;
   display: inline-flex;
@@ -1108,25 +1051,25 @@ label {
   height: 2.5rem;
 }
 
-.sidebar :deep(.p-inputnumber-input) {
+.conditions-modal :deep(.p-inputnumber-input) {
   min-width: 0;
   flex: 1 1 auto;
   height: 100%;
   box-sizing: border-box;
 }
 
-.sidebar :deep(.p-dropdown) {
+.conditions-modal :deep(.p-dropdown) {
   min-width: 0;
   flex: 1 1 auto;
 }
 
-.sidebar :deep(.p-dropdown .p-dropdown-label),
-.sidebar :deep(.p-dropdown .p-dropdown-trigger) {
+.conditions-modal :deep(.p-dropdown .p-dropdown-label),
+.conditions-modal :deep(.p-dropdown .p-dropdown-trigger) {
   display: flex;
   align-items: center;
 }
 
-.sidebar :deep(.p-inputnumber-button-group) {
+.conditions-modal :deep(.p-inputnumber-button-group) {
   flex: 0 0 auto;
   display: flex;
   flex-direction: column;
@@ -1134,7 +1077,7 @@ label {
   height: 100%;
 }
 
-.sidebar :deep(.p-inputnumber-button) {
+.conditions-modal :deep(.p-inputnumber-button) {
   flex: 1 1 0;
   width: 2rem;
   margin: 0;
@@ -1247,31 +1190,8 @@ label {
 }
 
 @media (max-width: 1100px) {
-  .grid,
-  .grid.left-collapsed {
+  .conditions-form {
     grid-template-columns: 1fr;
-    overflow-y: auto;
-  }
-
-  .splitter {
-    display: none;
-  }
-
-  .sidebar {
-    max-height: none;
-    overflow-y: visible;
-  }
-
-  .header {
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-  }
-
-  .header-era {
-    grid-column: 1 / -1;
-    order: 3;
-    flex-wrap: wrap;
-    white-space: normal;
   }
 }
 </style>

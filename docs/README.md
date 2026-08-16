@@ -19,7 +19,7 @@ Civilization Explorer のドキュメント置き場。
 | 技術 | URL |
 |------|-----|
 | Nuxt 4 | https://nuxt.com/docs/4.x/getting-started/introduction |
-| Three.js（任意） | https://threejs.org/docs/ |
+| Three.js | https://threejs.org/docs/（地球儀は補助。平面地図は Canvas 2D） |
 | Supabase CLI | https://supabase.com/docs/guides/local-development/cli/getting-started |
 | Drizzle ORM | https://orm.drizzle.team/ |
 | Better Auth | https://www.better-auth.com/ |

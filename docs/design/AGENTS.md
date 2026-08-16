@@ -11,14 +11,16 @@
 3. [Architecture.md](./Architecture.md) — スタックと実装 Phase
 4. [ADR 0003](../decisions/0003-drizzle-orm.md) — 永続化は Drizzle（SQLAlchemy は使わない）
 5. [ADR 0004](../decisions/0004-better-auth.md) — 認証は Better Auth 予定（MVP では実装しない）
-6. （テーマ根拠）[../hackathon/review.md](../hackathon/review.md)
+6. [ADR 0006](../decisions/0006-flat-map-primary.md) — 観測の主画面は平面世界地図
+7. （テーマ根拠）[../hackathon/review.md](../hackathon/review.md)
 
 ## プロダクトの立ち位置（短く）
 
 * AI は人間支援チャットではなく、**社会を形成する主体**
 * 人間は初期条件・制度（世界の法則）だけを変え、創発を観測する
 * シミュレーションは真理の証明ではなく仮説探索
-* 可視化は **Three.js の地球儀**（世界地図。建物モデルや衛星写真は広げない）
+* 可視化の既定は **Natural Earth の平面地図**（集団の領域・衝突）。地球儀は補助。衛星写真・建物モデルは広げない（[ADR 0006](../decisions/0006-flat-map-primary.md)）
+* 初期条件は中央モーダル、出来事はチャット型パネル。地図を常時広くする
 * 認証は将来 Better Auth + Drizzle。**MVP ではログインを作らない**
 
 ## 作業ルール

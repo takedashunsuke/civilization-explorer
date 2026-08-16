@@ -1,8 +1,9 @@
 # 0005. 可視化は Three.js の世界地図（地球儀）
 
-- Status: accepted
+- Status: accepted（主画面の既定は [0006](./0006-flat-map-primary.md) で平面地図に改正）
 - Date: 2026-08-11
 - Supersedes: [0002](./0002-2d-visualization.md)
+- Amended by: [0006](./0006-flat-map-primary.md)
 
 ## Context
 

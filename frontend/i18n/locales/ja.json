@@ -27,9 +27,12 @@
     "year": "{label}"
   },
   "headerStats": {
-    "population": "人口",
-    "wealth": "富",
-    "happiness": "幸福",
+    "groups": "集団",
+    "cities": "都市",
+    "nations": "国家",
+    "lone": "未所属",
+    "clashes": "争い",
+    "coops": "共同",
     "notables": "特異"
   },
   "population": "人口",
@@ -83,9 +86,9 @@
     "happinessHint": "生存主体の幸福度の平均（0〜1）。"
   },
   "layout": {
-    "resizeLeft": "左パネルの幅を調整",
     "showConditions": "初期条件",
     "hideConditions": "条件を閉じる",
+    "closeConditions": "初期条件を閉じる",
     "closeEvents": "出来事を閉じる"
   },
   "map": {

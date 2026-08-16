@@ -27,9 +27,12 @@
     "year": "{label}"
   },
   "headerStats": {
-    "population": "Pop.",
-    "wealth": "Wealth",
-    "happiness": "Happy",
+    "groups": "Groups",
+    "cities": "Cities",
+    "nations": "Nations",
+    "lone": "Unaffiliated",
+    "clashes": "Clashes",
+    "coops": "Co-ops",
     "notables": "Notable"
   },
   "population": "Population",
@@ -83,9 +86,9 @@
     "happinessHint": "Mean happiness of living actors (0–1)."
   },
   "layout": {
-    "resizeLeft": "Resize left panel",
     "showConditions": "Conditions",
     "hideConditions": "Hide conditions",
+    "closeConditions": "Close conditions",
     "closeEvents": "Close events"
   },
   "map": {

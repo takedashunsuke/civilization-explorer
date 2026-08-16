@@ -10,7 +10,8 @@
 |----------|------|--------|
 | [0001-local-runtime-and-supabase.md](./0001-local-runtime-and-supabase.md) | ローカル実行＋DB は Supabase（Docker） | accepted |
 | [0002-2d-visualization.md](./0002-2d-visualization.md) | 可視化は 2D 中心（地球・本格 3D は不要） | superseded |
-| [0005-threejs-world-globe.md](./0005-threejs-world-globe.md) | 可視化は Three.js の世界地図（地球儀） | accepted |
+| [0005-threejs-world-globe.md](./0005-threejs-world-globe.md) | 可視化は Three.js の世界地図（地球儀） | accepted（0006 で既定を平面に改正） |
+| [0006-flat-map-primary.md](./0006-flat-map-primary.md) | 観測の主画面は Natural Earth の平面地図 | accepted |
 | [0003-drizzle-orm.md](./0003-drizzle-orm.md) | DB ORM は Drizzle（永続化は Nuxt / TypeScript） | accepted |
 | [0004-better-auth.md](./0004-better-auth.md) | 認証は Better Auth + Drizzle（将来）。MVP は未実装 | accepted |
 
