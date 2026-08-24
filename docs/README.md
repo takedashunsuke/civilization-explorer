@@ -7,7 +7,7 @@ Civilization Explorer のドキュメント置き場。
 | [design/](./design/) | 要件・設計・ルール・エージェント指針 |
 | [updates/](./updates/) | 進捗メモ・変更記録（日付ごと） |
 | [guides/](./guides/) | セットアップ・デモ・運用手順 |
-| [hackathon/](./hackathon/) | ハッカソン発表・デモ資料（テーマ根拠 [review.md](./hackathon/review.md) 含む） |
+| [hackathon/](./hackathon/) | ハッカソン発表・デモ・**提出物**（[submission.md](./hackathon/submission.md)） |
 | [decisions/](./decisions/) | 設計判断の記録（ADR） |
 
 詳細な索引は各ディレクトリの `README.md` を参照。

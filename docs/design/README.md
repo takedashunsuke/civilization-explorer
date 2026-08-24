@@ -11,6 +11,8 @@
 | [AGENTS.md](./AGENTS.md) | AI（開発エージェント）向け実装指針 | 初版 |
 | [memo.md](./memo.md) | テーマ原案と提出1週間前の方針圧縮・TODO | メモ（仕様の正ではない） |
 
+提出物の索引: [../hackathon/submission.md](../hackathon/submission.md)
+
 テーマ根拠（ハッカソン）: [../hackathon/review.md](../hackathon/review.md)
 
 変更が入ったら、要点を [../updates/](../updates/) にも残す。

@@ -1,93 +1,102 @@
 # Civilization Explorer
 
-**AIエージェントが社会を創発し、人間がその法則を探索するプラットフォーム**
+**AI エージェントが社会を創発し、人間がその法則を探索するプラットフォーム**
 
-> What if...? を何万回も試す。
+> What if...? を何度も試す。
 
-人間は初期条件・環境・制度だけを変え、AIエージェント同士の相互作用から文明が生まれる過程を観測する。  
+人間は初期条件・環境・制度だけを変え、エージェント同士の相互作用から文明が生まれる過程を観測する。  
 AI 文明そのものが目的ではなく、**人間社会の問い（格差・権力・幸福・少数派など）を探る実験場**として使う。
 
-ハッカソン第2回に向けたテーマ根拠: [docs/hackathon/review.md](./docs/hackathon/review.md)
+| | |
+|--|--|
+| GitHub | https://github.com/tsuide-takeda/civ-explorer |
+| 提出物一覧 | [docs/hackathon/submission.md](./docs/hackathon/submission.md) |
+| 実行結果 | [docs/hackathon/RESULTS.md](./docs/hackathon/RESULTS.md) |
+| プレゼン原稿 | [docs/hackathon/slides.md](./docs/hackathon/slides.md) |
+| テーマ根拠 | [docs/hackathon/review.md](./docs/hackathon/review.md) |
 
 ---
 
-## コンセプト
+## 目的
 
-社会シミュレーションの目的は「未来予測」でも「人間への助言」でもない。
+社会シミュレーションは未来予測でも、人間への助言でもない。
 
-**どんな条件から、どんな文明が繰り返し生まれるのか**を探索するための実験環境である。
+**どんな条件から、どんな文明が繰り返し生まれるのか**を探索する。
 
 | 役割 | やること |
 |------|----------|
 | 人間 | 世界の法則と初期条件を変え、結果を観測・比較する |
-| AI Agent | 協力・争い・移住・服従などを自律的に意思決定する |
+| Agent | 協力・争い・移住・服従などを自律的に決める |
+
+今回のデモで固定する問い（案）: **制度は、次に生き残りやすい人物タイプをどう選別するか。**
 
 ---
 
-## MVP の完成ライン
+## いま動く範囲
 
-1. LLMエージェントが自律的に社会を形成すること
-2. その過程を 2D マップで直感的に観測できること
-3. 結果を構造化して蓄積し、同条件で再実行できること
+- 初期条件（年・舞台・大陸/島・気候・人口・制度・税率・教育・seed）からシミュレーションを作成できる
+- Tick でエージェントが動き、集団領域・争い・出来事が平面世界地図に出る
+- 意思決定は **ヒューリスティック**（LLM 接続は未了。提出前の最優先）
 
-「文明の相図」などの高度な比較 UI は発展機能とする。
+やらない（MVP）: 支援チャット、正解の制度提案、衛星写真、地球儀を主画面にすること、数千回バッチ UI
 
 ---
 
-## 技術スタック
+## 実行環境
 
 | 層 | 技術 |
 |----|------|
-| Frontend | Nuxt 4 / PrimeVue / 2D マップ（Canvas または SVG） |
-| Backend | Python / FastAPI（シミュレーション・LLM） |
-| LLM | Ollama（ローカル） / OpenAI API（切替可） |
-| DB | Supabase CLI（Docker 上の PostgreSQL） |
-| ORM | [Drizzle ORM](https://orm.drizzle.team/)（Nuxt Nitro 側で永続化） |
-| Auth（将来） | [Better Auth](https://www.better-auth.com/) + Drizzle（MVP では未実装） |
+| Frontend | Nuxt 4 / Vue 3 / PrimeVue 3 / Canvas 2D 平面地図 |
+| Backend | Python 3.12+ / FastAPI |
+| LLM（予定） | Ollama（ローカル）または OpenAI 等（`.env` で切替） |
+| DB | MVP では未接続。将来 Drizzle + ローカル Postgres（Supabase CLI） |
 
-詳細な実装手順は [docs/design/Architecture.md](./docs/design/Architecture.md) を参照。  
-ローカル起動・Ollama: [docs/guides/setup.md](./docs/guides/setup.md)
+必要なもの:
 
-### いま動くもの（スタブ）
+- Node.js 22.19 以上
+- Python 3.12 以上
+- （任意）[Ollama](https://ollama.com/download) — LLM 接続後
 
-```powershell
-# 端末1
-cd backend
-.\.venv\Scripts\Activate.ps1   # 初回は venv + pip install -r requirements.txt
-uvicorn main:app --reload --host 127.0.0.1 --port 8000
-
-# 端末2
-cd frontend
-npm run dev -- --host 127.0.0.1 --port 3000
-```
-
-* UI: http://127.0.0.1:3000/
-* API docs: http://127.0.0.1:8000/docs
-
-Create → Tick でヒューリスティック意思決定の文明が回り、2D マップと Event が更新される。  
-LLM の実呼び出しは Phase 2。Ollama は **ホストで動かす**（Docker 不要）。
-
-```bash
-# インストール後
-ollama pull llama3.2:1b
-```
-
-`backend/.env` で `LLM_PROVIDER=ollama`、`OLLAMA_BASE_URL=http://127.0.0.1:11434`、`OLLAMA_MODEL=llama3.2:1b`。詳細は [docs/guides/setup.md](./docs/guides/setup.md)。
-
+詳細: [docs/guides/setup.md](./docs/guides/setup.md)
 
 ---
 
-## 公式ドキュメント（参照）
+## 使い方
 
-| 技術 | ドキュメント |
-|------|--------------|
-| Nuxt 4 | [Introduction](https://nuxt.com/docs/4.x/getting-started/introduction) |
-| Three.js（任意） | [Docs](https://threejs.org/docs/) |
-| Supabase CLI | [Getting started](https://supabase.com/docs/guides/local-development/cli/getting-started) |
-| Drizzle ORM | [orm.drizzle.team](https://orm.drizzle.team/) |
-| Better Auth | [better-auth.com](https://www.better-auth.com/) |
-| FastAPI | [公式（日本語）](https://fastapi.tiangolo.com/ja/) |
-| PrimeVue 3 | [Setup](https://v3.primevue.org/setup/) |
+### 起動
+
+```powershell
+# 端末1 — API
+cd backend
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+copy .env.example .env
+uvicorn main:app --reload --host 127.0.0.1 --port 8000
+```
+
+```powershell
+# 端末2 — UI
+cd frontend
+copy .env.example .env
+npm install
+npm run dev -- --host 127.0.0.1 --port 3000
+```
+
+macOS / Linux は `python3`、`source .venv/bin/activate`、`cp .env.example .env`。
+
+- UI: http://127.0.0.1:3000/
+- API: http://127.0.0.1:8000/docs
+
+### 操作
+
+1. 初期条件モーダルで舞台・地形・気候・人口・制度・税率・seed を決める
+2. 作成する
+3. Tick（または自動再生）でターンを進める
+4. 地図の領域・争いの破線と、右下の出来事を読む
+5. 対照するときは **seed 以外は1項目だけ**変えて作り直す
+
+実行ログの書き方: [docs/hackathon/RESULTS.md](./docs/hackathon/RESULTS.md)
 
 ---
 
@@ -97,56 +106,20 @@ ollama pull llama3.2:1b
 
 | 場所 | 内容 |
 |------|------|
-| [docs/design/](./docs/design/) | 要件・設計・ルール（FeatureSpec / Architecture / SimulationRules など） |
-| [docs/updates/](./docs/updates/) | 進捗・変更記録 |
-| [docs/guides/](./docs/guides/) | セットアップ・デモ手順 |
-| [docs/hackathon/](./docs/hackathon/) | ハッカソン発表・デモ資料（[review.md](./docs/hackathon/review.md) 含む） |
-| [docs/decisions/](./docs/decisions/) | 設計判断（ADR） |
-
-主な設計ドキュメント:
-
-| ファイル | 内容 |
-|----------|------|
-| [FeatureSpec.md](./docs/design/FeatureSpec.md) | 要件定義（背景・コンセプト・MVP・非ゴール） |
-| [Architecture.md](./docs/design/Architecture.md) | 技術スタック・構成・**実装手順** |
-| [DesignDoc.md](./docs/design/DesignDoc.md) | 技術別の使い方・**機能要件**・画面分担 |
-| [SimulationRules.md](./docs/design/SimulationRules.md) | 行動・ターン・状態の最小定義 |
-| [hackathon/review.md](./docs/hackathon/review.md) | 第1回反省と第2回テーマ根拠 |
+| [docs/hackathon/](./docs/hackathon/) | 提出・発表・デモ・結果 |
+| [docs/design/](./docs/design/) | 要件・設計・ルール |
+| [docs/guides/setup.md](./docs/guides/setup.md) | セットアップ詳細 |
+| [docs/decisions/](./docs/decisions/) | ADR |
 
 ---
 
-## リポジトリ構成
+## 構成
 
 ```text
-docs/
-├── design/      # 仕様・設計
-├── updates/     # 進捗記録
-├── guides/      # 手順書
-├── hackathon/   # ハッカソン発表・デモ資料
-└── decisions/   # 設計判断
-frontend/        # Nuxt 4 + PrimeVue + 2D マップ（Drizzle は Phase 4）
-backend/         # FastAPI + シミュレーションエンジン
+docs/          仕様・提出・手順
+frontend/      Nuxt 観測 UI
+backend/       FastAPI + シミュレーション
 ```
-
-スタブ実装が動作中。次は LLM 接続（Phase 2）。結果の一時保存はブラウザ JSON（1日）。Drizzle は Phase 4。
-
----
-
-## 開発の進め方（概要）
-
-```text
-環境構築
-  → ルール＋スタブ tick
-  → API
-  → 最小 UI（可視化）
-  → LLM 接続
-  → 永続化
-  → 磨き込み
-```
-
-シミュレーションの行動空間（MVP）:
-
-`wait` / `cooperate` / `conflict` / `migrate` / `obey` / `resist`
 
 ---
 

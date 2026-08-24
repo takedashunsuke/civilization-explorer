@@ -14,6 +14,8 @@
 | [checklist.md](./checklist.md) | 当日チェックリスト（起動順・障害時） |
 | [slides.md](./slides.md) | スライド原稿・構成メモ |
 | [faq.md](./faq.md) | 想定質問と回答 |
+| [submission.md](./submission.md) | 提出物一覧（GitHub / README / 資料 / 結果） |
+| [RESULTS.md](./RESULTS.md) | 実行結果のまとめ（数値はデモ後に記入） |
 
 実装・セットアップの詳細手順は [../guides/](../guides/) を参照。  
 プロダクト要件は [../design/FeatureSpec.md](../design/FeatureSpec.md)、実行方針は [../decisions/](../decisions/) を参照。
