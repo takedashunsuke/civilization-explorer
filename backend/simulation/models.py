@@ -46,6 +46,7 @@ class ReligionType(str, Enum):
 
 
 YEARS_PER_TURN = 10
+MAX_CALENDAR_YEAR = 3000
 
 
 def resolve_theater_and_landform(
@@ -107,7 +108,7 @@ class InitialValues(BaseModel):
 class RegionParams(BaseModel):
     id: GeographyType
     subregion_id: str | None = None
-    population: int = Field(default=4, ge=2, le=40)
+    population: int = Field(default=100, ge=100, le=1000)
     institution: InstitutionType = InstitutionType.democracy
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     education_level: float = Field(default=0.5, ge=0, le=1)
@@ -120,7 +121,7 @@ class RegionParams(BaseModel):
 
 class WorldParams(BaseModel):
     seed: int = 42
-    population: int = Field(default=8, ge=2, le=100)
+    population: int = Field(default=100, ge=100, le=1000)
     resource_pool: float = 100.0
     education_level: float = Field(default=0.5, ge=0, le=1)
     tax_rate: float = Field(default=0.1, ge=0, le=1)
@@ -236,12 +237,23 @@ class EventRecord(BaseModel):
     extra: dict[str, str] = Field(default_factory=dict)
 
 
+class RegionMetricsSnapshot(BaseModel):
+    region_id: str
+    subregion_id: str | None = None
+    inequality: float
+    mean_trust: float
+    cooperation_rate: float
+    authority: float
+    mean_happiness: float
+
+
 class MetricsSnapshot(BaseModel):
     inequality: float
     mean_trust: float
     cooperation_rate: float
     authority: float
     mean_happiness: float
+    regions: list[RegionMetricsSnapshot] = Field(default_factory=list)
 
 
 class HistoryRecord(BaseModel):

@@ -34,6 +34,9 @@ def _region_for_sub(sim: SimulationState, subregion: str) -> RegionState | None:
 
 
 def _hit_agents(sim: SimulationState, region: RegionState):
+    sid = region.subregion_id
+    if sid:
+        return [a for a in sim.agents if a.alive and a.subregion_id == sid]
     return [a for a in sim.agents if a.alive and a.region_id == region.id.value]
 
 

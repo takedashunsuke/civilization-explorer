@@ -15,7 +15,7 @@
   "turnLabel": "ターン {turn}",
   "initialConditions": "初期条件",
   "calendarYear": "開始年",
-  "calendarYearHint": "西暦を BC / AD で指定。1ターン＝10年進みます。",
+  "calendarYearHint": "西暦を BC / AD で指定。1ターン＝10年進みます。シミュレーションは西暦3000年までです。",
   "calendarEra": {
     "bc": "BC（紀元前）",
     "ad": "AD（紀元後）"
@@ -36,7 +36,7 @@
     "notables": "特異"
   },
   "population": "人口",
-  "populationHint": "初期の主体数（2〜100）。幸福と富が高いと出生し、上限100まで増えます。",
+  "populationHint": "初期の主体数（100〜1000）。出生は亜地域ごとに起き、各列の上限は1000です。",
   "seed": "シード",
   "seedHint": "乱数の種。同じ値なら地形・初期配置・性格・関係が再現されます。",
   "taxRate": "税率",
@@ -140,14 +140,18 @@
   },
   "wizard": {
     "step1": "STEP 1 地理・自然",
-    "step2": "STEP 2 人間・体制",
+    "step2": "STEP 2 社会・人間",
     "step3": "STEP 3 創発の偏り",
     "lead1": "地理・自然・食・衛生は、選んだサブ地域ごとに固定です。内地・海側・島国の違いを表で確認してください。",
-    "lead2": "開始年と、列ごとの人間の気質・体制を変えると、同じ地理でも未来が分かれます。",
-    "lead3": "文明がどんな人物を生むかの偏りです。特異の出やすさ、施し（再分配）、列の人数を比べます。",
-    "notable": "特異の出やすさ",
+    "lead2": "開始年と、列ごとの社会の仕組み・人間の気質を変えると、同じ地理でも未来が分かれます。",
+    "lead3": "各大陸列で、どんな人が出やすいか・富の分け方・最初に何人置くかを決めます。",
+    "notable": "特異な人が出やすいか",
+    "notableHint": "カリスマや天才など、他と違う人物が生まれやすいかです。高いほど偏りが出ます。",
     "trade": "対外開放（交易）",
-    "columnPop": "列の人数",
+    "columnPop": "初期の人数",
+    "columnPopHint": "この大陸の列に、シミュレーション開始時に置く人数です。100〜1000人の間で選べます。地図上の集団の出発サイズになります。",
+    "columnPopCount": "{n}人",
+    "welfareHint": "富が偏ったとき、列の中で分け合う強さです。なしに近いほど格差が残りやすいです。",
     "welfare": {
       "label": "施し（再分配）",
       "none": "なし",
@@ -410,13 +414,16 @@
   },
   "actions": {
     "create": "作成",
-    "tick": "+1",
-    "tick5": "+5",
+    "tick": "+10年",
+    "tick5": "+50年",
     "autoPlay": "再生",
     "autoStop": "停止"
   },
   "metrics": {
     "title": "メトリクス",
+    "world": "世界",
+    "showDetail": "地域メトリクスの詳細を表示",
+    "hideDetail": "地域メトリクスの詳細を閉じる",
     "inequality": "格差",
     "inequalityHint": "富のばらつき（標準偏差÷平均）。高いほど貧富の差が大きい。",
     "trust": "信頼",
@@ -434,6 +441,20 @@
     "closeConditions": "初期条件を閉じる",
     "closeEvents": "出来事を閉じる"
   },
+  "headlines": {
+    "epidemic": "{group}で疫病",
+    "revolution": "{group}で革命（{from}→{to}）",
+    "warOut": "{group}と{other}が戦争",
+    "warIn": "{group}で内乱",
+    "typhoon": "{group}で台風",
+    "quake": "{group}で地震",
+    "flood": "{group}で水害",
+    "heat": "{group}で熱波",
+    "frost": "{group}で寒波",
+    "drought": "{group}で旱魃",
+    "storm": "{group}で嵐",
+    "disaster": "{group}で災害"
+  },
   "map": {
     "title": "世界地図",
     "legend": "色面＝集団の領域。人数で集団／都市／国家と表示。赤の破線＝集団間の争い。点の色は所属集団。",
@@ -442,6 +463,7 @@
     "settlements": "集落 {count}",
     "resources": "共有資源 {value}",
     "fiveContinents": "五大陸",
+    "shockLog": "世界の便り",
     "zoomHintFlat": "ドラッグで移動、スクロールまたはダブルクリックで拡大。",
     "zoomHintGlobe": "ドラッグで地球を回し、スクロールまたはダブルクリックで拡大。",
     "fit": "集団",

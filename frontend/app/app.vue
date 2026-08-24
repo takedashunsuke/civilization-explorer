@@ -2,11 +2,10 @@
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
+import Slider from 'primevue/slider'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
-import Toast from 'primevue/toast'
-import { useToast } from 'primevue/usetoast'
 import { polityKind, settlementColor } from '~/utils/groupColors'
 import WorldMap2D from '~/components/WorldMap2D.vue'
 import { BACKGROUND_ROWS, CONTINENT_IDS, defaultRegionDraft, macroOf, subregionChoices, type ContinentId, type RegionDraft } from '~/utils/continents'
@@ -32,6 +31,12 @@ type Metrics = {
   cooperation_rate: number
   authority: number
   mean_happiness: number
+  regions?: RegionMetrics[]
+}
+
+type RegionMetrics = Metrics & {
+  region_id: string
+  subregion_id?: string | null
 }
 
 type EventRow = {
@@ -96,7 +101,6 @@ type Simulation = {
 const AUTO_INTERVAL_MS = 800
 
 const { t, locale, setLocale } = useI18n()
-const toast = useToast()
 
 useHead(() => ({
   title: t('brand'),
@@ -104,6 +108,7 @@ useHead(() => ({
 
 const conditionsOpen = ref(true)
 const eventsOpen = ref(false)
+const metricsOpen = ref(false)
 
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
@@ -155,12 +160,8 @@ const LEVEL_STEPS = [0.2, 0.35, 0.5, 0.65, 0.8]
 const TAX_STEPS = [0.05, 0.1, 0.15, 0.2, 0.25]
 const NOTABLE_STEPS = [0.04, 0.085, 0.13, 0.175, 0.22]
 const WELFARE_STEPS = [0, 0.07, 0.14, 0.21, 0.28]
-
-const populationOptions = computed(() => [
-  { label: '3', value: 3 },
-  { label: '4', value: 4 },
-  { label: '6', value: 6 },
-])
+const COLUMN_POP_MIN = 100
+const COLUMN_POP_MAX = 1000
 
 const mapSeed = computed(() => sim.value?.world.seed ?? 0)
 
@@ -169,10 +170,21 @@ const calendarEraOptions = computed(() => [
   { label: t('calendarEra.ad'), value: 'ad' as const },
 ])
 
+const MAX_CALENDAR_YEAR = 3000
+const BC_YEAR_MAX = 50000
+
 const calendarYearMin = computed(() => (calendarEra.value === 'ad' ? 0 : 1))
+const calendarYearMax = computed(() => (calendarEra.value === 'ad' ? MAX_CALENDAR_YEAR : BC_YEAR_MAX))
 
 watch(calendarEra, (era) => {
   if (era === 'bc' && calendarYear.value < 1) calendarYear.value = 1
+  if (era === 'ad' && calendarYear.value > MAX_CALENDAR_YEAR) calendarYear.value = MAX_CALENDAR_YEAR
+})
+
+watch(calendarYear, (year) => {
+  if (year == null) return
+  const max = calendarYearMax.value
+  if (year > max) calendarYear.value = max
 })
 
 const step2Axes = [
@@ -209,6 +221,29 @@ function step3AxisLabel(key: (typeof step3Axes)[number]['key']): string {
   return t('wizard.columnPop')
 }
 
+function step3AxisHint(key: (typeof step3Axes)[number]['key']): string {
+  if (key === 'notable') return t('wizard.notableHint')
+  if (key === 'welfare') return t('wizard.welfareHint')
+  return t('wizard.columnPopHint')
+}
+
+const HEADLINE_RANK: Record<string, number> = {
+  historic_quake: 12,
+  disaster_earthquake: 11,
+  disaster_typhoon: 10,
+  epidemic: 9,
+  regime_shift: 8,
+  group_conflict_out: 7,
+  group_conflict_in: 6,
+  disaster_flood: 5,
+  weather_storm: 5,
+  disaster_heatwave: 4,
+  weather_heat: 4,
+  disaster_frost: 3,
+  weather_blizzard: 3,
+  weather_drought: 3,
+}
+
 const draftAstroYear = computed(() => toAstronomicalYear(calendarEra.value, calendarYear.value))
 
 const currentAstroYear = computed(() => {
@@ -217,6 +252,16 @@ const currentAstroYear = computed(() => {
   const years = sim.value.world.years_per_turn ?? 10
   return start + sim.value.world.turn * years
 })
+
+const atYearCap = computed(() => currentAstroYear.value >= MAX_CALENDAR_YEAR)
+
+function turnsUntilYearCap(): number {
+  if (!sim.value) return 0
+  const years = Math.max(1, sim.value.world.years_per_turn ?? 10)
+  const start = sim.value.world.start_year ?? draftAstroYear.value
+  const maxTurn = Math.floor((MAX_CALENDAR_YEAR - start) / years)
+  return Math.max(0, maxTurn - sim.value.world.turn)
+}
 
 function formatYearLabel(astro: number): string {
   const { era, year } = fromAstronomicalYear(astro)
@@ -245,9 +290,9 @@ const recentEvents = computed(() => (sim.value?.events ?? []).slice(-40).reverse
 const aliveCount = computed(() => (sim.value?.agents ?? []).filter((a) => a.alive).length)
 const totalAgents = computed(() => sim.value?.agents.length ?? 0)
 const initialPopulation = computed(
-  () => sim.value?.world.initial_population ?? 20,
+  () => sim.value?.world.initial_population ?? 100,
 )
-const populationCap = computed(() => sim.value?.world.population_cap ?? 100)
+const populationCap = computed(() => sim.value?.world.population_cap ?? 1000)
 const populationDelta = computed(() => aliveCount.value - initialPopulation.value)
 const settlementCount = computed(() => sim.value?.settlements?.length ?? 0)
 const polityCounts = computed(() => {
@@ -295,17 +340,53 @@ const turnOnlyLabel = computed(() => {
   return t('turnLabel', { turn: sim.value.world.turn })
 })
 
-const metricItems = computed(() => {
+const METRIC_COLS = [
+  { key: 'inequality', field: 'inequality', hint: 'metrics.inequalityHint' },
+  { key: 'trust', field: 'mean_trust', hint: 'metrics.trustHint' },
+  { key: 'cooperationRate', field: 'cooperation_rate', hint: 'metrics.cooperationRateHint' },
+  { key: 'authority', field: 'authority', hint: 'metrics.authorityHint' },
+  { key: 'happiness', field: 'mean_happiness', hint: 'metrics.happinessHint' },
+] as const
+
+type MetricField = (typeof METRIC_COLS)[number]['field']
+
+function metricValue(row: Pick<Metrics, MetricField>, field: MetricField): number {
+  return row[field]
+}
+
+const regionMetricRows = computed(() => {
   const m = sim.value?.last_metrics
   if (!m) return []
+  if (m.regions?.length) {
+    return m.regions.map((row) => ({
+      id: row.region_id,
+      subregion: row.subregion_id ?? null,
+      inequality: row.inequality,
+      mean_trust: row.mean_trust,
+      cooperation_rate: row.cooperation_rate,
+      authority: row.authority,
+      mean_happiness: row.mean_happiness,
+    }))
+  }
   return [
-    { key: 'inequality', value: m.inequality, hint: 'metrics.inequalityHint' },
-    { key: 'trust', value: m.mean_trust, hint: 'metrics.trustHint' },
-    { key: 'cooperationRate', value: m.cooperation_rate, hint: 'metrics.cooperationRateHint' },
-    { key: 'authority', value: m.authority, hint: 'metrics.authorityHint' },
-    { key: 'happiness', value: m.mean_happiness, hint: 'metrics.happinessHint' },
-  ] as const
+    {
+      id: 'world',
+      subregion: null,
+      inequality: m.inequality,
+      mean_trust: m.mean_trust,
+      cooperation_rate: m.cooperation_rate,
+      authority: m.authority,
+      mean_happiness: m.mean_happiness,
+    },
+  ]
 })
+
+function regionMetricLabel(id: string): string {
+  if (id === 'world') return t('metrics.world')
+  const key = `geographies.${id}`
+  const label = t(key)
+  return label === key ? id : label
+}
 
 function actorLabel(actorId: string): string {
   if (actorId === 'world') return t('events.world')
@@ -357,6 +438,51 @@ function inferDetailKey(row: EventRow): string {
   return 'wait'
 }
 
+function isHeadlineEvent(row: EventRow): boolean {
+  const key = inferDetailKey(row)
+  if (key in HEADLINE_RANK) return true
+  return row.action === 'regime' || row.action === 'disaster'
+}
+
+function headlineText(row: EventRow): string {
+  const key = inferDetailKey(row)
+  const group = actorLabel(row.actor_id)
+  const other = row.target_id ? actorLabel(row.target_id) : ''
+  const from = row.extra?.from ? t(`institutions.${row.extra.from}`) : ''
+  const to = row.extra?.to ? t(`institutions.${row.extra.to}`) : ''
+  const map: Record<string, string> = {
+    epidemic: t('headlines.epidemic', { group }),
+    regime_shift: t('headlines.revolution', { group, from, to }),
+    group_conflict_out: t('headlines.warOut', { group, other }),
+    group_conflict_in: t('headlines.warIn', { group }),
+    disaster_typhoon: t('headlines.typhoon', { group }),
+    disaster_earthquake: t('headlines.quake', { group }),
+    historic_quake: t('headlines.quake', { group }),
+    disaster_flood: t('headlines.flood', { group }),
+    disaster_heatwave: t('headlines.heat', { group }),
+    weather_heat: t('headlines.heat', { group }),
+    disaster_frost: t('headlines.frost', { group }),
+    weather_blizzard: t('headlines.frost', { group }),
+    weather_drought: t('headlines.drought', { group }),
+    weather_storm: t('headlines.storm', { group }),
+  }
+  return map[key] || t('headlines.disaster', { group })
+}
+
+const headerHeadline = computed(() => {
+  const rows = (sim.value?.events ?? []).filter(isHeadlineEvent)
+  if (!rows.length) return null
+  const latestTurn = rows[rows.length - 1].turn
+  const sameTurn = rows.filter((row) => row.turn === latestTurn)
+  sameTurn.sort((a, b) => (HEADLINE_RANK[inferDetailKey(b)] ?? 1) - (HEADLINE_RANK[inferDetailKey(a)] ?? 1))
+  const picked = sameTurn.slice(0, 2)
+  const texts = [...new Set(picked.map(headlineText))]
+  return {
+    text: texts.join(' · '),
+    alert: picked.some((row) => row.alert === 'red') ? 'red' : 'yellow',
+  }
+})
+
 function eventDetail(row: EventRow): string {
   const key = `eventDetails.${inferDetailKey(row)}`
   const personId = isGroupId(row.target_id) ? row.actor_id : (row.target_id || row.actor_id)
@@ -381,18 +507,6 @@ function eventDetail(row: EventRow): string {
     to: row.extra?.to ? t(`institutions.${row.extra.to}`) : '',
   })
   return translated === key ? row.detail : translated
-}
-
-function showShockToasts(rows: EventRow[], fromTurn: number) {
-  for (const row of rows) {
-    if (!row.alert || row.turn < fromTurn) continue
-    toast.add({
-      severity: row.alert === 'red' ? 'error' : 'warn',
-      summary: actionLabel(row.action),
-      detail: eventDetail(row),
-      life: 7000,
-    })
-  }
 }
 
 async function onLocaleChange(code: string) {
@@ -443,6 +557,7 @@ async function createSimulation() {
       },
     })
     conditionsOpen.value = false
+    await startAutoPlay()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
@@ -452,16 +567,21 @@ async function createSimulation() {
 
 async function tick(n = 1, opts?: { silent?: boolean }) {
   if (!sim.value || tickInFlight) return
+  const remaining = turnsUntilYearCap()
+  if (remaining <= 0) {
+    stopAutoPlay()
+    return
+  }
+  n = Math.min(n, remaining)
   tickInFlight = true
   if (!opts?.silent) busy.value = true
   error.value = ''
-  const fromTurn = sim.value.world.turn
   try {
     sim.value = await api<Simulation>(`/simulations/${sim.value.id}/tick`, {
       method: 'POST',
       body: { n },
     })
-    showShockToasts(sim.value.events ?? [], fromTurn)
+    if (turnsUntilYearCap() <= 0) stopAutoPlay()
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
     stopAutoPlay()
@@ -471,12 +591,8 @@ async function tick(n = 1, opts?: { silent?: boolean }) {
   }
 }
 
-async function toggleAutoPlay() {
-  if (autoPlaying.value) {
-    stopAutoPlay()
-    return
-  }
-  if (!sim.value) return
+async function startAutoPlay() {
+  if (!sim.value || atYearCap.value) return
   autoPlaying.value = true
   await tick(1, { silent: true })
   if (!autoPlaying.value) return
@@ -486,6 +602,14 @@ async function toggleAutoPlay() {
   }, AUTO_INTERVAL_MS)
 }
 
+async function toggleAutoPlay() {
+  if (autoPlaying.value) {
+    stopAutoPlay()
+    return
+  }
+  await startAutoPlay()
+}
+
 onBeforeUnmount(() => {
   stopAutoPlay()
 })
@@ -493,7 +617,6 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="layout">
-    <Toast position="top-right" />
     <div class="lang" role="group" :aria-label="t('language')">
       <button
         type="button"
@@ -521,6 +644,12 @@ onBeforeUnmount(() => {
           <p class="eyebrow">{{ t('brand') }}</p>
           <h1>{{ t('consoleTitle') }}</h1>
         </div>
+        <p
+          class="header-headline"
+          :class="headerHeadline?.alert"
+          :title="headerHeadline?.text || undefined"
+          aria-live="polite"
+        >{{ headerHeadline?.text || '' }}</p>
         <div class="header-right">
         <div class="header-controls">
           <Button
@@ -541,7 +670,7 @@ onBeforeUnmount(() => {
             :label="t('actions.tick')"
             icon="pi pi-step-forward"
             class="header-btn"
-            :disabled="!sim || autoPlaying"
+            :disabled="!sim || autoPlaying || atYearCap"
             :loading="busy && !autoPlaying"
             severity="success"
             @click="tick(1)"
@@ -550,7 +679,7 @@ onBeforeUnmount(() => {
             :label="t('actions.tick5')"
             icon="pi pi-forward"
             class="header-btn"
-            :disabled="!sim || autoPlaying"
+            :disabled="!sim || autoPlaying || atYearCap"
             :loading="busy && !autoPlaying"
             severity="help"
             @click="tick(5)"
@@ -559,7 +688,7 @@ onBeforeUnmount(() => {
             :label="autoPlaying ? t('actions.autoStop') : t('actions.autoPlay')"
             :icon="autoPlaying ? 'pi pi-stop' : 'pi pi-play'"
             class="header-btn"
-            :disabled="!sim"
+            :disabled="!sim || (!autoPlaying && atYearCap)"
             :severity="autoPlaying ? 'danger' : 'secondary'"
             @click="toggleAutoPlay"
           />
@@ -618,17 +747,47 @@ onBeforeUnmount(() => {
         <div class="map-stage">
           <WorldMap2D :sim="sim" geography="world" :seed="mapSeed" />
         </div>
-        <div v-if="metricItems.length" class="metrics">
-          <h2>{{ t('metrics.title') }}</h2>
-          <ul>
-            <li v-for="item in metricItems" :key="item.key">
-              <div class="metric-row">
-                <span class="metric-name">{{ t(`metrics.${item.key}`) }}</span>
-                <span class="metric-value">{{ item.value.toFixed(3) }}</span>
+        <div v-if="regionMetricRows.length" class="metrics" :class="{ open: metricsOpen }">
+          <button
+            type="button"
+            class="metrics-bar"
+            :aria-expanded="metricsOpen"
+            :aria-label="metricsOpen ? t('metrics.hideDetail') : t('metrics.showDetail')"
+            @click="metricsOpen = !metricsOpen"
+          >
+            <span class="metrics-bar-title">{{ t('metrics.title') }}</span>
+            <ul class="metrics-bar-list">
+              <li v-for="row in regionMetricRows" :key="row.id">
+                <span class="metrics-bar-region">{{ regionMetricLabel(row.id) }}</span>
+                <span v-if="row.subregion" class="metrics-bar-sub">{{ t(`subregions.${row.subregion}`) }}</span>
+                <span class="metrics-bar-stat">
+                  {{ t('metrics.happiness') }}
+                  <em>{{ row.mean_happiness.toFixed(2) }}</em>
+                </span>
+              </li>
+            </ul>
+            <span class="metrics-bar-chevron" aria-hidden="true">{{ metricsOpen ? '▾' : '▴' }}</span>
+          </button>
+          <div class="metrics-sheet">
+            <div class="metrics-grid" role="table">
+              <div class="metrics-grid-row metrics-grid-head" role="row">
+                <div class="metrics-grid-stub" role="columnheader">{{ t('wizard.axis') }}</div>
+                <div v-for="col in METRIC_COLS" :key="col.key" class="metrics-grid-cell" role="columnheader">
+                  <span>{{ t(`metrics.${col.key}`) }}</span>
+                  <p class="hint">{{ t(col.hint) }}</p>
+                </div>
               </div>
-              <p class="hint">{{ t(item.hint) }}</p>
-            </li>
-          </ul>
+              <div v-for="row in regionMetricRows" :key="`detail-${row.id}`" class="metrics-grid-row" role="row">
+                <div class="metrics-grid-stub" role="rowheader">
+                  <span>{{ regionMetricLabel(row.id) }}</span>
+                  <span v-if="row.subregion" class="col-sub">{{ t(`subregions.${row.subregion}`) }}</span>
+                </div>
+                <div v-for="col in METRIC_COLS" :key="`${row.id}-${col.key}`" class="metrics-grid-cell" role="cell">
+                  <span class="metric-value">{{ metricValue(row, col.field).toFixed(3) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>
@@ -772,7 +931,7 @@ onBeforeUnmount(() => {
                   <InputNumber
                     v-model="calendarYear"
                     :min="calendarYearMin"
-                    :max="50000"
+                    :max="calendarYearMax"
                     :step="100"
                     show-buttons
                     class="year-input"
@@ -795,7 +954,10 @@ onBeforeUnmount(() => {
             <DataTable :value="step3Axes" class="conditions-dt">
               <Column :header="t('wizard.axis')" class="dt-axis">
                 <template #body="{ data }">
-                  <span>{{ step3AxisLabel(data.key) }}</span>
+                  <span class="axis-label">
+                    {{ step3AxisLabel(data.key) }}
+                    <i v-tooltip.right="step3AxisHint(data.key)" class="pi pi-info-circle axis-info" tabindex="0" />
+                  </span>
                 </template>
               </Column>
               <Column v-for="region in regionDrafts" :key="region.id">
@@ -818,14 +980,15 @@ onBeforeUnmount(() => {
                     :steps="WELFARE_STEPS"
                     :labels="welfareLabels"
                   />
-                  <Dropdown
-                    v-else
-                    v-model="region.population"
-                    :options="populationOptions"
-                    option-label="label"
-                    option-value="value"
-                    class="field-control"
-                  />
+                  <div v-else class="pop-slider">
+                    <Slider
+                      v-model="region.population"
+                      :min="COLUMN_POP_MIN"
+                      :max="COLUMN_POP_MAX"
+                      :step="10"
+                    />
+                    <span class="pop-slider-value">{{ t('wizard.columnPopCount', { n: region.population }) }}</span>
+                  </div>
                 </template>
               </Column>
             </DataTable>
@@ -891,11 +1054,32 @@ onBeforeUnmount(() => {
 }
 
 .header-top {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(7.5rem, auto) minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 0.75rem;
   min-width: 0;
+}
+
+.header-headline {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: var(--header-bar-h);
+  color: var(--text);
+}
+
+.header-headline.yellow {
+  color: #efc15a;
+}
+
+.header-headline.red {
+  color: #ff7a6e;
 }
 
 .header-left {
@@ -1285,6 +1469,30 @@ h2 {
   background: #4d5d6c;
 }
 
+.conditions-dt :deep(.p-slider .p-slider-range) {
+  background: #7ec4ff;
+}
+
+.conditions-dt :deep(.p-slider .p-slider-handle) {
+  border-color: #7ec4ff;
+  background: #e8f4ff;
+}
+
+.pop-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  width: 100%;
+  min-width: 5.5rem;
+  padding: 0.15rem 0.2rem 0;
+}
+
+.pop-slider-value {
+  font-size: 0.7rem;
+  line-height: 1.2;
+  color: #d5e4f2;
+}
+
 .bg-table {
   margin-top: 0.55rem;
   border: 1px solid #6b7c8d;
@@ -1431,6 +1639,7 @@ h2 {
 }
 
 .viewport {
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -1640,43 +1849,136 @@ label {
 }
 
 .metrics {
-  margin-top: 0.7rem;
-  flex: 0 0 auto;
+  position: absolute;
+  left: 0.55rem;
+  right: 0.55rem;
+  bottom: 0.45rem;
+  z-index: 8;
+  display: flex;
+  flex-direction: column-reverse;
   min-height: 0;
+  pointer-events: none;
 }
 
-.metrics h2 {
-  margin: 0 0 0.45rem;
+.metrics-bar {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
 }
 
-.metrics ul {
+.metrics-bar-title {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-size: 0.78rem;
+}
+
+.metrics-bar-list {
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.35rem;
   margin: 0;
   padding: 0;
   list-style: none;
-  color: var(--text);
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.45rem;
-}
-
-.metrics li {
-  margin: 0;
-  padding: 0.4rem 0.45rem;
-  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  border-radius: 8px;
   min-width: 0;
 }
 
-.metric-row {
+.metrics-bar-list li {
   display: flex;
-  justify-content: space-between;
-  gap: 0.35rem;
-  align-items: baseline;
+  flex-direction: column;
+  gap: 0.05rem;
+  min-width: 0;
+  padding: 0.1rem 0.25rem;
+  border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
 }
 
-.metric-name {
+.metrics-bar-region {
   font-weight: 600;
-  font-size: 0.78rem;
+  font-size: 0.74rem;
+}
+
+.metrics-bar-sub {
+  font-size: 0.62rem;
+  color: var(--muted);
+}
+
+.metrics-bar-stat {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.metrics-bar-stat em {
+  margin-left: 0.2rem;
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.metrics-bar-chevron {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.metrics-sheet {
+  pointer-events: auto;
+  overflow: hidden;
+  max-height: 0;
+  opacity: 0;
+  transform: translateY(0.6rem);
+  transition: max-height 0.28s ease, opacity 0.22s ease, transform 0.28s ease;
+  margin-bottom: 0.4rem;
+}
+
+.metrics.open .metrics-sheet {
+  max-height: 22rem;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.metrics-grid {
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.5rem 0.55rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--panel) 96%, transparent);
+}
+
+.metrics-grid-row {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 0.9fr) repeat(5, minmax(0, 1fr));
+  gap: 0.3rem;
+  align-items: start;
+}
+
+.metrics-grid-stub {
+  display: flex;
+  flex-direction: column;
+  gap: 0.08rem;
+  font-weight: 600;
+  font-size: 0.74rem;
+}
+
+.metrics-grid-cell {
+  min-width: 0;
+  padding: 0.2rem 0.25rem;
+}
+
+.metrics-grid-head .metrics-grid-cell {
+  font-weight: 600;
+  font-size: 0.74rem;
 }
 
 .metric-value {
@@ -1686,8 +1988,9 @@ label {
 }
 
 .metrics .hint {
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   line-height: 1.3;
+  margin: 0.15rem 0 0;
 }
 
 .map-stats {
@@ -1706,6 +2009,7 @@ label {
   position: relative;
   flex: 1 1 auto;
   min-height: 280px;
+  padding-bottom: 4.2rem;
 }
 
 .map-stage :deep(.map-wrap) {

@@ -19,6 +19,7 @@ from simulation.models import (
     InstitutionState,
     LandformType,
     MetricsSnapshot,
+    RegionMetricsSnapshot,
     Personality,
     Position,
     RegionParams,
@@ -30,24 +31,29 @@ from simulation.models import (
     WorldParams,
     WorldState,
     YEARS_PER_TURN,
+    MAX_CALENDAR_YEAR,
     resolve_theater_and_landform,
 )
 from simulation.terrain import biome_at, generate_terrain, random_land_position, snap_to_land
 
 
-SETTLEMENT_DISTANCE = 10.0
+SETTLEMENT_DISTANCE = 22.0
 SETTLEMENT_MIN_SIZE = 2
-POPULATION_CAP = 100
+POPULATION_MIN = 100
+POPULATION_MAX = 1000
 ENERGY_WAIT_THRESHOLD = 0.15
+CROSS_CONTINENT_CHANCE = 0.015
+COHORT_MIGRATE_CHANCE = 0.20
+MAX_BIRTHS_PER_REGION = 24
 MAX_MEMORY = 10
-BIRTH_MIN_WEALTH = 10.0
-BIRTH_MIN_HAPPINESS = 0.42
-BIRTH_COST = 4.0
+BIRTH_MIN_WEALTH = 4.0
+BIRTH_MIN_HAPPINESS = 0.35
+BIRTH_COST = 1.5
 CHARISMA_CHANCE = 0.10
 GENIUS_CHANCE = 0.08
 TRAIT_INHERIT_BONUS = 0.18
 BIRTH_AGE_MIN = 16
-BIRTH_AGE_MAX = 48
+BIRTH_AGE_MAX = 55
 TRAIT_GAIN_CHANCE = 0.018
 TRAIT_LOSE_CHANCE = 0.03
 ACTION_PRIORITY = {
@@ -132,14 +138,46 @@ def _build_region(params: RegionParams, seed: int) -> RegionState:
     )
 
 
+def _region_key(agent: AgentState) -> str:
+    return agent.subregion_id or agent.region_id or "lone"
+
+
 def agent_region(sim: SimulationState, agent: AgentState) -> RegionState | None:
     if not sim.world.regions:
         return None
+    sid = agent.subregion_id
     rid = agent.region_id
-    for region in sim.world.regions:
-        if region.id.value == rid:
-            return region
+    if sid:
+        for region in sim.world.regions:
+            if region.subregion_id == sid:
+                return region
+    if rid:
+        for region in sim.world.regions:
+            if region.id.value == rid and region.subregion_id == sid:
+                return region
+        for region in sim.world.regions:
+            if region.id.value == rid:
+                return region
     return sim.world.regions[0]
+
+
+def agents_in_region(sim: SimulationState, region: RegionState) -> list[AgentState]:
+    sid = region.subregion_id
+    rid = region.id.value
+    out: list[AgentState] = []
+    for agent in sim.agents:
+        if not agent.alive:
+            continue
+        if sid:
+            if agent.subregion_id == sid:
+                out.append(agent)
+        elif agent.region_id == rid:
+            out.append(agent)
+    return out
+
+
+def _cohort_key(agent: AgentState) -> str:
+    return agent.settlement_id or _region_key(agent) or agent.id
 
 
 def region_terrain(sim: SimulationState, agent: AgentState):
@@ -159,7 +197,7 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
                     theater if theater in CONTINENT_PRESETS else GeographyType.asia,
                     None,
                 ),
-                population=params.population,
+                population=max(POPULATION_MIN, min(POPULATION_MAX, params.population)),
                 institution=params.institution,
                 tax_rate=params.tax_rate,
                 education_level=params.education_level,
@@ -171,6 +209,7 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
     agents: list[AgentState] = []
     idx = 0
     for spec, region in zip(region_params, regions):
+        home = random_land_position(region.terrain, rng, region.landform, region.climate)
         for _ in range(spec.population):
             idx += 1
             coop = clamp(spec.initial_values.cooperation + rng.uniform(-0.2, 0.2))
@@ -183,11 +222,17 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
             wealth = rng.uniform(max(2.0, 14.0 - spread / 2), 14.0 + spread / 2)
             if "genius" in traits:
                 wealth += 4
+            jitter = min(8.0, 3.2 + spec.population * 0.004)
+            pos = snap_to_land(
+                region.terrain,
+                home.x + rng.uniform(-jitter, jitter),
+                home.y + rng.uniform(-jitter, jitter),
+            )
             agents.append(
                 AgentState(
                     id=f"a{idx}",
                     name=f"a{idx}",
-                    position=random_land_position(region.terrain, rng, region.landform, region.climate),
+                    position=pos,
                     wealth=wealth,
                     energy=clamp(0.7 + rng.uniform(-0.2, 0.2)),
                     happiness=clamp(0.5 + rng.uniform(-0.15, 0.15)),
@@ -200,25 +245,16 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
                 )
             )
 
-    relationships: list[RelationshipState] = []
-    for i, a in enumerate(agents):
-        for b in agents[i + 1 :]:
-            relationships.append(
-                RelationshipState(
-                    a_id=a.id,
-                    b_id=b.id,
-                    trust=rng.uniform(-0.1, 0.2),
-                    affinity=rng.uniform(-0.05, 0.15),
-                )
-            )
-
     primary = regions[0]
     world = WorldState(
         turn=0,
         seed=params.seed,
         initial_population=len(agents),
         initial_total_wealth=sum(a.wealth for a in agents),
-        population_cap=POPULATION_CAP,
+        population_cap=min(
+            max(len(regions), 1) * POPULATION_MAX,
+            max(len(agents), int(len(agents) * 1.4)),
+        ),
         resource_pool=sum(r.resource_pool for r in regions),
         education_level=sum(r.education_level for r in regions) / len(regions),
         tax_rate=sum(r.tax_rate for r in regions) / len(regions),
@@ -242,11 +278,11 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
         id=sim_id,
         world=world,
         agents=agents,
-        relationships=relationships,
+        relationships=[],
         settlements=[],
     )
     recompute_settlements(sim)
-    sim.last_metrics = compute_metrics(sim, cooperate_successes=0, action_count=0)
+    sim.last_metrics = compute_metrics(sim, cooperate_successes=0, action_count=0, micro_events=[])
     return sim
 
 
@@ -268,7 +304,7 @@ def nearest_other(sim: SimulationState, agent: AgentState) -> AgentState | None:
     others = [
         a
         for a in sim.agents
-        if a.alive and a.id != agent.id and a.region_id == agent.region_id
+        if a.alive and a.id != agent.id and _region_key(a) == _region_key(agent)
     ]
     if not others:
         return None
@@ -333,9 +369,64 @@ def heuristic_decide(sim: SimulationState, agent: AgentState, rng: random.Random
     return ChosenAction(agent_id=agent.id, action=ActionType.wait, reason="default wait")
 
 
+def _cohere_region_migration(
+    sim: SimulationState, choices: list[ChosenAction], rng: random.Random
+) -> list[ChosenAction]:
+    """集落（なければ亜地域）ごとに同じ変位で移す。大陸をまたぐ移動は例外。"""
+    by_id = {c.agent_id: c for c in choices}
+    by_cohort: dict[str, list[AgentState]] = defaultdict(list)
+    for agent in sim.agents:
+        if agent.alive:
+            by_cohort[_cohort_key(agent)].append(agent)
+    other_regions = sim.world.regions
+    for members in by_cohort.values():
+        if not members:
+            continue
+        migrating = any(
+            by_id.get(m.id) is not None and by_id[m.id].action == ActionType.migrate for m in members
+        )
+        mean_e = sum(m.energy for m in members) / len(members)
+        if not migrating and mean_e > 0.42 and rng.random() < COHORT_MIGRATE_CHANCE:
+            migrating = True
+        if not migrating:
+            continue
+        dest = None
+        if other_regions and rng.random() < CROSS_CONTINENT_CHANCE:
+            candidates = [
+                r
+                for r in other_regions
+                if r.id.value != members[0].region_id
+            ]
+            if candidates:
+                dest = rng.choice(candidates)
+        if dest is not None:
+            landing = random_land_position(dest.terrain, rng, dest.landform, dest.climate)
+            sid = dest.subregion_id or dest.id.value
+            for member in members:
+                jx, jy = rng.uniform(-4, 4), rng.uniform(-4, 4)
+                by_id[member.id] = ChosenAction(
+                    agent_id=member.id,
+                    action=ActionType.migrate,
+                    reason=(
+                        f"migrate_cross:{dest.id.value}:{sid}:"
+                        f"{landing.x + jx:.1f},{landing.y + jy:.1f}"
+                    ),
+                )
+            continue
+        dx, dy = rng.uniform(-7, 7), rng.uniform(-7, 7)
+        for member in members:
+            by_id[member.id] = ChosenAction(
+                agent_id=member.id,
+                action=ActionType.migrate,
+                reason=f"migrate:{member.position.x + dx:.1f},{member.position.y + dy:.1f}",
+            )
+    return [by_id[a.id] for a in sim.agents if a.alive and a.id in by_id]
+
+
 def decide_actions(sim: SimulationState, rng: random.Random) -> list[ChosenAction]:
     # Phase 2 で LLM に差し替え。現状は常にヒューリスティック。
-    return [heuristic_decide(sim, agent, rng) for agent in sim.agents if agent.alive]
+    choices = [heuristic_decide(sim, agent, rng) for agent in sim.agents if agent.alive]
+    return _cohere_region_migration(sim, choices, rng)
 
 
 def resolve_actions(
@@ -510,7 +601,19 @@ def resolve_actions(
         if action == ActionType.migrate:
             # reason に migrate:x,y があれば使う。なければランダム近傍。
             nx, ny = actor.position.x, actor.position.y
-            if choice.reason.startswith("migrate:"):
+            if choice.reason.startswith("migrate_cross:"):
+                try:
+                    _, rest = choice.reason.split(":", 1)
+                    dest_id, dest_sub, coords = rest.split(":", 2)
+                    nx_s, ny_s = coords.split(",")
+                    nx, ny = float(nx_s), float(ny_s)
+                    actor.region_id = dest_id
+                    actor.subregion_id = dest_sub
+                    actor.settlement_id = None
+                except ValueError:
+                    nx += rng.uniform(-10, 10)
+                    ny += rng.uniform(-10, 10)
+            elif choice.reason.startswith("migrate:"):
                 try:
                     coords = choice.reason.split(":", 1)[1]
                     nx_s, ny_s = coords.split(",")
@@ -522,7 +625,7 @@ def resolve_actions(
                 nx += rng.uniform(-10, 10)
                 ny += rng.uniform(-10, 10)
             actor.position = snap_to_land(region_terrain(sim, actor), nx, ny)
-            cost = 0.2
+            cost = 0.08
             region = agent_region(sim, actor)
             if (region.landform if region else sim.world.landform) == LandformType.island:
                 cost += 0.04
@@ -579,7 +682,7 @@ def resolve_actions(
             same = [
                 a
                 for a in sim.agents
-                if a.alive and a.region_id == actor.region_id
+                if a.alive and _region_key(a) == _region_key(actor)
             ]
             resist_count = sum(1 for a in same if a.allegiance == Allegiance.resist)
             if resist_count >= max(2, len(same) // 3):
@@ -622,22 +725,44 @@ def apply_births(sim: SimulationState, rng: random.Random) -> None:
     alive = [a for a in sim.agents if a.alive]
     if len(alive) >= sim.world.population_cap:
         return
-    eligible = [
-        a
-        for a in alive
-        if a.wealth >= BIRTH_MIN_WEALTH
-        and a.happiness >= BIRTH_MIN_HAPPINESS
-        and a.energy > 0.3
-        and BIRTH_AGE_MIN <= a.age <= BIRTH_AGE_MAX
-    ]
-    if not eligible:
-        return
-    mean_h = sum(a.happiness for a in alive) / len(alive)
-    chance = 0.10 + 0.18 * mean_h + 0.08 * sim.world.education_level
-    if rng.random() >= chance:
-        return
+    by_region: dict[str, list[AgentState]] = defaultdict(list)
+    for agent in alive:
+        by_region[_region_key(agent)].append(agent)
+    for members in by_region.values():
+        if len(alive) >= sim.world.population_cap:
+            return
+        if len(members) >= POPULATION_MAX:
+            continue
+        eligible = [
+            a
+            for a in members
+            if a.wealth >= BIRTH_MIN_WEALTH
+            and a.happiness >= BIRTH_MIN_HAPPINESS
+            and a.energy > 0.18
+            and BIRTH_AGE_MIN <= a.age <= BIRTH_AGE_MAX
+        ]
+        if not eligible:
+            continue
+        mean_h = sum(a.happiness for a in members) / len(members)
+        parent_p = 0.32 + 0.22 * mean_h + 0.08 * sim.world.education_level
+        born = 0
+        rng.shuffle(eligible)
+        for parent in eligible:
+            if born >= MAX_BIRTHS_PER_REGION:
+                break
+            if len(alive) >= sim.world.population_cap or len(members) + born >= POPULATION_MAX:
+                break
+            if rng.random() >= parent_p:
+                continue
+            child = _spawn_child(sim, parent, rng)
+            if child is None:
+                continue
+            alive.append(child)
+            members.append(child)
+            born += 1
 
-    parent = rng.choice(eligible)
+
+def _spawn_child(sim: SimulationState, parent: AgentState, rng: random.Random) -> AgentState | None:
     idx = _next_agent_index(sim)
     child_id = f"a{idx}"
     home = agent_region(sim, parent)
@@ -674,18 +799,14 @@ def apply_births(sim: SimulationState, rng: random.Random) -> None:
     parent.wealth = max(0.0, parent.wealth - BIRTH_COST)
     parent.energy = clamp(parent.energy - 0.08)
     sim.agents.append(child)
-    for other in sim.agents:
-        if other.id == child_id:
-            continue
-        trust0 = 0.25 if other.id == parent.id else rng.uniform(-0.05, 0.12)
-        sim.relationships.append(
-            RelationshipState(
-                a_id=child_id,
-                b_id=other.id,
-                trust=trust0,
-                affinity=0.2 if other.id == parent.id else rng.uniform(-0.05, 0.1),
-            )
+    sim.relationships.append(
+        RelationshipState(
+            a_id=child_id,
+            b_id=parent.id,
+            trust=0.25,
+            affinity=0.2,
         )
+    )
     if "charisma" in traits and "genius" in traits:
         detail_key = "birth_both"
     elif "charisma" in traits:
@@ -707,6 +828,7 @@ def apply_births(sim: SimulationState, rng: random.Random) -> None:
         )
     )
     _remember(parent, detail)
+    return child
 
 
 def _emit_leadership_changes(sim: SimulationState, previous: set[str], current: set[str]) -> None:
@@ -737,69 +859,73 @@ def apply_aging(sim: SimulationState) -> None:
 def _yearly_death_chance(agent: AgentState) -> float:
     age = agent.age
     if age < 45:
-        chance = 0.004
+        chance = 0.002
     elif age < 55:
-        chance = 0.02
+        chance = 0.008
     elif age < 65:
-        chance = 0.07
+        chance = 0.018
     elif age < 75:
-        chance = 0.14
+        chance = 0.04
     else:
-        chance = 0.28
+        chance = 0.08
     if agent.wealth < 3:
-        chance += 0.025
+        chance += 0.01
     if agent.happiness < 0.25:
-        chance += 0.02
-    return min(0.4, chance)
+        chance += 0.008
+    return min(0.18, chance)
 
 
 def _death_chance(agent: AgentState, years: int = 10) -> float:
     yearly = _yearly_death_chance(agent)
-    return min(0.65, 1.0 - (1.0 - yearly) ** max(1, years))
+    return min(0.32, 1.0 - (1.0 - yearly) ** max(1, years))
 
 
 def apply_deaths(sim: SimulationState, rng: random.Random) -> None:
-    alive = [a for a in sim.agents if a.alive]
-    if len(alive) <= 2:
-        return
-    for agent in list(alive):
-        living = [a for a in sim.agents if a.alive]
-        if len(living) <= 2:
-            break
-        years = max(1, int(getattr(sim.world, "years_per_turn", 10)))
-        if rng.random() >= _death_chance(agent, years):
+    years = max(1, int(getattr(sim.world, "years_per_turn", 10)))
+    by_region: dict[str, list[AgentState]] = defaultdict(list)
+    for agent in sim.agents:
+        if agent.alive:
+            by_region[_region_key(agent)].append(agent)
+    for members in by_region.values():
+        if len(members) <= 2:
             continue
-        heirs = [
-            a
-            for a in living
-            if a.id != agent.id and a.settlement_id and a.settlement_id == agent.settlement_id
-        ]
-        if not heirs:
-            others = [a for a in living if a.id != agent.id]
-            if others:
-                heirs = [min(others, key=lambda o: distance(agent.position, o.position))]
-        heir = heirs[0] if heirs else None
-        if heirs and agent.wealth > 0:
-            share = agent.wealth / len(heirs)
-            for h in heirs:
-                h.wealth += share
-        agent.alive = False
-        agent.energy = 0.0
-        sim.relationships = [
-            rel for rel in sim.relationships if rel.a_id != agent.id and rel.b_id != agent.id
-        ]
-        sim.events.append(
-            EventRecord(
-                turn=sim.world.turn,
-                actor_id=agent.id,
-                action=ActionType.death,
-                target_id=heir.id if heir else None,
-                success=False,
-                detail_key="death",
-                detail=f"{agent.id} died at {agent.age}",
-                deltas={"age": float(agent.age)},
+        for agent in list(members):
+            living = [a for a in members if a.alive]
+            if len(living) <= 2:
+                break
+            if rng.random() >= _death_chance(agent, years):
+                continue
+            heirs = [
+                a
+                for a in living
+                if a.id != agent.id and a.settlement_id and a.settlement_id == agent.settlement_id
+            ]
+            if not heirs:
+                others = [a for a in living if a.id != agent.id]
+                if others:
+                    heirs = [min(others, key=lambda o: distance(agent.position, o.position))]
+            heir = heirs[0] if heirs else None
+            if heirs and agent.wealth > 0:
+                share = agent.wealth / len(heirs)
+                for h in heirs:
+                    h.wealth += share
+            agent.alive = False
+            agent.energy = 0.0
+            sim.relationships = [
+                rel for rel in sim.relationships if rel.a_id != agent.id and rel.b_id != agent.id
+            ]
+            sim.events.append(
+                EventRecord(
+                    turn=sim.world.turn,
+                    actor_id=agent.id,
+                    action=ActionType.death,
+                    target_id=heir.id if heir else None,
+                    success=False,
+                    detail_key="death",
+                    detail=f"{agent.id} died at {agent.age}",
+                    deltas={"age": float(agent.age)},
+                )
             )
-        )
 
 
 def apply_trait_shifts(sim: SimulationState, rng: random.Random) -> None:
@@ -878,7 +1004,7 @@ def recompute_settlements(sim: SimulationState, rng: random.Random | None = None
 
     for i, a in enumerate(alive):
         for b in alive[i + 1 :]:
-            if a.region_id != b.region_id:
+            if _region_key(a) != _region_key(b):
                 continue
             if distance(a.position, b.position) <= SETTLEMENT_DISTANCE:
                 union(a.id, b.id)
@@ -915,8 +1041,12 @@ def recompute_settlements(sim: SimulationState, rng: random.Random | None = None
     sim.settlements = settlements
 
 
-def compute_metrics(sim: SimulationState, cooperate_successes: int, action_count: int) -> MetricsSnapshot:
-    alive = [a for a in sim.agents if a.alive]
+def _slice_metrics(
+    sim: SimulationState,
+    alive: list[AgentState],
+    coop_rate: float,
+    authority: float,
+) -> tuple[float, float, float, float, float]:
     wealths = [a.wealth for a in alive] or [0.0]
     mean_w = sum(wealths) / len(wealths)
     var = sum((w - mean_w) ** 2 for w in wealths) / len(wealths)
@@ -924,20 +1054,77 @@ def compute_metrics(sim: SimulationState, cooperate_successes: int, action_count
     alive_ids = {a.id for a in alive}
     trusts = [r.trust for r in sim.relationships if r.a_id in alive_ids and r.b_id in alive_ids] or [0.0]
     mean_trust = sum(trusts) / len(trusts)
-    coop_rate = (cooperate_successes / action_count) if action_count else 0.0
     mean_happiness = sum(a.happiness for a in alive) / len(alive) if alive else 0.0
+    return (
+        round(inequality, 4),
+        round(mean_trust, 4),
+        round(coop_rate, 4),
+        round(authority, 4),
+        round(mean_happiness, 4),
+    )
+
+
+def _coop_by_region(sim: SimulationState, events: list[EventRecord]) -> dict[str, tuple[int, int]]:
+    ok: dict[str, int] = defaultdict(int)
+    n: dict[str, int] = defaultdict(int)
+    by_id = {a.id: a for a in sim.agents}
+    for event in events:
+        if event.action != ActionType.cooperate:
+            continue
+        actor = by_id.get(event.actor_id)
+        rid = actor.region_id if actor and actor.region_id else "lone"
+        n[rid] += 1
+        if event.success:
+            ok[rid] += 1
+    return {rid: (ok[rid], n[rid]) for rid in n}
+
+
+def compute_metrics(
+    sim: SimulationState,
+    cooperate_successes: int,
+    action_count: int,
+    micro_events: list[EventRecord] | None = None,
+) -> MetricsSnapshot:
+    alive = [a for a in sim.agents if a.alive]
+    coop_rate = (cooperate_successes / action_count) if action_count else 0.0
     if sim.world.regions:
         authority = sum(r.institution_runtime.authority for r in sim.world.regions) / len(
             sim.world.regions
         )
     else:
         authority = sim.world.institution_runtime.authority
+    inequality, mean_trust, coop_rate, authority, mean_happiness = _slice_metrics(
+        sim, alive, coop_rate, authority
+    )
+    region_rows: list[RegionMetricsSnapshot] = []
+    coop_map = _coop_by_region(sim, micro_events or [])
+    if sim.world.regions:
+        for region in sim.world.regions:
+            rid = region.id.value
+            members = agents_in_region(sim, region)
+            ok, n = coop_map.get(rid, (0, 0))
+            r_coop = (ok / n) if n else 0.0
+            ineq, trust, coop, auth, happy = _slice_metrics(
+                sim, members, r_coop, region.institution_runtime.authority
+            )
+            region_rows.append(
+                RegionMetricsSnapshot(
+                    region_id=rid,
+                    subregion_id=region.subregion_id,
+                    inequality=ineq,
+                    mean_trust=trust,
+                    cooperation_rate=coop,
+                    authority=auth,
+                    mean_happiness=happy,
+                )
+            )
     return MetricsSnapshot(
-        inequality=round(inequality, 4),
-        mean_trust=round(mean_trust, 4),
-        cooperation_rate=round(coop_rate, 4),
-        authority=round(authority, 4),
-        mean_happiness=round(mean_happiness, 4),
+        inequality=inequality,
+        mean_trust=mean_trust,
+        cooperation_rate=coop_rate,
+        authority=authority,
+        mean_happiness=mean_happiness,
+        regions=region_rows,
     )
 
 
@@ -1135,7 +1322,7 @@ def apply_welfare(sim: SimulationState) -> None:
         rate = region.welfare_rate
         if rate <= 0:
             continue
-        members = [a for a in sim.agents if a.alive and a.region_id == region.id.value]
+        members = agents_in_region(sim, region)
         if len(members) < 2:
             continue
         mean = sum(a.wealth for a in members) / len(members)
@@ -1176,7 +1363,9 @@ def apply_disasters(sim: SimulationState, rng: random.Random, skip_quake: set[st
         sid = region.subregion_id or region.id.value
         if kind == "earthquake" and sid in skip_quake:
             continue
-        hit = [a for a in sim.agents if a.alive and (a.region_id == region.id.value or not sim.world.regions)]
+        hit = agents_in_region(sim, region)
+        if not sim.world.regions:
+            hit = [a for a in sim.agents if a.alive]
         if not hit:
             continue
         if kind in ("typhoon", "earthquake") and len(hit) > 2:
@@ -1228,7 +1417,7 @@ def apply_regime_drift(sim: SimulationState, rng: random.Random) -> list[EventRe
     for region in sim.world.regions:
         inst = region.institution
         auth = region.institution_runtime.authority
-        members = [a for a in sim.agents if a.alive and a.region_id == region.id.value]
+        members = agents_in_region(sim, region)
         ineq = region.initial_values.inequality
         if len(members) >= 3:
             mean = sum(a.wealth for a in members) / len(members)
@@ -1285,10 +1474,10 @@ def end_of_turn(
     previous_leaders = {s.leader_id for s in sim.settlements if s.leader_id}
     snapshot = {a.id: _set_id(a) for a in sim.agents}
     marker = len(sim.events)
+    apply_births(sim, rng)
     apply_aging(sim)
     apply_deaths(sim, rng)
     apply_trait_shifts(sim, rng)
-    apply_births(sim, rng)
     recompute_settlements(sim, rng)
     current_leaders = {s.leader_id for s in sim.settlements if s.leader_id}
     _emit_leadership_changes(sim, previous_leaders, current_leaders)
@@ -1311,9 +1500,8 @@ def end_of_turn(
                 regen *= 1.15
             elif region.climate == ClimateType.cold:
                 regen *= 0.7
-                for agent in sim.agents:
-                    if agent.alive and agent.region_id == region.id.value:
-                        agent.energy = clamp(agent.energy - 0.03)
+                for agent in agents_in_region(sim, region):
+                    agent.energy = clamp(agent.energy - 0.03)
             region.resource_pool += regen
             region.institution_runtime.authority = clamp(region.institution_runtime.authority)
         sim.world.resource_pool = sum(r.resource_pool for r in sim.world.regions)
@@ -1334,7 +1522,7 @@ def end_of_turn(
         sim.world.resource_pool += regen
         sim.world.institution_runtime.authority = clamp(sim.world.institution_runtime.authority)
     apply_welfare(sim)
-    metrics = compute_metrics(sim, cooperate_successes, action_count)
+    metrics = compute_metrics(sim, cooperate_successes, action_count, micro_events or [])
     sim.last_metrics = metrics
     sim.history.append(
         HistoryRecord(
@@ -1350,9 +1538,19 @@ def end_of_turn(
     sim.world.turn += 1
 
 
+def _turns_until_year_cap(sim: SimulationState) -> int:
+    years = max(1, int(getattr(sim.world, "years_per_turn", YEARS_PER_TURN)))
+    max_turn = (MAX_CALENDAR_YEAR - int(sim.world.start_year)) // years
+    return max(0, max_turn - int(sim.world.turn))
+
+
 def tick(sim: SimulationState, n: int = 1) -> SimulationState:
+    remaining = _turns_until_year_cap(sim)
+    steps = min(max(0, n), remaining)
+    if steps <= 0:
+        return sim
     rng = random.Random(sim.world.seed + sim.world.turn * 1009)
-    for _ in range(max(1, n)):
+    for _ in range(steps):
         choices = decide_actions(sim, rng)
         coop_ok, action_count, micro_events = resolve_actions(sim, choices, rng)
         end_of_turn(sim, coop_ok, action_count, rng, micro_events)

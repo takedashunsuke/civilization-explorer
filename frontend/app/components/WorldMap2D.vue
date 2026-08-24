@@ -269,26 +269,32 @@ function draw() {
       if (!agent?.alive) continue
       pts.push(projectAgent(agent, earth))
     }
-    const member = pts.length
-      ? agentsById.get(settlement.member_ids.find((id) => agentsById.get(id)?.alive) ?? '')
-      : undefined
-    const center = member
-      ? projectAgent(member, earth)
-      : projectOnLand(settlement.position.x, settlement.position.y, theaterFor(settlement.subregion_id || settlement.region_id), earth)
+    const center: [number, number] = pts.length
+      ? [
+          pts.reduce((s, p) => s + p[0], 0) / pts.length,
+          pts.reduce((s, p) => s + p[1], 0) / pts.length,
+        ]
+      : projectOnLand(
+          settlement.position.x,
+          settlement.position.y,
+          theaterFor(settlement.subregion_id || settlement.region_id),
+          earth,
+        )
     centers.set(settlement.id, center)
     const hull = convexHull(pts)
     const color = settlementColor(settlement.region_id || settlement.id)
     const target = octx ?? ctx
+    const extent = pts.length
+      ? Math.max(0, ...pts.map(([x, y]) => Math.hypot(x - center[0], y - center[1])))
+      : 0
+    const minR = 26 / scale
     target.beginPath()
-    if (hull.length >= 3) {
+    if (hull.length >= 3 && extent > minR * 1.15) {
       target.moveTo(hull[0][0], hull[0][1])
       for (let i = 1; i < hull.length; i++) target.lineTo(hull[i][0], hull[i][1])
       target.closePath()
     } else {
-      const spread = pts.length
-        ? Math.max(14, ...pts.map(([x, y]) => Math.hypot(x - center[0], y - center[1])))
-        : 18
-      target.arc(center[0], center[1], spread + 8, 0, Math.PI * 2)
+      target.arc(center[0], center[1], Math.max(extent + 8 / scale, minR), 0, Math.PI * 2)
     }
     target.fillStyle = hexRgba(color, 0.22)
     target.fill()
@@ -329,7 +335,7 @@ function draw() {
     ctx.setLineDash([])
   }
 
-  const alive = (props.sim?.agents ?? []).filter((a) => a.alive).slice(0, 128)
+  const alive = (props.sim?.agents ?? []).filter((a) => a.alive)
   for (const agent of alive) {
     const [x, y] = projectAgent(agent, earth)
     const isLeader = leaders.has(agent.id)

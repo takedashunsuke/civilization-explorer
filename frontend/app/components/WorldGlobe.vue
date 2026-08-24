@@ -51,7 +51,7 @@ const panning = ref(false)
 const zoomPct = ref(100)
 const theaterId = ref('asia')
 
-const MAX_MARKERS = 128
+const MAX_MARKERS = 512
 const EARTH_R = 1
 const MARKER_R = 1.018
 

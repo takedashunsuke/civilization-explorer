@@ -15,7 +15,7 @@
   "turnLabel": "Turn {turn}",
   "initialConditions": "Initial conditions",
   "calendarYear": "Start year",
-  "calendarYearHint": "Set a Gregorian year as BC or AD. Each turn advances ten years.",
+  "calendarYearHint": "Set a Gregorian year as BC or AD. Each turn advances ten years. Simulation stops at AD 3000.",
   "calendarEra": {
     "bc": "BC",
     "ad": "AD"
@@ -36,7 +36,7 @@
     "notables": "Notable"
   },
   "population": "Population",
-  "populationHint": "Initial actors (2–100). Births can raise the count up to 100 when wealth and happiness are high.",
+  "populationHint": "Initial actors (100–1000). Births happen per subregion, up to 1000 per column.",
   "seed": "Seed",
   "seedHint": "RNG seed. Same value reproduces terrain, positions, traits, and ties.",
   "taxRate": "Tax rate",
@@ -140,14 +140,18 @@
   },
   "wizard": {
     "step1": "STEP 1 Geography",
-    "step2": "STEP 2 People & regime",
+    "step2": "STEP 2 Society & people",
     "step3": "STEP 3 Who emerges",
     "lead1": "Geography, nature, food, and sanitation are preset per chosen subregion. Read inland, coast, and islands in the table.",
-    "lead2": "Set the start year and, per column, human disposition and starting regime—the same land can still fork.",
-    "lead3": "Bias in who a civilization produces: notable people, redistribution (dole), and starting headcount per column.",
-    "notable": "Notable people",
+    "lead2": "Set the start year and, per column, social rules and human disposition—the same land can still fork.",
+    "lead3": "Per continent column: how unusual people appear, how wealth is shared, and how many people start there.",
+    "notable": "Chance of unusual people",
+    "notableHint": "How easily charisma or genius appears. Higher values bias the run toward outliers.",
     "trade": "Openness (trade)",
-    "columnPop": "People in column",
+    "columnPop": "Starting people",
+    "columnPopHint": "How many people this continent column starts with (100–1000). That is the group's starting size on the map.",
+    "columnPopCount": "{n} people",
+    "welfareHint": "How strongly this column shares wealth when it is uneven. Closer to none, inequality stays.",
     "welfare": {
       "label": "Dole (redistribute)",
       "none": "None",
@@ -410,13 +414,16 @@
   },
   "actions": {
     "create": "Create",
-    "tick": "+1",
-    "tick5": "+5",
+    "tick": "+10 years",
+    "tick5": "+50 years",
     "autoPlay": "Play",
     "autoStop": "Stop"
   },
   "metrics": {
     "title": "Metrics",
+    "world": "World",
+    "showDetail": "Show regional metrics",
+    "hideDetail": "Hide regional metrics",
     "inequality": "Inequality",
     "inequalityHint": "Wealth spread (stddev ÷ mean). Higher = wider gap.",
     "trust": "Trust",
@@ -434,6 +441,20 @@
     "closeConditions": "Close conditions",
     "closeEvents": "Close events"
   },
+  "headlines": {
+    "epidemic": "Plague in {group}",
+    "revolution": "Revolution in {group} ({from}→{to})",
+    "warOut": "War: {group} vs {other}",
+    "warIn": "Civil war in {group}",
+    "typhoon": "Typhoon in {group}",
+    "quake": "Quake in {group}",
+    "flood": "Flood in {group}",
+    "heat": "Heat wave in {group}",
+    "frost": "Cold snap in {group}",
+    "drought": "Drought in {group}",
+    "storm": "Storm in {group}",
+    "disaster": "Disaster in {group}"
+  },
   "map": {
     "title": "World map",
     "legend": "Color fill = group territory. Labels scale from band to city to nation. Red dashes = clashes. Dot color matches the group.",
@@ -442,6 +463,7 @@
     "settlements": "Settlements {count}",
     "resources": "Shared resources {value}",
     "fiveContinents": "Five continents",
+    "shockLog": "World dispatches",
     "zoomHintFlat": "Drag to pan. Scroll or double-click to zoom.",
     "zoomHintGlobe": "Drag to orbit. Scroll or double-click to zoom.",
     "fit": "Groups",
