@@ -758,8 +758,8 @@ onBeforeUnmount(() => {
                 </template>
               </Column>
             </DataTable>
-            <div class="conditions-grid conditions-grid-stage year-block">
-              <div class="conditions-field">
+            <div class="year-block">
+              <div class="conditions-field year-field">
                 <label>{{ t('calendarYear') }}</label>
                 <div class="year-row">
                   <Dropdown
@@ -769,16 +769,25 @@ onBeforeUnmount(() => {
                     option-value="value"
                     class="era-select"
                   />
-                  <InputNumber v-model="calendarYear" :min="calendarYearMin" :max="50000" show-buttons class="year-input" />
+                  <InputNumber
+                    v-model="calendarYear"
+                    :min="calendarYearMin"
+                    :max="50000"
+                    :step="100"
+                    show-buttons
+                    class="year-input"
+                  />
                 </div>
-                <p class="hint">{{ t('calendarYearHint') }}</p>
               </div>
-              <div class="era-preview">
-                <p class="era-preview-title">{{ t('eraPreview.title') }}</p>
-                <p><span class="era-k">{{ t('eraPreview.year', { label: draftYearLabel }) }}</span></p>
-                <p><span class="era-k">{{ t('eraPreview.japan') }}</span> {{ draftJapanEra }}</p>
-                <p><span class="era-k">{{ t('eraPreview.world') }}</span> {{ draftWorldEra }}</p>
+              <div class="era-preview" aria-live="polite">
+                <span class="era-preview-title">{{ t('eraPreview.title') }}</span>
+                <span class="era-banner-year">{{ draftYearLabel }}</span>
+                <span class="header-era-sep" aria-hidden="true">·</span>
+                <span><span class="era-k">{{ t('eraPreview.japan') }}</span>{{ draftJapanEra }}</span>
+                <span class="header-era-sep" aria-hidden="true">·</span>
+                <span><span class="era-k">{{ t('eraPreview.world') }}</span>{{ draftWorldEra }}</span>
               </div>
+              <p class="hint year-hint">{{ t('calendarYearHint') }}</p>
             </div>
           </section>
 
@@ -989,32 +998,30 @@ onBeforeUnmount(() => {
 }
 
 .era-preview {
-  margin-top: 0;
-  padding: 0.45rem 0.6rem;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem 0.5rem;
+  margin: 0;
+  min-height: 2.15rem;
+  padding: 0.2rem 0.65rem;
   border-radius: 8px;
   border: 1px dashed var(--line);
   background: color-mix(in srgb, var(--panel) 70%, #121820);
   min-width: 0;
-}
-
-.era-preview-title {
-  margin: 0 0 0.35rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #e6eef5;
-}
-
-.era-preview p {
-  margin: 0.15rem 0;
-  font-size: 0.82rem;
-  line-height: 1.4;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  line-height: 1.2;
   color: var(--text);
 }
 
-.era-preview p {
-  margin: 0.15rem 0;
-  font-size: 0.82rem;
-  line-height: 1.4;
+.era-preview-title {
+  margin: 0;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #e6eef5;
 }
 
 .lang {
@@ -1205,7 +1212,27 @@ h2 {
 }
 
 .year-block {
+  display: grid;
+  grid-template-columns: minmax(14rem, 18rem) minmax(0, 1fr);
+  grid-template-areas:
+    'year era'
+    'hint hint';
+  gap: 0.35rem 0.75rem;
+  align-items: end;
   margin-top: 0.7rem;
+}
+
+.year-field {
+  grid-area: year;
+}
+
+.year-block .era-preview {
+  grid-area: era;
+}
+
+.year-hint {
+  grid-area: hint;
+  margin: 0;
 }
 
 .conditions-dt {
@@ -1717,8 +1744,21 @@ label {
   .conditions-grid-land,
   .conditions-grid-4,
   .conditions-grid-replay,
-  .continent-grid {
+  .continent-grid,
+  .year-block {
     grid-template-columns: 1fr;
+  }
+
+  .year-block {
+    grid-template-areas:
+      'year'
+      'era'
+      'hint';
+  }
+
+  .era-preview {
+    flex-wrap: wrap;
+    white-space: normal;
   }
 }
 </style>
