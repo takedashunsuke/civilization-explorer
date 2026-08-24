@@ -1,4 +1,4 @@
-/** Astronomical year: AD 1 = 1, BC 1 = 0, BC 44 = -43. */
+/** Astronomical year: AD 0 = 0, AD 1 = 1, BC 1 = 0. */
 
 import { JAPAN_NENGO, type JapanNengo } from './japanNengo'
 
@@ -49,13 +49,14 @@ export const WORLD_PERIODS: PeriodDef[] = [
 const MODERN_PERIOD_KEYS = new Set(['meiji', 'taisho', 'showa', 'heisei', 'reiwa'])
 
 export function toAstronomicalYear(era: CalendarEra, year: number): number {
+  if (era === 'ad') return Math.max(0, Math.floor(year))
   const n = Math.max(1, Math.floor(Math.abs(year)))
-  return era === 'ad' ? n : 1 - n
+  return 1 - n
 }
 
 export function fromAstronomicalYear(astro: number): { era: CalendarEra; year: number } {
   const y = Math.trunc(astro)
-  if (y > 0) return { era: 'ad', year: y }
+  if (y >= 0) return { era: 'ad', year: y }
   return { era: 'bc', year: 1 - y }
 }
 

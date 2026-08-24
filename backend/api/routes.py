@@ -34,7 +34,10 @@ class RegionCreateBody(BaseModel):
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     education_level: float = Field(default=0.5, ge=0, le=1)
     religion: str = "folk"
+    trade_openness: float = Field(default=0.5, ge=0, le=1)
     initial_values: dict[str, float] | None = None
+    trait_rate: float = Field(default=0.1, ge=0, le=1)
+    welfare_rate: float = Field(default=0.0, ge=0, le=1)
 
 
 class CreateSimulationRequest(BaseModel):
@@ -128,7 +131,10 @@ def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
                 tax_rate=item.tax_rate,
                 education_level=item.education_level,
                 religion=r_rel,
+                trade_openness=item.trade_openness,
                 initial_values=r_init,
+                trait_rate=item.trait_rate,
+                welfare_rate=item.welfare_rate,
             )
         )
 

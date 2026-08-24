@@ -15,7 +15,7 @@
   "turnLabel": "Turn {turn}",
   "initialConditions": "Initial conditions",
   "calendarYear": "Start year",
-  "calendarYearHint": "Set a Gregorian year as BC or AD. Each turn advances one year.",
+  "calendarYearHint": "Set a Gregorian year as BC or AD. Each turn advances ten years.",
   "calendarEra": {
     "bc": "BC",
     "ad": "AD"
@@ -63,10 +63,12 @@
   "disasterFrequency": "Frequency",
   "disasterFrequencyHint": "0 almost never; 1 fairly often (0–1).",
   "religion": "Outlook",
-  "religionHint": "Organized faith favors obedience; secular outlooks make resistance easier.",
+  "religionHint": "Polytheism leans loosely obedient; monotheism favors authority; secular outlooks make resistance easier.",
   "religions": {
     "folk": "Folk belief",
-    "organized": "Organized religion",
+    "polytheism": "Polytheism",
+    "monotheism": "Monotheism",
+    "organized": "Monotheism",
     "secular": "Secular"
   },
   "cooperation": "Mutual aid",
@@ -91,7 +93,7 @@
     "wetland": "Wetland",
     "arid": "Arid"
   },
-  "institutionHint": "Affects how readily people obey or resist.",
+  "institutionHint": "Starting regime. Authority, resistance, and inequality can shift it later; no regime stays frozen.",
   "geographies": {
     "africa": "Africa",
     "asia": "Asia",
@@ -137,19 +139,32 @@
     "world": "World"
   },
   "wizard": {
-    "step1": "STEP 1 Backdrop",
-    "step2": "STEP 2 Society",
-    "step3": "STEP 3 Outlook",
-    "lead1": "Geography, nature, and food are preset per chosen subregion. Read inland, coast, and islands in the table.",
-    "lead2": "Change social constraints per selected subregion to see whether futures diverge in one world.",
-    "lead3": "Set religion and disposition per column to compare group agents in the chosen subregions.",
+    "step1": "STEP 1 Geography",
+    "step2": "STEP 2 People & regime",
+    "step3": "STEP 3 Who emerges",
+    "lead1": "Geography, nature, food, and sanitation are preset per chosen subregion. Read inland, coast, and islands in the table.",
+    "lead2": "Set the start year and, per column, human disposition and starting regime—the same land can still fork.",
+    "lead3": "Bias in who a civilization produces: notable people, redistribution (dole), and starting headcount per column.",
+    "notable": "Notable people",
+    "trade": "Openness (trade)",
+    "columnPop": "People in column",
+    "welfare": {
+      "label": "Dole (redistribute)",
+      "none": "None",
+      "thin": "Light",
+      "mid": "Medium",
+      "thick": "Heavy",
+      "high": "Very heavy"
+    },
     "next": "Next",
     "back": "Back",
     "axis": "Item",
     "levels": {
+      "veryLow": "Very low",
       "low": "Low",
       "mid": "Medium",
-      "high": "High"
+      "high": "High",
+      "veryHigh": "Very high"
     },
     "rows": {
       "subregion": "Subregion",
@@ -387,7 +402,7 @@
       }
     }
   },
-  "institution": "Institution",
+  "institution": "Regime",
   "institutions": {
     "democracy": "Democracy",
     "autocracy": "Autocracy",
@@ -465,7 +480,8 @@
     "death": "Death",
     "lead": "Succession",
     "trait": "Notable",
-    "disaster": "Disaster"
+    "disaster": "Disaster",
+    "regime": "Regime"
   },
   "eventDetails": {
     "wait": "Rested to recover energy.",
@@ -516,7 +532,8 @@
     "weather_blizzard": "A severe cold snap and blizzard hit {group}.",
     "weather_storm": "Abnormal storms struck coasts and islands in {group}.",
     "weather_heat": "An abnormal heat wave hit {group}.",
-    "historic_quake": "In {year}, a recorded great earthquake near {group} ({name}, M{mag}). From Wikipedia."
+    "historic_quake": "In {year}, a recorded great earthquake near {group} ({name}, M{mag}). From Wikipedia.",
+    "regime_shift": "{group} shifted from {from} to {to}."
   },
   "yearLabel": {
     "bc": "BC {year}",

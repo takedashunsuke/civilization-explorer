@@ -39,8 +39,13 @@ class ClimateType(str, Enum):
 
 class ReligionType(str, Enum):
     folk = "folk"
-    organized = "organized"
+    polytheism = "polytheism"
+    monotheism = "monotheism"
     secular = "secular"
+    organized = "organized"  # legacy: treated as monotheism
+
+
+YEARS_PER_TURN = 10
 
 
 def resolve_theater_and_landform(
@@ -78,6 +83,7 @@ class ActionType(str, Enum):
     lead = "lead"
     trait = "trait"
     disaster = "disaster"
+    regime = "regime"
 
 
 class Position(BaseModel):
@@ -95,7 +101,7 @@ class InitialValues(BaseModel):
     cooperation: float = Field(ge=0, le=1, default=0.5)
     authority_acceptance: float = Field(ge=0, le=1, default=0.5)
     ambition: float = Field(ge=0, le=1, default=0.5)
-    inequality: float = Field(ge=0, le=1, default=0.35)
+    inequality: float = Field(ge=0, le=1, default=0.5)
 
 
 class RegionParams(BaseModel):
@@ -106,7 +112,10 @@ class RegionParams(BaseModel):
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     education_level: float = Field(default=0.5, ge=0, le=1)
     religion: ReligionType = ReligionType.folk
+    trade_openness: float = Field(default=0.5, ge=0, le=1)
     initial_values: InitialValues = Field(default_factory=InitialValues)
+    trait_rate: float = Field(default=0.1, ge=0, le=1)
+    welfare_rate: float = Field(default=0.0, ge=0, le=1)
 
 
 class WorldParams(BaseModel):
@@ -180,13 +189,17 @@ class RegionState(BaseModel):
     tax_rate: float = 0.1
     institution: InstitutionType = InstitutionType.democracy
     religion: ReligionType = ReligionType.folk
+    trade_openness: float = Field(default=0.5, ge=0, le=1)
     initial_values: InitialValues = Field(default_factory=InitialValues)
     terrain: TerrainState = Field(default_factory=TerrainState)
     institution_runtime: InstitutionState = Field(default_factory=InstitutionState)
+    trait_rate: float = Field(default=0.1, ge=0, le=1)
+    welfare_rate: float = Field(default=0.0, ge=0, le=1)
 
 
 class WorldState(BaseModel):
     turn: int = 0
+    years_per_turn: int = YEARS_PER_TURN
     seed: int
     initial_population: int = 8
     initial_total_wealth: float = 0.0

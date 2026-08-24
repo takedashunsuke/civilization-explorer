@@ -18,7 +18,8 @@ def historic_earthquakes() -> list[dict[str, Any]]:
 
 
 def calendar_year(sim: SimulationState) -> int:
-    return int(sim.world.start_year) + int(sim.world.turn)
+    years = max(1, int(getattr(sim.world, "years_per_turn", 10)))
+    return int(sim.world.start_year) + int(sim.world.turn) * years
 
 
 def clamp(value: float, low: float = 0.0, high: float = 1.0) -> float:
@@ -95,6 +96,7 @@ def apply_epidemics(sim: SimulationState, rng) -> list[EventRecord]:
     for region in sim.world.regions:
         sanitation = getattr(region, "sanitation", 0.5)
         chance = (1.0 - sanitation) * 0.09
+        chance += getattr(region, "trade_openness", 0.5) * 0.035
         if region.climate == ClimateType.wetland:
             chance += 0.03
         if rng.random() >= chance:

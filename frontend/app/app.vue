@@ -2,6 +2,8 @@
 import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
+import DataTable from 'primevue/datatable'
+import Column from 'primevue/column'
 import Tag from 'primevue/tag'
 import Toast from 'primevue/toast'
 import { useToast } from 'primevue/usetoast'
@@ -78,6 +80,7 @@ type Simulation = {
     climate?: string
     disaster_frequency?: number
     religion?: string
+    years_per_turn?: number
     regions?: Array<{ id: string; climate?: string; resource_pool?: number; subregion_id?: string | null }>
     terrain?: Terrain
     initial_population?: number
@@ -113,7 +116,7 @@ let autoTimer: ReturnType<typeof setInterval> | null = null
 let tickInFlight = false
 
 const calendarEra = ref<'bc' | 'ad'>('ad')
-const calendarYear = ref(700)
+const calendarYear = ref(0)
 const conditionStep = ref(1)
 const regionDrafts = ref<RegionDraft[]>(CONTINENT_IDS.map((id) => defaultRegionDraft(id)))
 
@@ -129,20 +132,34 @@ const institutionOptions = computed(() => [
 
 const religionOptions = computed(() => [
   { label: t('religions.folk'), value: 'folk' },
-  { label: t('religions.organized'), value: 'organized' },
+  { label: t('religions.polytheism'), value: 'polytheism' },
+  { label: t('religions.monotheism'), value: 'monotheism' },
   { label: t('religions.secular'), value: 'secular' },
 ])
 
-const levelOptions = computed(() => [
-  { label: t('wizard.levels.low'), value: 0.2 },
-  { label: t('wizard.levels.mid'), value: 0.5 },
-  { label: t('wizard.levels.high'), value: 0.8 },
+const levelLabels = computed(() => [
+  t('wizard.levels.veryLow'),
+  t('wizard.levels.low'),
+  t('wizard.levels.mid'),
+  t('wizard.levels.high'),
+  t('wizard.levels.veryHigh'),
 ])
+const welfareLabels = computed(() => [
+  t('wizard.welfare.none'),
+  t('wizard.welfare.thin'),
+  t('wizard.welfare.mid'),
+  t('wizard.welfare.thick'),
+  t('wizard.welfare.high'),
+])
+const LEVEL_STEPS = [0.2, 0.35, 0.5, 0.65, 0.8]
+const TAX_STEPS = [0.05, 0.1, 0.15, 0.2, 0.25]
+const NOTABLE_STEPS = [0.04, 0.085, 0.13, 0.175, 0.22]
+const WELFARE_STEPS = [0, 0.07, 0.14, 0.21, 0.28]
 
-const taxOptions = computed(() => [
-  { label: t('wizard.levels.low'), value: 0.05 },
-  { label: t('wizard.levels.mid'), value: 0.1 },
-  { label: t('wizard.levels.high'), value: 0.25 },
+const populationOptions = computed(() => [
+  { label: '3', value: 3 },
+  { label: '4', value: 4 },
+  { label: '6', value: 6 },
 ])
 
 const mapSeed = computed(() => sim.value?.world.seed ?? 0)
@@ -152,12 +169,53 @@ const calendarEraOptions = computed(() => [
   { label: t('calendarEra.ad'), value: 'ad' as const },
 ])
 
+const calendarYearMin = computed(() => (calendarEra.value === 'ad' ? 0 : 1))
+
+watch(calendarEra, (era) => {
+  if (era === 'bc' && calendarYear.value < 1) calendarYear.value = 1
+})
+
+const step2Axes = [
+  { key: 'institution' },
+  { key: 'taxRate' },
+  { key: 'education' },
+  { key: 'religion' },
+  { key: 'trade' },
+  { key: 'cooperation' },
+  { key: 'ambition' },
+  { key: 'inequality' },
+] as const
+
+function step2AxisLabel(key: (typeof step2Axes)[number]['key']): string {
+  if (key === 'trade') return t('wizard.trade')
+  if (key === 'taxRate') return t('taxRate')
+  if (key === 'education') return t('education')
+  if (key === 'religion') return t('religion')
+  if (key === 'cooperation') return t('cooperation')
+  if (key === 'ambition') return t('ambition')
+  if (key === 'inequality') return t('inequality')
+  return t('institution')
+}
+
+const step3Axes = [
+  { key: 'notable' },
+  { key: 'welfare' },
+  { key: 'columnPop' },
+] as const
+
+function step3AxisLabel(key: (typeof step3Axes)[number]['key']): string {
+  if (key === 'notable') return t('wizard.notable')
+  if (key === 'welfare') return t('wizard.welfare.label')
+  return t('wizard.columnPop')
+}
+
 const draftAstroYear = computed(() => toAstronomicalYear(calendarEra.value, calendarYear.value))
 
 const currentAstroYear = computed(() => {
   if (!sim.value) return draftAstroYear.value
   const start = sim.value.world.start_year ?? draftAstroYear.value
-  return start + sim.value.world.turn
+  const years = sim.value.world.years_per_turn ?? 10
+  return start + sim.value.world.turn * years
 })
 
 function formatYearLabel(astro: number): string {
@@ -319,6 +377,8 @@ function eventDetail(row: EventRow): string {
     name,
     mag: row.extra?.mag_label || (row.deltas?.magnitude != null ? String(row.deltas.magnitude) : ''),
     year: row.extra?.year || '',
+    from: row.extra?.from ? t(`institutions.${row.extra.from}`) : '',
+    to: row.extra?.to ? t(`institutions.${row.extra.to}`) : '',
   })
   return translated === key ? row.detail : translated
 }
@@ -365,11 +425,14 @@ async function createSimulation() {
         regions: regionDrafts.value.map((region) => ({
           id: region.id,
           subregion: region.subregion,
-          population: 4,
+          population: region.population,
           institution: region.institution,
           tax_rate: region.taxRate,
           education_level: region.education,
           religion: region.religion,
+          trade_openness: region.tradeOpenness,
+          trait_rate: region.traitRate,
+          welfare_rate: region.welfareRate,
           initial_values: {
             cooperation: region.cooperation,
             authority_acceptance: region.authorityAcceptance,
@@ -592,28 +655,6 @@ onBeforeUnmount(() => {
           <p class="conditions-lead">{{ t(`wizard.lead${conditionStep}`) }}</p>
 
           <section v-if="conditionStep === 1" class="conditions-section">
-            <div class="conditions-grid conditions-grid-stage">
-              <div class="conditions-field">
-                <label>{{ t('calendarYear') }}</label>
-                <div class="year-row">
-                  <Dropdown
-                    v-model="calendarEra"
-                    :options="calendarEraOptions"
-                    option-label="label"
-                    option-value="value"
-                    class="era-select"
-                  />
-                  <InputNumber v-model="calendarYear" :min="1" :max="50000" show-buttons class="year-input" />
-                </div>
-                <p class="hint">{{ t('calendarYearHint') }}</p>
-              </div>
-              <div class="era-preview">
-                <p class="era-preview-title">{{ t('eraPreview.title') }}</p>
-                <p><span class="era-k">{{ t('eraPreview.year', { label: draftYearLabel }) }}</span></p>
-                <p><span class="era-k">{{ t('eraPreview.japan') }}</span> {{ draftJapanEra }}</p>
-                <p><span class="era-k">{{ t('eraPreview.world') }}</span> {{ draftWorldEra }}</p>
-              </div>
-            </div>
             <div class="bg-table" role="table">
               <div class="bg-row bg-head" role="row">
                 <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
@@ -640,69 +681,145 @@ onBeforeUnmount(() => {
           </section>
 
           <section v-else-if="conditionStep === 2" class="conditions-section">
-            <div class="bg-table bg-form" role="table">
-              <div class="bg-row bg-head" role="row">
-                <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-h2`" class="bg-cell col-head" role="columnheader">
-                  <span>{{ t(`geographies.${region.id}`) }}</span>
-                  <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
+            <DataTable :value="step2Axes" class="conditions-dt">
+              <Column :header="t('wizard.axis')" class="dt-axis">
+                <template #body="{ data }">
+                  <span class="axis-label">
+                    {{ step2AxisLabel(data.key) }}
+                    <i
+                      v-if="data.key === 'institution'"
+                      v-tooltip.right="t('institutionHint')"
+                      class="pi pi-info-circle axis-info"
+                      tabindex="0"
+                    />
+                  </span>
+                </template>
+              </Column>
+              <Column v-for="region in regionDrafts" :key="region.id">
+                <template #header>
+                  <div class="col-head">
+                    <span>{{ t(`geographies.${region.id}`) }}</span>
+                    <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
+                  </div>
+                </template>
+                <template #body="{ data }">
+                  <Dropdown
+                    v-if="data.key === 'institution'"
+                    v-model="region.institution"
+                    :options="institutionOptions"
+                    option-label="label"
+                    option-value="value"
+                    class="field-control"
+                  />
+                  <LevelRating
+                    v-else-if="data.key === 'taxRate'"
+                    v-model="region.taxRate"
+                    :steps="TAX_STEPS"
+                    :labels="levelLabels"
+                  />
+                  <LevelRating
+                    v-else-if="data.key === 'education'"
+                    v-model="region.education"
+                    :steps="LEVEL_STEPS"
+                    :labels="levelLabels"
+                  />
+                  <Dropdown
+                    v-else-if="data.key === 'religion'"
+                    v-model="region.religion"
+                    :options="religionOptions"
+                    option-label="label"
+                    option-value="value"
+                    class="field-control"
+                  />
+                  <LevelRating
+                    v-else-if="data.key === 'trade'"
+                    v-model="region.tradeOpenness"
+                    :steps="LEVEL_STEPS"
+                    :labels="levelLabels"
+                  />
+                  <LevelRating
+                    v-else-if="data.key === 'cooperation'"
+                    v-model="region.cooperation"
+                    :steps="LEVEL_STEPS"
+                    :labels="levelLabels"
+                  />
+                  <LevelRating
+                    v-else-if="data.key === 'ambition'"
+                    v-model="region.ambition"
+                    :steps="LEVEL_STEPS"
+                    :labels="levelLabels"
+                  />
+                  <LevelRating
+                    v-else-if="data.key === 'inequality'"
+                    v-model="region.inequality"
+                    :steps="LEVEL_STEPS"
+                    :labels="levelLabels"
+                  />
+                </template>
+              </Column>
+            </DataTable>
+            <div class="conditions-grid conditions-grid-stage year-block">
+              <div class="conditions-field">
+                <label>{{ t('calendarYear') }}</label>
+                <div class="year-row">
+                  <Dropdown
+                    v-model="calendarEra"
+                    :options="calendarEraOptions"
+                    option-label="label"
+                    option-value="value"
+                    class="era-select"
+                  />
+                  <InputNumber v-model="calendarYear" :min="calendarYearMin" :max="50000" show-buttons class="year-input" />
                 </div>
+                <p class="hint">{{ t('calendarYearHint') }}</p>
               </div>
-              <div class="bg-row" role="row">
-                <div class="bg-stub" role="rowheader">{{ t('institution') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-institution`" class="bg-cell" role="cell">
-                  <Dropdown v-model="region.institution" :options="institutionOptions" option-label="label" option-value="value" class="field-control" />
-                </div>
-              </div>
-              <div class="bg-row" role="row">
-                <div class="bg-stub" role="rowheader">{{ t('taxRate') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-tax`" class="bg-cell" role="cell">
-                  <Dropdown v-model="region.taxRate" :options="taxOptions" option-label="label" option-value="value" class="field-control" />
-                </div>
-              </div>
-              <div class="bg-row" role="row">
-                <div class="bg-stub" role="rowheader">{{ t('education') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-edu`" class="bg-cell" role="cell">
-                  <Dropdown v-model="region.education" :options="levelOptions" option-label="label" option-value="value" class="field-control" />
-                </div>
+              <div class="era-preview">
+                <p class="era-preview-title">{{ t('eraPreview.title') }}</p>
+                <p><span class="era-k">{{ t('eraPreview.year', { label: draftYearLabel }) }}</span></p>
+                <p><span class="era-k">{{ t('eraPreview.japan') }}</span> {{ draftJapanEra }}</p>
+                <p><span class="era-k">{{ t('eraPreview.world') }}</span> {{ draftWorldEra }}</p>
               </div>
             </div>
           </section>
 
           <section v-else class="conditions-section">
-            <div class="bg-table bg-form" role="table">
-              <div class="bg-row bg-head" role="row">
-                <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-h3`" class="bg-cell col-head" role="columnheader">
-                  <span>{{ t(`geographies.${region.id}`) }}</span>
-                  <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
-                </div>
-              </div>
-              <div class="bg-row" role="row">
-                <div class="bg-stub" role="rowheader">{{ t('religion') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-religion`" class="bg-cell" role="cell">
-                  <Dropdown v-model="region.religion" :options="religionOptions" option-label="label" option-value="value" class="field-control" />
-                </div>
-              </div>
-              <div class="bg-row" role="row">
-                <div class="bg-stub" role="rowheader">{{ t('cooperation') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-coop`" class="bg-cell" role="cell">
-                  <Dropdown v-model="region.cooperation" :options="levelOptions" option-label="label" option-value="value" class="field-control" />
-                </div>
-              </div>
-              <div class="bg-row" role="row">
-                <div class="bg-stub" role="rowheader">{{ t('ambition') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-ambition`" class="bg-cell" role="cell">
-                  <Dropdown v-model="region.ambition" :options="levelOptions" option-label="label" option-value="value" class="field-control" />
-                </div>
-              </div>
-              <div class="bg-row" role="row">
-                <div class="bg-stub" role="rowheader">{{ t('inequality') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-ineq`" class="bg-cell" role="cell">
-                  <Dropdown v-model="region.inequality" :options="levelOptions" option-label="label" option-value="value" class="field-control" />
-                </div>
-              </div>
-            </div>
+            <DataTable :value="step3Axes" class="conditions-dt">
+              <Column :header="t('wizard.axis')" class="dt-axis">
+                <template #body="{ data }">
+                  <span>{{ step3AxisLabel(data.key) }}</span>
+                </template>
+              </Column>
+              <Column v-for="region in regionDrafts" :key="region.id">
+                <template #header>
+                  <div class="col-head">
+                    <span>{{ t(`geographies.${region.id}`) }}</span>
+                    <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
+                  </div>
+                </template>
+                <template #body="{ data }">
+                  <LevelRating
+                    v-if="data.key === 'notable'"
+                    v-model="region.traitRate"
+                    :steps="NOTABLE_STEPS"
+                    :labels="levelLabels"
+                  />
+                  <LevelRating
+                    v-else-if="data.key === 'welfare'"
+                    v-model="region.welfareRate"
+                    :steps="WELFARE_STEPS"
+                    :labels="welfareLabels"
+                  />
+                  <Dropdown
+                    v-else
+                    v-model="region.population"
+                    :options="populationOptions"
+                    option-label="label"
+                    option-value="value"
+                    class="field-control"
+                  />
+                </template>
+              </Column>
+            </DataTable>
           </section>
           <p v-if="error" class="error">{{ error }}</p>
         </div>
@@ -1085,6 +1202,60 @@ h2 {
   margin: 0 0 0.35rem;
   font-size: 0.88rem;
   color: var(--text);
+}
+
+.year-block {
+  margin-top: 0.7rem;
+}
+
+.conditions-dt {
+  margin-top: 0.35rem;
+}
+
+.conditions-dt :deep(.p-datatable-wrapper) {
+  background: #0b1118;
+  border: 1px solid #6b7c8d;
+  border-radius: 8px;
+}
+
+.conditions-dt :deep(.p-datatable-thead > tr > th),
+.conditions-dt :deep(.p-datatable-tbody > tr > td) {
+  background: #1c2632;
+  color: #f8fbff;
+  border-color: #4d5d6c;
+  padding: 0.4rem 0.5rem;
+  vertical-align: middle;
+}
+
+.conditions-dt :deep(.p-datatable-thead > tr > th) {
+  background: #2d3d4e;
+  font-weight: 700;
+}
+
+.conditions-dt :deep(.p-datatable-tbody > tr:nth-child(odd) > td) {
+  background: #151d27;
+}
+
+.conditions-dt :deep(.dt-axis) {
+  background: #3a4c5e !important;
+  font-weight: 700;
+  min-width: 7.2rem;
+}
+
+.axis-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.axis-info {
+  color: #9ec4e8;
+  cursor: help;
+  font-size: 0.85rem;
+}
+
+.conditions-dt :deep(.p-slider) {
+  background: #4d5d6c;
 }
 
 .bg-table {

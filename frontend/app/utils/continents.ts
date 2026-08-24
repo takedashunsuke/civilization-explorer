@@ -79,10 +79,14 @@ export type RegionDraft = {
   taxRate: number
   education: number
   religion: string
+  tradeOpenness: number
   cooperation: number
   authorityAcceptance: number
   ambition: number
   inequality: number
+  traitRate: number
+  welfareRate: number
+  population: number
 }
 
 export function defaultRegionDraft(id: ContinentId): RegionDraft {
@@ -93,10 +97,14 @@ export function defaultRegionDraft(id: ContinentId): RegionDraft {
     taxRate: 0.1,
     education: 0.5,
     religion: 'folk',
+    tradeOpenness: 0.5,
     cooperation: 0.5,
     authorityAcceptance: 0.5,
     ambition: 0.5,
-    inequality: 0.35,
+    inequality: 0.5,
+    traitRate: 0.1,
+    welfareRate: 0,
+    population: 4,
   }
 }
 

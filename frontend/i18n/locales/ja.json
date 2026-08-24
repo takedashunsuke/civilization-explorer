@@ -15,7 +15,7 @@
   "turnLabel": "ターン {turn}",
   "initialConditions": "初期条件",
   "calendarYear": "開始年",
-  "calendarYearHint": "西暦を BC / AD で指定。1ターン＝1年進みます。",
+  "calendarYearHint": "西暦を BC / AD で指定。1ターン＝10年進みます。",
   "calendarEra": {
     "bc": "BC（紀元前）",
     "ad": "AD（紀元後）"
@@ -63,10 +63,12 @@
   "disasterFrequency": "頻度",
   "disasterFrequencyHint": "0はほぼ起きず、1はたびたび起きます（0〜1）。",
   "religion": "観念",
-  "religionHint": "組織宗教は服従しやすく、世俗は抵抗が出やすい。",
+  "religionHint": "多神教は緩い服従、一神教は権威に寄りやすく、世俗は抵抗が出やすい。",
   "religions": {
     "folk": "民間信仰",
-    "organized": "組織宗教",
+    "polytheism": "多神教",
+    "monotheism": "一神教",
+    "organized": "一神教",
     "secular": "世俗"
   },
   "cooperation": "助け合い",
@@ -91,7 +93,7 @@
     "wetland": "湿地",
     "arid": "乾燥"
   },
-  "institutionHint": "誰が従い、誰が抵抗しやすいかに効きます。",
+  "institutionHint": "開始時の体制です。権威・抵抗・格差によって後から変わります。ずっと同じ民主制は想定しません。",
   "geographies": {
     "africa": "アフリカ",
     "asia": "アジア",
@@ -137,19 +139,32 @@
     "world": "世界"
   },
   "wizard": {
-    "step1": "STEP 1 背景",
-    "step2": "STEP 2 社会",
-    "step3": "STEP 3 観念",
-    "lead1": "地理・自然・食は、選んだサブ地域ごとに固定です。内地・海側・島国の違いを表で確認してください。",
-    "lead2": "選んだサブ地域ごとに社会的制約を変えると、同じ世界でも未来が分かれます。",
-    "lead3": "宗教と気質を列ごとに選び、選んだサブ地域の集団エージェントを比較します。",
+    "step1": "STEP 1 地理・自然",
+    "step2": "STEP 2 人間・体制",
+    "step3": "STEP 3 創発の偏り",
+    "lead1": "地理・自然・食・衛生は、選んだサブ地域ごとに固定です。内地・海側・島国の違いを表で確認してください。",
+    "lead2": "開始年と、列ごとの人間の気質・体制を変えると、同じ地理でも未来が分かれます。",
+    "lead3": "文明がどんな人物を生むかの偏りです。特異の出やすさ、施し（再分配）、列の人数を比べます。",
+    "notable": "特異の出やすさ",
+    "trade": "対外開放（交易）",
+    "columnPop": "列の人数",
+    "welfare": {
+      "label": "施し（再分配）",
+      "none": "なし",
+      "thin": "薄い",
+      "mid": "中",
+      "thick": "やや厚い",
+      "high": "厚い"
+    },
     "next": "次へ",
     "back": "戻る",
     "axis": "項目",
     "levels": {
+      "veryLow": "とても低い",
       "low": "低い",
-      "mid": "中くらい",
-      "high": "高い"
+      "mid": "中",
+      "high": "高い",
+      "veryHigh": "とても高い"
     },
     "rows": {
       "subregion": "サブ地域",
@@ -387,10 +402,10 @@
       }
     }
   },
-  "institution": "制度",
+  "institution": "体制",
   "institutions": {
-    "democracy": "民主主義",
-    "autocracy": "独裁制",
+    "democracy": "民主制",
+    "autocracy": "専制",
     "anarchy": "無政府"
   },
   "actions": {
@@ -465,7 +480,8 @@
     "death": "死",
     "lead": "交代",
     "trait": "特異",
-    "disaster": "災害"
+    "disaster": "災害",
+    "regime": "体制"
   },
   "eventDetails": {
     "wait": "力を回復するために休んだ。",
@@ -516,7 +532,8 @@
     "weather_blizzard": "{group} で異常な寒波・吹雪が襲った。",
     "weather_storm": "{group} で異常な嵐が海岸と島を叩いた。",
     "weather_heat": "{group} で異常な熱波が出た。",
-    "historic_quake": "{year}年、{group} 付近で史実の大地震（{name}、M{mag}）。Wikipedia の記録に基づく。"
+    "historic_quake": "{year}年、{group} 付近で史実の大地震（{name}、M{mag}）。Wikipedia の記録に基づく。",
+    "regime_shift": "{group} の体制が {from} から {to} へ移った。"
   },
   "yearLabel": {
     "bc": "BC {year}",

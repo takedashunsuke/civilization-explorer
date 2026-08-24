@@ -15,6 +15,7 @@ from simulation.models import (
     EventRecord,
     GeographyType,
     HistoryRecord,
+    InstitutionType,
     InstitutionState,
     LandformType,
     MetricsSnapshot,
@@ -28,6 +29,7 @@ from simulation.models import (
     SimulationState,
     WorldParams,
     WorldState,
+    YEARS_PER_TURN,
     resolve_theater_and_landform,
 )
 from simulation.terrain import biome_at, generate_terrain, random_land_position, snap_to_land
@@ -66,10 +68,16 @@ def pair_key(a_id: str, b_id: str) -> tuple[str, str]:
     return (a_id, b_id) if a_id < b_id else (b_id, a_id)
 
 
-def roll_traits(rng: random.Random, parent: AgentState | None = None) -> list[str]:
+def roll_traits(
+    rng: random.Random,
+    parent: AgentState | None = None,
+    trait_rate: float | None = None,
+) -> list[str]:
     traits: list[str] = []
-    charisma_p = CHARISMA_CHANCE + (TRAIT_INHERIT_BONUS if parent and "charisma" in parent.traits else 0)
-    genius_p = GENIUS_CHANCE + (TRAIT_INHERIT_BONUS if parent and "genius" in parent.traits else 0)
+    base_c = CHARISMA_CHANCE if trait_rate is None else float(trait_rate)
+    base_g = GENIUS_CHANCE if trait_rate is None else float(trait_rate) * 0.8
+    charisma_p = base_c + (TRAIT_INHERIT_BONUS if parent and "charisma" in parent.traits else 0)
+    genius_p = base_g + (TRAIT_INHERIT_BONUS if parent and "genius" in parent.traits else 0)
     if rng.random() < charisma_p:
         traits.append("charisma")
     if rng.random() < genius_p:
@@ -113,11 +121,14 @@ def _build_region(params: RegionParams, seed: int) -> RegionState:
         tax_rate=params.tax_rate,
         institution=params.institution,
         religion=params.religion,
+        trade_openness=params.trade_openness,
         initial_values=params.initial_values,
         terrain=terrain,
         institution_runtime=InstitutionState(
             authority=0.4 + 0.3 * params.initial_values.authority_acceptance
         ),
+        trait_rate=params.trait_rate,
+        welfare_rate=params.welfare_rate,
     )
 
 
@@ -165,7 +176,7 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
             coop = clamp(spec.initial_values.cooperation + rng.uniform(-0.2, 0.2))
             aggr = clamp(0.4 + rng.uniform(-0.25, 0.25))
             ambi = clamp(spec.initial_values.ambition + rng.uniform(-0.2, 0.2))
-            traits = roll_traits(rng)
+            traits = roll_traits(rng, trait_rate=region.trait_rate)
             if "charisma" in traits:
                 ambi = max(ambi, 0.68)
             spread = 4.0 + 28.0 * spec.initial_values.inequality
@@ -213,6 +224,7 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
         tax_rate=sum(r.tax_rate for r in regions) / len(regions),
         institution=primary.institution,
         start_year=params.start_year,
+        years_per_turn=YEARS_PER_TURN,
         geography=GeographyType.world,
         landform=primary.landform,
         climate=primary.climate,
@@ -298,10 +310,12 @@ def heuristic_decide(sim: SimulationState, agent: AgentState, rng: random.Random
     )
     if institution.value != "anarchy":
         piety = {
-            ReligionType.organized: 0.18,
             ReligionType.folk: 0.08,
+            ReligionType.polytheism: 0.12,
+            ReligionType.monotheism: 0.18,
+            ReligionType.organized: 0.18,
             ReligionType.secular: -0.04,
-        }[religion]
+        }.get(religion, 0.08)
         if p.ambition < 0.4 and roll < 0.25 + authority_acceptance * 0.2 + piety:
             return ChosenAction(agent_id=agent.id, action=ActionType.obey, reason="obey institution")
         if p.ambition > 0.7 and roll < max(0.08, 0.2 - piety):
@@ -626,7 +640,8 @@ def apply_births(sim: SimulationState, rng: random.Random) -> None:
     parent = rng.choice(eligible)
     idx = _next_agent_index(sim)
     child_id = f"a{idx}"
-    traits = roll_traits(rng, parent)
+    home = agent_region(sim, parent)
+    traits = roll_traits(rng, parent, home.trait_rate if home else None)
     ambi = clamp(parent.personality.ambition + rng.uniform(-0.12, 0.12))
     if "charisma" in traits:
         ambi = max(ambi, 0.68)
@@ -713,12 +728,13 @@ def _emit_leadership_changes(sim: SimulationState, previous: set[str], current: 
 
 
 def apply_aging(sim: SimulationState) -> None:
+    years = max(1, int(getattr(sim.world, "years_per_turn", 10)))
     for agent in sim.agents:
         if agent.alive:
-            agent.age += 1
+            agent.age += years
 
 
-def _death_chance(agent: AgentState) -> float:
+def _yearly_death_chance(agent: AgentState) -> float:
     age = agent.age
     if age < 45:
         chance = 0.004
@@ -737,6 +753,11 @@ def _death_chance(agent: AgentState) -> float:
     return min(0.4, chance)
 
 
+def _death_chance(agent: AgentState, years: int = 10) -> float:
+    yearly = _yearly_death_chance(agent)
+    return min(0.65, 1.0 - (1.0 - yearly) ** max(1, years))
+
+
 def apply_deaths(sim: SimulationState, rng: random.Random) -> None:
     alive = [a for a in sim.agents if a.alive]
     if len(alive) <= 2:
@@ -745,7 +766,8 @@ def apply_deaths(sim: SimulationState, rng: random.Random) -> None:
         living = [a for a in sim.agents if a.alive]
         if len(living) <= 2:
             break
-        if rng.random() >= _death_chance(agent):
+        years = max(1, int(getattr(sim.world, "years_per_turn", 10)))
+        if rng.random() >= _death_chance(agent, years):
             continue
         heirs = [
             a
@@ -784,8 +806,10 @@ def apply_trait_shifts(sim: SimulationState, rng: random.Random) -> None:
     for agent in sim.agents:
         if not agent.alive:
             continue
+        region = agent_region(sim, agent)
+        gain = TRAIT_GAIN_CHANCE * ((region.trait_rate / CHARISMA_CHANCE) if region else 1.0)
         if 16 <= agent.age <= 42:
-            if "charisma" not in agent.traits and rng.random() < TRAIT_GAIN_CHANCE:
+            if "charisma" not in agent.traits and rng.random() < gain:
                 agent.traits.append("charisma")
                 agent.personality.ambition = max(agent.personality.ambition, 0.66)
                 sim.events.append(
@@ -798,7 +822,7 @@ def apply_trait_shifts(sim: SimulationState, rng: random.Random) -> None:
                         detail=f"{agent.id} gained charisma",
                     )
                 )
-            if "genius" not in agent.traits and rng.random() < TRAIT_GAIN_CHANCE * 0.7:
+            if "genius" not in agent.traits and rng.random() < gain * 0.7:
                 agent.traits.append("genius")
                 sim.events.append(
                     EventRecord(
@@ -1106,6 +1130,31 @@ def _pick_disaster(region: RegionState, rng: random.Random) -> str:
     return kinds[-1]
 
 
+def apply_welfare(sim: SimulationState) -> None:
+    for region in sim.world.regions:
+        rate = region.welfare_rate
+        if rate <= 0:
+            continue
+        members = [a for a in sim.agents if a.alive and a.region_id == region.id.value]
+        if len(members) < 2:
+            continue
+        mean = sum(a.wealth for a in members) / len(members)
+        pool = 0.0
+        for agent in members:
+            if agent.wealth > mean:
+                take = (agent.wealth - mean) * rate * 0.2
+                agent.wealth -= take
+                pool += take
+        needy = [a for a in members if a.wealth < mean]
+        if not needy or pool <= 0:
+            continue
+        share = pool / len(needy)
+        for agent in needy:
+            agent.wealth += share
+            agent.happiness = clamp(agent.happiness + 0.015 * rate)
+        region.institution_runtime.authority = clamp(region.institution_runtime.authority + 0.01 * rate)
+
+
 def apply_disasters(sim: SimulationState, rng: random.Random, skip_quake: set[str] | None = None) -> list[EventRecord]:
     events: list[EventRecord] = []
     skip_quake = skip_quake or set()
@@ -1174,6 +1223,58 @@ def apply_disasters(sim: SimulationState, rng: random.Random, skip_quake: set[st
     return events
 
 
+def apply_regime_drift(sim: SimulationState, rng: random.Random) -> list[EventRecord]:
+    events: list[EventRecord] = []
+    for region in sim.world.regions:
+        inst = region.institution
+        auth = region.institution_runtime.authority
+        members = [a for a in sim.agents if a.alive and a.region_id == region.id.value]
+        ineq = region.initial_values.inequality
+        if len(members) >= 3:
+            mean = sum(a.wealth for a in members) / len(members)
+            var = sum((a.wealth - mean) ** 2 for a in members) / len(members)
+            ineq = min(1.0, (var ** 0.5) / max(mean, 1.0))
+        resist = 0.0
+        if members:
+            resist = sum(1 for a in members if a.allegiance == Allegiance.resist or a.personality.ambition > 0.7) / len(
+                members
+            )
+        nxt = inst
+        if inst == InstitutionType.democracy:
+            if auth > 0.62 and ineq > 0.55 and rng.random() < 0.07:
+                nxt = InstitutionType.autocracy
+            elif resist > 0.42 and auth < 0.38 and rng.random() < 0.05:
+                nxt = InstitutionType.anarchy
+        elif inst == InstitutionType.autocracy:
+            if resist > 0.38 and auth < 0.48 and rng.random() < 0.08:
+                nxt = InstitutionType.democracy if ineq < 0.55 else InstitutionType.anarchy
+        else:
+            if auth > 0.45 and rng.random() < 0.09:
+                nxt = InstitutionType.democracy if resist < 0.35 else InstitutionType.autocracy
+        if nxt == inst:
+            continue
+        prev = inst
+        region.institution = nxt
+        sid = region.subregion_id or region.id.value
+        lon, lat = SUBREGION_CENTERS.get(sid, (0.0, 0.0))
+        events.append(
+            EventRecord(
+                turn=sim.world.turn,
+                actor_id=sid,
+                action=ActionType.regime,
+                detail_key="regime_shift",
+                detail=f"{sid} {prev.value} -> {nxt.value}",
+                lon=lon,
+                lat=lat,
+                alert="yellow",
+                extra={"from": prev.value, "to": nxt.value},
+            )
+        )
+    if sim.world.regions:
+        sim.world.institution = sim.world.regions[0].institution
+    return events
+
+
 def end_of_turn(
     sim: SimulationState,
     cooperate_successes: int,
@@ -1198,10 +1299,12 @@ def end_of_turn(
     weather = apply_weather_shocks(sim, rng)
     skip_quake = {e.actor_id for e in historic}
     disasters = apply_disasters(sim, rng, skip_quake)
-    sim.events = sim.events[:marker] + grouped + historic + epidemics + weather + disasters
+    regimes = apply_regime_drift(sim, rng)
+    sim.events = sim.events[:marker] + grouped + historic + epidemics + weather + disasters + regimes
     if sim.world.regions:
         for region in sim.world.regions:
             regen = 2.0 + 3.0 * region.education_level
+            regen *= 0.65 + 0.7 * getattr(region, "trade_openness", 0.5)
             if region.climate == ClimateType.arid:
                 regen *= 0.45
             elif region.climate == ClimateType.wetland:
@@ -1230,6 +1333,7 @@ def end_of_turn(
                     agent.energy = clamp(agent.energy - 0.03)
         sim.world.resource_pool += regen
         sim.world.institution_runtime.authority = clamp(sim.world.institution_runtime.authority)
+    apply_welfare(sim)
     metrics = compute_metrics(sim, cooperate_successes, action_count)
     sim.last_metrics = metrics
     sim.history.append(
