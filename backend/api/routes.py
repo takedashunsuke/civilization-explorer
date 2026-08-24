@@ -14,6 +14,8 @@ from simulation.models import (
     InitialValues,
     InstitutionType,
     LandformType,
+    RegionParams,
+    ReligionType,
     SimulationState,
     WorldParams,
 )
@@ -23,18 +25,31 @@ router = APIRouter()
 _STORE: dict[str, SimulationState] = {}
 
 
+class RegionCreateBody(BaseModel):
+    id: str
+    population: int = Field(default=4, ge=2, le=40)
+    institution: str = "democracy"
+    tax_rate: float = Field(default=0.1, ge=0, le=1)
+    education_level: float = Field(default=0.5, ge=0, le=1)
+    religion: str = "folk"
+    initial_values: dict[str, float] | None = None
+
+
 class CreateSimulationRequest(BaseModel):
-    seed: int = 42
+    seed: int | None = None
     population: int = Field(default=8, ge=2, le=100)
     resource_pool: float = 100.0
     education_level: float = Field(default=0.5, ge=0, le=1)
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     institution: str = "democracy"
     start_year: int = Field(default=700, ge=-50000, le=3000)
-    geography: str = "asia"
+    geography: str = "world"
     landform: str = "continent"
     climate: str = "temperate"
+    disaster_frequency: float = Field(default=0.2, ge=0, le=1)
+    religion: str = "folk"
     initial_values: dict[str, float] | None = None
+    regions: list[RegionCreateBody] | None = None
 
 
 class TickRequest(BaseModel):
@@ -68,6 +83,10 @@ def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
         climate = ClimateType(body.climate)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"invalid climate: {body.climate}") from exc
+    try:
+        religion = ReligionType(body.religion)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"invalid religion: {body.religion}") from exc
 
     initial = InitialValues()
     if body.initial_values:
@@ -80,8 +99,38 @@ def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
             inequality=body.initial_values.get("inequality", initial.inequality),
         )
 
+    region_models: list[RegionParams] = []
+    for item in body.regions or []:
+        try:
+            rid = GeographyType(item.id)
+            r_inst = InstitutionType(item.institution)
+            r_rel = ReligionType(item.religion)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=f"invalid region: {item.id}") from exc
+        r_init = InitialValues()
+        if item.initial_values:
+            r_init = InitialValues(
+                cooperation=item.initial_values.get("cooperation", r_init.cooperation),
+                authority_acceptance=item.initial_values.get(
+                    "authority_acceptance", r_init.authority_acceptance
+                ),
+                ambition=item.initial_values.get("ambition", r_init.ambition),
+                inequality=item.initial_values.get("inequality", r_init.inequality),
+            )
+        region_models.append(
+            RegionParams(
+                id=rid,
+                population=item.population,
+                institution=r_inst,
+                tax_rate=item.tax_rate,
+                education_level=item.education_level,
+                religion=r_rel,
+                initial_values=r_init,
+            )
+        )
+
     params = WorldParams(
-        seed=body.seed,
+        seed=body.seed if body.seed is not None else uuid.uuid4().int % 1_000_000_000,
         population=body.population,
         resource_pool=body.resource_pool,
         education_level=body.education_level,
@@ -91,7 +140,10 @@ def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
         geography=geography,
         landform=landform,
         climate=climate,
+        disaster_frequency=body.disaster_frequency,
+        religion=religion,
         initial_values=initial,
+        regions=region_models,
     )
     sim_id = str(uuid.uuid4())
     sim = create_simulation(sim_id, params)

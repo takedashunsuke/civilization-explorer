@@ -23,13 +23,17 @@ export type Theater = {
 }
 
 export const THEATERS: Theater[] = [
-  { id: 'asia', west: 60, east: 150, south: -10, north: 56 },
+  { id: 'africa', west: -18, east: 52, south: -35, north: 37 },
   { id: 'europe', west: -12, east: 42, south: 34, north: 72 },
-  { id: 'middle_east', west: 26, east: 66, south: 12, north: 43 },
+  { id: 'asia', west: 60, east: 150, south: -10, north: 56 },
   { id: 'america', west: -125, east: -34, south: -56, north: 50 },
+  { id: 'oceania', west: 110, east: 180, south: -48, north: 0 },
+  { id: 'middle_east', west: 26, east: 66, south: 12, north: 43 },
 ]
 
 const THEATER_BY_ID: Record<string, Theater> = Object.fromEntries(THEATERS.map((item) => [item.id, item]))
+
+export const CONTINENT_THEATERS = THEATERS.filter((item) => item.id !== 'middle_east')
 
 const LAND = landRings as Ring[]
 const LAKES = physical.lakes as Ring[]
@@ -112,6 +116,7 @@ function forWraps(fn: (shift: number) => void) {
 export function pickTheater(geography: string | undefined, _seed = 0): Theater {
   if (geography && THEATER_BY_ID[geography]) return THEATER_BY_ID[geography]
   if (geography === 'continent') return THEATER_BY_ID.europe
+  if (geography === 'world') return THEATER_BY_ID.asia
   return THEATER_BY_ID.asia
 }
 
@@ -279,5 +284,76 @@ export function createEarthCanvases(width = 4096) {
     forWraps((shift) => drawLine(cctx, river.p, width, height, shift))
   }
 
-  return { color, rough }
+  return { color, rough, mask }
+}
+
+const landAlphaCache = new WeakMap<HTMLCanvasElement, Uint8ClampedArray>()
+const theaterLandCache = new Map<string, Array<{ lon: number; lat: number }>>()
+
+function maskAlpha(mask: HTMLCanvasElement, px: number, py: number): number {
+  let data = landAlphaCache.get(mask)
+  if (!data) {
+    const ctx = mask.getContext('2d')
+    if (!ctx) return 0
+    data = ctx.getImageData(0, 0, mask.width, mask.height).data
+    landAlphaCache.set(mask, data)
+  }
+  const x = Math.max(0, Math.min(mask.width - 1, px))
+  const y = Math.max(0, Math.min(mask.height - 1, py))
+  return data[(y * mask.width + x) * 4] ?? 0
+}
+
+export function isLandLonLat(lon: number, lat: number, mask: HTMLCanvasElement | null): boolean {
+  if (!mask) return true
+  const [x, y] = lonLatToXy(lon, lat, mask.width, mask.height)
+  return maskAlpha(mask, Math.round(x), Math.round(y)) > 16
+}
+
+function theaterLandSamples(mask: HTMLCanvasElement, theater: Theater): Array<{ lon: number; lat: number }> {
+  const key = `${theater.id}:${mask.width}`
+  const cached = theaterLandCache.get(key)
+  if (cached) return cached
+  const [x1, y1] = lonLatToXy(theater.west, theater.north, mask.width, mask.height)
+  const [x2, y2] = lonLatToXy(theater.east, theater.south, mask.width, mask.height)
+  const left = Math.max(0, Math.floor(Math.min(x1, x2)))
+  const right = Math.min(mask.width - 1, Math.ceil(Math.max(x1, x2)))
+  const top = Math.max(0, Math.floor(Math.min(y1, y2)))
+  const bottom = Math.min(mask.height - 1, Math.ceil(Math.max(y1, y2)))
+  const step = 8
+  const samples: Array<{ lon: number; lat: number }> = []
+  for (let py = top; py <= bottom; py += step) {
+    for (let px = left; px <= right; px += step) {
+      if (maskAlpha(mask, px, py) <= 16) continue
+      samples.push({
+        lon: (px / mask.width) * 360 - 180,
+        lat: 90 - (py / mask.height) * 180,
+      })
+    }
+  }
+  theaterLandCache.set(key, samples)
+  return samples
+}
+
+/** 海に落ちた投影を、舞台内の最も近い陸地へ寄せる。島をまたぐ移動は許可する。 */
+export function snapLonLatToLand(
+  lon: number,
+  lat: number,
+  mask: HTMLCanvasElement | null,
+  theater: Theater,
+): { lon: number; lat: number } {
+  if (!mask || isLandLonLat(lon, lat, mask)) return { lon, lat }
+  const samples = theaterLandSamples(mask, theater)
+  if (!samples.length) return { lon, lat }
+  let best = samples[0]
+  let bestD = Infinity
+  for (const sample of samples) {
+    const dLon = sample.lon - lon
+    const dLat = sample.lat - lat
+    const d = dLon * dLon + dLat * dLat
+    if (d < bestD) {
+      bestD = d
+      best = sample
+    }
+  }
+  return { lon: best.lon, lat: best.lat }
 }

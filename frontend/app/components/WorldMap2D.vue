@@ -6,6 +6,8 @@ import {
   lonLatToXy,
   pickTheater,
   simToLatLon,
+  snapLonLatToLand,
+  CONTINENT_THEATERS,
   type Theater,
 } from '~/utils/earthMap'
 
@@ -16,6 +18,7 @@ type MapAgent = {
   settlement_id: string | null
   alive: boolean
   traits?: string[]
+  region_id?: string | null
 }
 
 type MapSettlement = {
@@ -23,6 +26,7 @@ type MapSettlement = {
   position: { x: number; y: number }
   member_ids: string[]
   leader_id?: string | null
+  region_id?: string | null
 }
 
 type MapEvent = {
@@ -33,7 +37,14 @@ type MapEvent = {
 }
 
 type MapSim = {
-  world: { seed: number; geography?: string; landform?: string; climate?: string; turn?: number }
+  world: {
+    seed: number
+    geography?: string
+    landform?: string
+    climate?: string
+    turn?: number
+    regions?: Array<{ id: string; climate?: string }>
+  }
   agents: MapAgent[]
   settlements?: MapSettlement[]
   events?: MapEvent[]
@@ -52,7 +63,7 @@ const wrapRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
 const panning = ref(false)
 const zoomPct = ref(100)
-const theaterId = ref('asia')
+const theaterId = ref('world')
 
 const MIN_SCALE = 0.12
 const MAX_SCALE = 18
@@ -60,6 +71,8 @@ const MAX_SCALE = 18
 const SOUTH_CROP = 0.1
 
 let earthCanvas: HTMLCanvasElement | null = null
+let landMask: HTMLCanvasElement | null = null
+let overlayCanvas: HTMLCanvasElement | null = null
 let scale = 1
 let ox = 0
 let oy = 0
@@ -69,8 +82,18 @@ let disposed = false
 let resizeObs: ResizeObserver | null = null
 let builtKey = ''
 
-function activeTheater(): Theater {
-  return pickTheater(props.sim?.world.geography ?? props.geography, props.sim?.world.seed ?? props.seed)
+function theaterFor(id?: string | null): Theater {
+  return pickTheater(id || 'asia')
+}
+
+function projectOnLand(x: number, y: number, theater: Theater, earth: HTMLCanvasElement): [number, number] {
+  const raw = simToLatLon(x, y, theater)
+  const snapped = snapLonLatToLand(raw.lon, raw.lat, landMask, theater)
+  return lonLatToXy(snapped.lon, snapped.lat, earth.width, earth.height)
+}
+
+function projectAgent(agent: { position: { x: number; y: number }; region_id?: string | null }, earth: HTMLCanvasElement): [number, number] {
+  return projectOnLand(agent.position.x, agent.position.y, theaterFor(agent.region_id), earth)
 }
 
 function viewSize() {
@@ -105,22 +128,31 @@ function fitRect(x: number, y: number, bw: number, bh: number, pad = 0.9) {
 
 function fitTheater() {
   if (!earthCanvas) return
-  const theater = activeTheater()
-  theaterId.value = theater.id
-  const [x1, y1] = lonLatToXy(theater.west, theater.north, earthCanvas.width, earthCanvas.height)
-  const [x2, y2] = lonLatToXy(theater.east, theater.south, earthCanvas.width, earthCanvas.height)
-  fitRect(x1, y1, Math.max(8, x2 - x1), Math.max(8, y2 - y1), 0.86)
+  theaterId.value = 'world'
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const theater of CONTINENT_THEATERS) {
+    const [x1, y1] = lonLatToXy(theater.west, theater.north, earthCanvas.width, earthCanvas.height)
+    const [x2, y2] = lonLatToXy(theater.east, theater.south, earthCanvas.width, earthCanvas.height)
+    minX = Math.min(minX, x1, x2)
+    minY = Math.min(minY, y1, y2)
+    maxX = Math.max(maxX, x1, x2)
+    maxY = Math.max(maxY, y1, y2)
+  }
+  fitRect(minX, minY, Math.max(8, maxX - minX), Math.max(8, maxY - minY), 0.9)
 }
 
 function showWorld() {
   if (!earthCanvas) return
+  theaterId.value = 'world'
   const usableH = earthCanvas.height * (1 - SOUTH_CROP)
   fitRect(0, 0, earthCanvas.width, usableH, 1)
 }
 
 function fitToAgents() {
   if (!earthCanvas) return
-  const theater = activeTheater()
   const alive = (props.sim?.agents ?? []).filter((a) => a.alive)
   if (!alive.length) {
     fitTheater()
@@ -131,8 +163,7 @@ function fitToAgents() {
   let maxX = -Infinity
   let maxY = -Infinity
   for (const agent of alive) {
-    const { lat, lon } = simToLatLon(agent.position.x, agent.position.y, theater)
-    const [x, y] = lonLatToXy(lon, lat, earthCanvas.width, earthCanvas.height)
+    const [x, y] = projectAgent(agent, earthCanvas)
     minX = Math.min(minX, x)
     minY = Math.min(minY, y)
     maxX = Math.max(maxX, x)
@@ -143,17 +174,17 @@ function fitToAgents() {
 }
 
 async function rebuildEarth() {
-  const theater = activeTheater()
   await ensureElevation()
   if (disposed) return
-  if (builtKey === theater.id && earthCanvas) {
-    theaterId.value = theater.id
+  if (builtKey === 'earth' && earthCanvas) {
+    theaterId.value = 'world'
     return
   }
-  const { color } = createEarthCanvases(4096)
+  const { color, mask } = createEarthCanvases(4096)
   earthCanvas = color
-  builtKey = theater.id
-  theaterId.value = theater.id
+  landMask = mask
+  builtKey = 'earth'
+  theaterId.value = 'world'
   showWorld()
 }
 
@@ -172,23 +203,26 @@ function draw() {
   ctx.imageSmoothingQuality = 'high'
   ctx.drawImage(earth, 0, 0)
 
-  const theater = activeTheater()
-  const [x1, y1] = lonLatToXy(theater.west, theater.north, earth.width, earth.height)
-  const [x2, y2] = lonLatToXy(theater.east, theater.south, earth.width, earth.height)
-  ctx.strokeStyle = 'rgba(255, 214, 120, 0.9)'
-  ctx.lineWidth = 1.25 / scale
-  ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
-  const climate = props.sim?.world.climate ?? props.climate ?? 'temperate'
+  const climateByRegion = Object.fromEntries(
+    (props.sim?.world.regions ?? []).map((region) => [region.id, region.climate ?? 'temperate']),
+  )
   const tint: Record<string, string | null> = {
     temperate: null,
-    cold: 'rgba(186, 214, 238, 0.28)',
-    wetland: 'rgba(64, 130, 88, 0.22)',
-    arid: 'rgba(214, 176, 96, 0.24)',
+    cold: 'rgba(186, 214, 238, 0.22)',
+    wetland: 'rgba(64, 130, 88, 0.18)',
+    arid: 'rgba(214, 176, 96, 0.2)',
   }
-  const overlay = tint[climate]
-  if (overlay) {
-    ctx.fillStyle = overlay
-    ctx.fillRect(x1, y1, x2 - x1, y2 - y1)
+  for (const theater of CONTINENT_THEATERS) {
+    const [x1, y1] = lonLatToXy(theater.west, theater.north, earth.width, earth.height)
+    const [x2, y2] = lonLatToXy(theater.east, theater.south, earth.width, earth.height)
+    const overlay = tint[climateByRegion[theater.id] ?? 'temperate']
+    if (overlay) {
+      ctx.fillStyle = overlay
+      ctx.fillRect(x1, y1, x2 - x1, y2 - y1)
+    }
+    ctx.strokeStyle = 'rgba(255, 214, 120, 0.75)'
+    ctx.lineWidth = 1.1 / scale
+    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
   }
 
   const settlements = props.sim?.settlements ?? []
@@ -196,36 +230,61 @@ function draw() {
   const leaders = new Set(settlements.map((s) => s.leader_id).filter((id): id is string => Boolean(id)))
   const centers = new Map<string, [number, number]>()
 
+  if (!overlayCanvas) overlayCanvas = document.createElement('canvas')
+  if (overlayCanvas.width !== w || overlayCanvas.height !== h) {
+    overlayCanvas.width = w
+    overlayCanvas.height = h
+  }
+  const octx = overlayCanvas.getContext('2d')
+  if (octx) {
+    octx.setTransform(1, 0, 0, 1, 0, 0)
+    octx.clearRect(0, 0, w, h)
+    octx.setTransform(scale, 0, 0, scale, ox, oy)
+  }
+
   for (const settlement of settlements) {
     if (settlement.member_ids.length < 2) continue
     const pts: Array<[number, number]> = []
     for (const id of settlement.member_ids) {
       const agent = agentsById.get(id)
       if (!agent?.alive) continue
-      const { lat, lon } = simToLatLon(agent.position.x, agent.position.y, theater)
-      pts.push(lonLatToXy(lon, lat, earth.width, earth.height))
+      pts.push(projectAgent(agent, earth))
     }
-    const { lat, lon } = simToLatLon(settlement.position.x, settlement.position.y, theater)
-    const center = lonLatToXy(lon, lat, earth.width, earth.height)
+    const member = pts.length
+      ? agentsById.get(settlement.member_ids.find((id) => agentsById.get(id)?.alive) ?? '')
+      : undefined
+    const center = member
+      ? projectAgent(member, earth)
+      : projectOnLand(settlement.position.x, settlement.position.y, theaterFor(settlement.region_id), earth)
     centers.set(settlement.id, center)
     const hull = convexHull(pts)
     const color = settlementColor(settlement.id)
-    ctx.beginPath()
+    const target = octx ?? ctx
+    target.beginPath()
     if (hull.length >= 3) {
-      ctx.moveTo(hull[0][0], hull[0][1])
-      for (let i = 1; i < hull.length; i++) ctx.lineTo(hull[i][0], hull[i][1])
-      ctx.closePath()
+      target.moveTo(hull[0][0], hull[0][1])
+      for (let i = 1; i < hull.length; i++) target.lineTo(hull[i][0], hull[i][1])
+      target.closePath()
     } else {
       const spread = pts.length
         ? Math.max(14, ...pts.map(([x, y]) => Math.hypot(x - center[0], y - center[1])))
         : 18
-      ctx.arc(center[0], center[1], spread + 8, 0, Math.PI * 2)
+      target.arc(center[0], center[1], spread + 8, 0, Math.PI * 2)
     }
-    ctx.fillStyle = hexRgba(color, 0.22)
-    ctx.fill()
-    ctx.strokeStyle = color
-    ctx.lineWidth = (1.6 + Math.min(3, settlement.member_ids.length / 8)) / scale
-    ctx.stroke()
+    target.fillStyle = hexRgba(color, 0.22)
+    target.fill()
+    target.strokeStyle = color
+    target.lineWidth = (1.6 + Math.min(3, settlement.member_ids.length / 8)) / scale
+    target.stroke()
+  }
+
+  if (octx && landMask) {
+    octx.globalCompositeOperation = 'destination-in'
+    octx.drawImage(landMask, 0, 0)
+    octx.globalCompositeOperation = 'source-over'
+    ctx.setTransform(1, 0, 0, 1, 0, 0)
+    ctx.drawImage(overlayCanvas, 0, 0)
+    ctx.setTransform(scale, 0, 0, scale, ox, oy)
   }
 
   const turn = props.sim?.world.turn
@@ -253,8 +312,7 @@ function draw() {
 
   const alive = (props.sim?.agents ?? []).filter((a) => a.alive).slice(0, 128)
   for (const agent of alive) {
-    const { lat, lon } = simToLatLon(agent.position.x, agent.position.y, theater)
-    const [x, y] = lonLatToXy(lon, lat, earth.width, earth.height)
+    const [x, y] = projectAgent(agent, earth)
     const isLeader = leaders.has(agent.id)
     const r = (isLeader ? 5.5 : 4) + Math.min(4, agent.wealth / 250)
     ctx.beginPath()

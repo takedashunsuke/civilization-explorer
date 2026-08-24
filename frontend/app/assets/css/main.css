@@ -1,9 +1,9 @@
 :root {
   --bg: #0f1419;
   --panel: #1a222c;
-  --text: #e8eef4;
-  --muted: #9aa8b5;
-  --accent: #3d8bfd;
+  --text: #f7fafc;
+  --muted: #d4dde6;
+  --accent: #6aa8ff;
   --line: #2a3542;
 }
 
@@ -24,6 +24,18 @@ body,
   word-break: keep-all;
   overflow-wrap: anywhere;
   line-break: strict;
+}
+
+.p-dropdown .p-dropdown-label,
+.p-inputtext,
+.p-inputnumber-input {
+  color: #1a222c;
+}
+
+.p-placeholder,
+.p-dropdown .p-dropdown-label.p-placeholder {
+  color: #4b5a68;
+  opacity: 1;
 }
 
 button,

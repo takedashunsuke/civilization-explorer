@@ -47,6 +47,8 @@ MVP 向けの最小ルール。
 | `geography` | enum | `asia` / `europe` / `middle_east` / `america`。平面地図に投影する広域舞台 |
 | `landform` | enum | `continent` / `island`。シミュレーション用の粗い地形グリッドの形 |
 | `climate` | enum | `temperate` / `cold` / `wetland` / `arid`。地形バイオームと移動コスト・資源回復に効く。地図の舞台枠に薄い色を重ねる |
+| `disaster_frequency` | number (0–1) | 災害の起きやすさ。種類（台風・地震・水害・熱波・冷害）は地形・気候で偏る |
+| `religion` | enum | `folk` / `organized` / `secular`。服従・抵抗の出やすさ |
 | `terrain` | object | 粗いタイル（既定 48×48）。biome は `ocean` / `coast` / `river` / `plain` / `mountain` / `marsh` / `tundra` / `desert` |
 | `initial_values` | object | 初期価値観（例: 協力傾向・権威受容） |
 

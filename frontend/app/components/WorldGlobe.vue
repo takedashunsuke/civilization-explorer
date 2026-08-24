@@ -8,6 +8,7 @@ import {
   ensureElevation,
   pickTheater,
   simToLatLon,
+  snapLonLatToLand,
   theaterCenter,
   theaterOutline,
   theaterSpan,
@@ -59,6 +60,7 @@ let camera: THREE.PerspectiveCamera | null = null
 let controls: OrbitControls | null = null
 let earth: THREE.Mesh | null = null
 let earthMap: THREE.CanvasTexture | null = null
+let landMask: HTMLCanvasElement | null = null
 let roughMap: THREE.CanvasTexture | null = null
 let theaterLine: THREE.Line | null = null
 let agentsMesh: InstancedMesh | null = null
@@ -143,7 +145,8 @@ function lookAtLatLon(lat: number, lon: number, distance: number) {
 
 function applyEarth(theater: Theater) {
   if (!earth) return
-  const { color: colorCanvas, rough } = createEarthCanvases()
+  const { color: colorCanvas, rough, mask } = createEarthCanvases()
+  landMask = mask
   earthMap?.dispose()
   roughMap?.dispose()
   earthMap = new THREE.CanvasTexture(colorCanvas)
@@ -202,7 +205,8 @@ function fitToAgents() {
   let slat = 0
   let slon = 0
   for (const agent of alive) {
-    const p = simToLatLon(agent.position.x, agent.position.y, theater)
+    const raw = simToLatLon(agent.position.x, agent.position.y, theater)
+    const p = snapLonLatToLand(raw.lon, raw.lat, landMask, theater)
     slat += p.lat
     slon += p.lon
   }
@@ -238,7 +242,8 @@ function updateMarkers() {
       agentsMesh.setColorAt(i, color)
       continue
     }
-    const { lat, lon } = simToLatLon(agent.position.x, agent.position.y, theater)
+    const raw = simToLatLon(agent.position.x, agent.position.y, theater)
+    const { lat, lon } = snapLonLatToLand(raw.lon, raw.lat, landMask, theater)
     const isLeader = leaders.has(agent.id)
     dummy.position.copy(latLonToVec(lat, lon, MARKER_R))
     dummy.scale.setScalar((isLeader ? 0.018 : 0.012) + Math.min(0.012, agent.wealth / 900))
@@ -260,9 +265,10 @@ function updateMarkers() {
       halosMesh.setMatrixAt(i, dummy.matrix)
       continue
     }
-    const { lat, lon } = simToLatLon(settlement.position.x, settlement.position.y, theater)
+    const raw = simToLatLon(settlement.position.x, settlement.position.y, theater)
+    const { lat, lon } = snapLonLatToLand(raw.lon, raw.lat, landMask, theater)
     dummy.position.copy(latLonToVec(lat, lon, 1.012))
-    dummy.scale.setScalar(0.04 + settlement.member_ids.length * 0.004)
+    dummy.scale.setScalar(0.018 + settlement.member_ids.length * 0.002)
     dummy.updateMatrix()
     halosMesh.setMatrixAt(i, dummy.matrix)
     color.set(settlementColor(settlement.id))
@@ -333,7 +339,8 @@ async function init() {
   starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3))
   scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xcfe4ff, size: 0.03, sizeAttenuation: true })))
 
-  const { color: colorCanvas, rough } = createEarthCanvases()
+  const { color: colorCanvas, rough, mask } = createEarthCanvases()
+  landMask = mask
   earthMap = new THREE.CanvasTexture(colorCanvas)
   roughMap = new THREE.CanvasTexture(rough)
   earthMap.colorSpace = THREE.SRGBColorSpace

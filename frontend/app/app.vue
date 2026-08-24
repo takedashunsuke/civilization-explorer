@@ -5,6 +5,7 @@ import Dropdown from 'primevue/dropdown'
 import Tag from 'primevue/tag'
 import { polityKind, settlementColor } from '~/utils/groupColors'
 import WorldMap2D from '~/components/WorldMap2D.vue'
+import { BACKGROUND_ROWS, CONTINENT_IDS, defaultRegionDraft, type RegionDraft } from '~/utils/continents'
 
 type Agent = {
   id: string
@@ -14,10 +15,11 @@ type Agent = {
   happiness: number
   settlement_id: string | null
   alive: boolean
-  traits?: string[]
-  personality?: { cooperation: number; aggression: number; ambition: number }
-  age?: number
-}
+    traits?: string[]
+    personality?: { cooperation: number; aggression: number; ambition: number }
+    age?: number
+    region_id?: string | null
+  }
 
 type Metrics = {
   inequality: number
@@ -42,8 +44,9 @@ type Settlement = {
   id: string
   position: { x: number; y: number }
   member_ids: string[]
-  leader_id?: string | null
-}
+    leader_id?: string | null
+    region_id?: string | null
+  }
 
 type Terrain = {
   cols: number
@@ -65,6 +68,9 @@ type Simulation = {
     geography?: string
     landform?: string
     climate?: string
+    disaster_frequency?: number
+    religion?: string
+    regions?: Array<{ id: string; climate?: string; resource_pool?: number }>
     terrain?: Terrain
     initial_population?: number
     initial_total_wealth?: number
@@ -99,20 +105,8 @@ let tickInFlight = false
 
 const calendarEra = ref<'bc' | 'ad'>('ad')
 const calendarYear = ref(700)
-const population = ref(8)
-const seed = ref(42)
-const taxRate = ref(0.1)
-const education = ref(0.5)
-const resourcePool = ref(100)
-const cooperation = ref(0.5)
-const authorityAcceptance = ref(0.5)
-const ambition = ref(0.5)
-const inequality = ref(0.35)
-/** API には英語キーのまま送る */
-const institution = ref('democracy')
-const geography = ref('asia')
-const landform = ref('continent')
-const climate = ref('temperate')
+const conditionStep = ref(1)
+const regionDrafts = ref<RegionDraft[]>(CONTINENT_IDS.map((id) => defaultRegionDraft(id)))
 
 const institutionOptions = computed(() => [
   { label: t('institutions.democracy'), value: 'democracy' },
@@ -120,24 +114,25 @@ const institutionOptions = computed(() => [
   { label: t('institutions.anarchy'), value: 'anarchy' },
 ])
 
-const geographyOptions = computed(() => [
-  { label: t('geographies.asia'), value: 'asia' },
-  { label: t('geographies.europe'), value: 'europe' },
-  { label: t('geographies.middle_east'), value: 'middle_east' },
-  { label: t('geographies.america'), value: 'america' },
+const religionOptions = computed(() => [
+  { label: t('religions.folk'), value: 'folk' },
+  { label: t('religions.organized'), value: 'organized' },
+  { label: t('religions.secular'), value: 'secular' },
 ])
 
-const landformOptions = computed(() => [
-  { label: t('landforms.continent'), value: 'continent' },
-  { label: t('landforms.island'), value: 'island' },
+const levelOptions = computed(() => [
+  { label: t('wizard.levels.low'), value: 0.2 },
+  { label: t('wizard.levels.mid'), value: 0.5 },
+  { label: t('wizard.levels.high'), value: 0.8 },
 ])
 
-const climateOptions = computed(() => [
-  { label: t('climates.temperate'), value: 'temperate' },
-  { label: t('climates.cold'), value: 'cold' },
-  { label: t('climates.wetland'), value: 'wetland' },
-  { label: t('climates.arid'), value: 'arid' },
+const taxOptions = computed(() => [
+  { label: t('wizard.levels.low'), value: 0.05 },
+  { label: t('wizard.levels.mid'), value: 0.1 },
+  { label: t('wizard.levels.high'), value: 0.25 },
 ])
+
+const mapSeed = computed(() => sim.value?.world.seed ?? 0)
 
 const calendarEraOptions = computed(() => [
   { label: t('calendarEra.bc'), value: 'bc' as const },
@@ -179,7 +174,7 @@ const recentEvents = computed(() => (sim.value?.events ?? []).slice(-40).reverse
 const aliveCount = computed(() => (sim.value?.agents ?? []).filter((a) => a.alive).length)
 const totalAgents = computed(() => sim.value?.agents.length ?? 0)
 const initialPopulation = computed(
-  () => sim.value?.world.initial_population ?? population.value,
+  () => sim.value?.world.initial_population ?? 20,
 )
 const populationCap = computed(() => sim.value?.world.population_cap ?? 100)
 const populationDelta = computed(() => aliveCount.value - initialPopulation.value)
@@ -244,6 +239,7 @@ const metricItems = computed(() => {
 function actorLabel(actorId: string): string {
   if (actorId === 'world') return t('events.world')
   if (actorId === 'lone') return t('events.lone')
+  if ((CONTINENT_IDS as readonly string[]).includes(actorId)) return t(`geographies.${actorId}`)
   if (actorId.startsWith('s')) return actorId
   const agent = sim.value?.agents.find((a) => a.id === actorId)
   return agent?.name ?? actorId
@@ -251,6 +247,7 @@ function actorLabel(actorId: string): string {
 
 function eventGroupId(actorId: string): string | null {
   if (!actorId || actorId === 'world' || actorId === 'lone') return null
+  if ((CONTINENT_IDS as readonly string[]).includes(actorId)) return actorId
   if (actorId.startsWith('s')) return actorId
   return sim.value?.agents.find((a) => a.id === actorId)?.settlement_id ?? null
 }
@@ -260,7 +257,7 @@ function eventActorColor(actorId: string): string {
 }
 
 function isGroupId(id: string | null | undefined): boolean {
-  return !id || id === 'world' || id === 'lone' || id.startsWith('s')
+  return !id || id === 'world' || id === 'lone' || id.startsWith('s') || (CONTINENT_IDS as readonly string[]).includes(id)
 }
 
 function actionLabel(action: string): string {
@@ -328,22 +325,22 @@ async function createSimulation() {
     sim.value = await api<Simulation>('/simulations', {
       method: 'POST',
       body: {
-        seed: seed.value,
-        population: population.value,
-        tax_rate: taxRate.value,
-        education_level: education.value,
-        institution: institution.value,
         start_year: draftAstroYear.value,
-        geography: geography.value,
-        landform: landform.value,
-        climate: climate.value,
-        resource_pool: resourcePool.value,
-        initial_values: {
-          cooperation: cooperation.value,
-          authority_acceptance: authorityAcceptance.value,
-          ambition: ambition.value,
-          inequality: inequality.value,
-        },
+        geography: 'world',
+        regions: regionDrafts.value.map((region) => ({
+          id: region.id,
+          population: 4,
+          institution: region.institution,
+          tax_rate: region.taxRate,
+          education_level: region.education,
+          religion: region.religion,
+          initial_values: {
+            cooperation: region.cooperation,
+            authority_acceptance: region.authorityAcceptance,
+            ambition: region.ambition,
+            inequality: region.inequality,
+          },
+        })),
       },
     })
     conditionsOpen.value = false
@@ -512,16 +509,12 @@ onBeforeUnmount(() => {
             ·
             {{ t('map.resources', { value: sim.world.resource_pool.toFixed(1) }) }}
             ·
-            {{ t(`geographies.${sim.world.geography}`) }}
-            ·
-            {{ t(`landforms.${sim.world.landform ?? 'continent'}`) }}
-            ·
-            {{ t(`climates.${sim.world.climate ?? 'temperate'}`) }}
+            {{ t('map.fiveContinents') }}
           </p>
         </div>
         <p class="hint map-legend">{{ t('map.legend') }} {{ t('map.zoomHintFlat') }}</p>
         <div class="map-stage">
-          <WorldMap2D :sim="sim" :geography="geography" :landform="landform" :climate="climate" :seed="seed" />
+          <WorldMap2D :sim="sim" geography="world" :seed="mapSeed" />
         </div>
         <div v-if="metricItems.length" class="metrics">
           <h2>{{ t('metrics.title') }}</h2>
@@ -551,126 +544,115 @@ onBeforeUnmount(() => {
         <button type="button" class="events-close" :aria-label="t('layout.closeConditions')" @click="conditionsOpen = false">×</button>
       </div>
       <div class="conditions-form">
-        <section class="conditions-section">
-          <p class="conditions-group">{{ t('conditionGroups.stage') }}</p>
-          <div class="conditions-grid conditions-grid-stage">
-            <div class="conditions-field">
-              <label>{{ t('calendarYear') }}</label>
-              <div class="year-row">
-                <Dropdown
-                  v-model="calendarEra"
-                  :options="calendarEraOptions"
-                  option-label="label"
-                  option-value="value"
-                  class="era-select"
-                />
-                <InputNumber v-model="calendarYear" :min="1" :max="50000" show-buttons class="year-input" />
+        <div class="conditions-fields">
+          <nav class="step-nav" aria-label="steps">
+            <button type="button" class="step-tab" :class="{ active: conditionStep === 1 }" @click="conditionStep = 1">{{ t('wizard.step1') }}</button>
+            <button type="button" class="step-tab" :class="{ active: conditionStep === 2 }" @click="conditionStep = 2">{{ t('wizard.step2') }}</button>
+            <button type="button" class="step-tab" :class="{ active: conditionStep === 3 }" @click="conditionStep = 3">{{ t('wizard.step3') }}</button>
+          </nav>
+          <p class="conditions-lead">{{ t(`wizard.lead${conditionStep}`) }}</p>
+
+          <section v-if="conditionStep === 1" class="conditions-section">
+            <div class="conditions-grid conditions-grid-stage">
+              <div class="conditions-field">
+                <label>{{ t('calendarYear') }}</label>
+                <div class="year-row">
+                  <Dropdown
+                    v-model="calendarEra"
+                    :options="calendarEraOptions"
+                    option-label="label"
+                    option-value="value"
+                    class="era-select"
+                  />
+                  <InputNumber v-model="calendarYear" :min="1" :max="50000" show-buttons class="year-input" />
+                </div>
+                <p class="hint">{{ t('calendarYearHint') }}</p>
               </div>
-              <p class="hint">{{ t('calendarYearHint') }}</p>
+              <div class="era-preview">
+                <p class="era-preview-title">{{ t('eraPreview.title') }}</p>
+                <p><span class="era-k">{{ t('eraPreview.year', { label: draftYearLabel }) }}</span></p>
+                <p><span class="era-k">{{ t('eraPreview.japan') }}</span> {{ draftJapanEra }}</p>
+                <p><span class="era-k">{{ t('eraPreview.world') }}</span> {{ draftWorldEra }}</p>
+              </div>
             </div>
-            <div class="era-preview">
-              <p class="era-preview-title">{{ t('eraPreview.title') }}</p>
-              <p><span class="era-k">{{ t('eraPreview.year', { label: draftYearLabel }) }}</span></p>
-              <p><span class="era-k">{{ t('eraPreview.japan') }}</span> {{ draftJapanEra }}</p>
-              <p><span class="era-k">{{ t('eraPreview.world') }}</span> {{ draftWorldEra }}</p>
+            <div class="bg-table" role="table">
+              <div class="bg-row bg-head" role="row">
+                <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
+                <div v-for="id in CONTINENT_IDS" :key="id" class="bg-cell" role="columnheader">{{ t(`geographies.${id}`) }}</div>
+              </div>
+              <div v-for="row in BACKGROUND_ROWS" :key="row" class="bg-row" role="row">
+                <div class="bg-stub" role="rowheader">{{ t(`wizard.rows.${row}`) }}</div>
+                <div v-for="id in CONTINENT_IDS" :key="`${id}-${row}`" class="bg-cell" role="cell">{{ t(`wizard.table.${id}.${row}`) }}</div>
+              </div>
             </div>
-            <div class="conditions-field">
-              <label>{{ t('geography') }}</label>
-              <Dropdown v-model="geography" :options="geographyOptions" option-label="label" option-value="value" class="field-control" />
-              <p class="hint">{{ t('geographyHint') }}</p>
-            </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="conditions-section">
-          <p class="conditions-group">{{ t('conditionGroups.land') }}</p>
-          <div class="conditions-grid conditions-grid-2">
-            <div class="conditions-field">
-              <label>{{ t('landform') }}</label>
-              <Dropdown v-model="landform" :options="landformOptions" option-label="label" option-value="value" class="field-control" />
-              <p class="hint">{{ t('landformHint') }}</p>
+          <section v-else-if="conditionStep === 2" class="conditions-section">
+            <div class="bg-table bg-form" role="table">
+              <div class="bg-row bg-head" role="row">
+                <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
+                <div v-for="id in CONTINENT_IDS" :key="id" class="bg-cell" role="columnheader">{{ t(`geographies.${id}`) }}</div>
+              </div>
+              <div class="bg-row" role="row">
+                <div class="bg-stub" role="rowheader">{{ t('institution') }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-institution`" class="bg-cell" role="cell">
+                  <Dropdown v-model="region.institution" :options="institutionOptions" option-label="label" option-value="value" class="field-control" />
+                </div>
+              </div>
+              <div class="bg-row" role="row">
+                <div class="bg-stub" role="rowheader">{{ t('taxRate') }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-tax`" class="bg-cell" role="cell">
+                  <Dropdown v-model="region.taxRate" :options="taxOptions" option-label="label" option-value="value" class="field-control" />
+                </div>
+              </div>
+              <div class="bg-row" role="row">
+                <div class="bg-stub" role="rowheader">{{ t('education') }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-edu`" class="bg-cell" role="cell">
+                  <Dropdown v-model="region.education" :options="levelOptions" option-label="label" option-value="value" class="field-control" />
+                </div>
+              </div>
             </div>
-            <div class="conditions-field">
-              <label>{{ t('climate') }}</label>
-              <Dropdown v-model="climate" :options="climateOptions" option-label="label" option-value="value" class="field-control" />
-              <p class="hint">{{ t('climateHint') }}</p>
-            </div>
-          </div>
-        </section>
+          </section>
 
-        <section class="conditions-section">
-          <p class="conditions-group">{{ t('conditionGroups.society') }}</p>
-          <p class="conditions-lead">{{ t('conditionGroups.societyLead') }}</p>
-          <div class="conditions-grid conditions-grid-4">
-            <div class="conditions-field">
-              <label>{{ t('population') }}</label>
-              <InputNumber v-model="population" :min="2" :max="100" show-buttons class="field-control" />
-              <p class="hint">{{ t('populationHint') }}</p>
+          <section v-else class="conditions-section">
+            <div class="bg-table bg-form" role="table">
+              <div class="bg-row bg-head" role="row">
+                <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
+                <div v-for="id in CONTINENT_IDS" :key="id" class="bg-cell" role="columnheader">{{ t(`geographies.${id}`) }}</div>
+              </div>
+              <div class="bg-row" role="row">
+                <div class="bg-stub" role="rowheader">{{ t('religion') }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-religion`" class="bg-cell" role="cell">
+                  <Dropdown v-model="region.religion" :options="religionOptions" option-label="label" option-value="value" class="field-control" />
+                </div>
+              </div>
+              <div class="bg-row" role="row">
+                <div class="bg-stub" role="rowheader">{{ t('cooperation') }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-coop`" class="bg-cell" role="cell">
+                  <Dropdown v-model="region.cooperation" :options="levelOptions" option-label="label" option-value="value" class="field-control" />
+                </div>
+              </div>
+              <div class="bg-row" role="row">
+                <div class="bg-stub" role="rowheader">{{ t('ambition') }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-ambition`" class="bg-cell" role="cell">
+                  <Dropdown v-model="region.ambition" :options="levelOptions" option-label="label" option-value="value" class="field-control" />
+                </div>
+              </div>
+              <div class="bg-row" role="row">
+                <div class="bg-stub" role="rowheader">{{ t('inequality') }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-ineq`" class="bg-cell" role="cell">
+                  <Dropdown v-model="region.inequality" :options="levelOptions" option-label="label" option-value="value" class="field-control" />
+                </div>
+              </div>
             </div>
-            <div class="conditions-field">
-              <label>{{ t('institution') }}</label>
-              <Dropdown v-model="institution" :options="institutionOptions" option-label="label" option-value="value" class="field-control" />
-              <p class="hint">{{ t('institutionHint') }}</p>
-            </div>
-            <div class="conditions-field">
-              <label>{{ t('taxRate') }}</label>
-              <InputNumber v-model="taxRate" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
-              <p class="hint">{{ t('taxRateHint') }}</p>
-            </div>
-            <div class="conditions-field">
-              <label>{{ t('education') }}</label>
-              <InputNumber v-model="education" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
-              <p class="hint">{{ t('educationHint') }}</p>
-            </div>
-          </div>
-        </section>
-
-        <section class="conditions-section">
-          <p class="conditions-group">{{ t('conditionGroups.people') }}</p>
-          <p class="conditions-lead">{{ t('conditionGroups.peopleLead') }}</p>
-          <div class="conditions-grid conditions-grid-4">
-            <div class="conditions-field">
-              <label>{{ t('resourcePool') }}</label>
-              <InputNumber v-model="resourcePool" :min="20" :max="300" :step="10" show-buttons class="field-control" />
-              <p class="hint">{{ t('resourcePoolHint') }}</p>
-            </div>
-            <div class="conditions-field">
-              <label>{{ t('cooperation') }}</label>
-              <InputNumber v-model="cooperation" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
-              <p class="hint">{{ t('cooperationHint') }}</p>
-            </div>
-            <div class="conditions-field">
-              <label>{{ t('authorityAcceptance') }}</label>
-              <InputNumber v-model="authorityAcceptance" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
-              <p class="hint">{{ t('authorityAcceptanceHint') }}</p>
-            </div>
-            <div class="conditions-field">
-              <label>{{ t('ambition') }}</label>
-              <InputNumber v-model="ambition" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
-              <p class="hint">{{ t('ambitionHint') }}</p>
-            </div>
-            <div class="conditions-field">
-              <label>{{ t('inequality') }}</label>
-              <InputNumber v-model="inequality" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
-              <p class="hint">{{ t('inequalityHint') }}</p>
-            </div>
-          </div>
-        </section>
-
-        <section class="conditions-section">
-          <p class="conditions-group">{{ t('conditionGroups.replay') }}</p>
-          <div class="conditions-grid conditions-grid-replay">
-            <div class="conditions-field">
-              <label>{{ t('seed') }}</label>
-              <InputNumber v-model="seed" show-buttons class="field-control" />
-              <p class="hint">{{ t('seedHint') }}</p>
-            </div>
-            <div class="actions">
-              <Button :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy && !autoPlaying" @click="createSimulation" />
-            </div>
-          </div>
-        </section>
-        <p v-if="error" class="error">{{ error }}</p>
+          </section>
+          <p v-if="error" class="error">{{ error }}</p>
+        </div>
+        <div class="conditions-footer step-footer">
+          <Button v-if="conditionStep > 1" :label="t('wizard.back')" class="action-btn" severity="secondary" @click="conditionStep -= 1" />
+          <Button v-if="conditionStep < 3" :label="t('wizard.next')" class="action-btn" @click="conditionStep += 1" />
+          <Button v-else :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy && !autoPlaying" @click="createSimulation" />
+        </div>
       </div>
     </aside>
 
@@ -773,7 +755,7 @@ onBeforeUnmount(() => {
 }
 
 .era-k {
-  color: var(--muted);
+  color: #dbe4ee;
   font-size: 0.72rem;
   margin-right: 0.25rem;
 }
@@ -844,7 +826,14 @@ onBeforeUnmount(() => {
   margin: 0 0 0.35rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: var(--muted);
+  color: #e6eef5;
+}
+
+.era-preview p {
+  margin: 0.15rem 0;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--text);
 }
 
 .era-preview p {
@@ -912,7 +901,7 @@ h1 {
 h2 {
   margin: 0 0 0.75rem;
   font-size: 0.95rem;
-  color: var(--muted);
+  color: var(--text);
   font-weight: 600;
 }
 
@@ -948,20 +937,161 @@ h2 {
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 40;
-  width: min(84rem, calc(100vw - 2rem));
-  max-height: calc(100vh - 2rem);
+  width: min(88rem, calc(100vw - 1.5rem));
+  height: calc((100dvh - 2rem) * 0.8);
+  max-height: calc((100dvh - 2rem) * 0.8);
+  overflow: hidden;
   display: flex;
   flex-direction: column;
+  padding: 0.7rem 0.85rem 0.65rem;
+  background: #1c252f;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
 }
 
 .conditions-form {
   display: flex;
   flex-direction: column;
-  gap: 0.7rem;
-  overflow: visible;
+  gap: 0.45rem;
+  overflow: hidden;
   min-height: 0;
+  flex: 1 1 auto;
+}
+
+.conditions-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding-right: 0.2rem;
+}
+
+.conditions-footer {
   flex: 0 0 auto;
+  padding-top: 0.45rem;
+  border-top: 1px solid var(--line);
+}
+
+.step-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.step-footer .action-btn {
+  width: auto;
+  min-width: 8rem;
+}
+
+.step-nav {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-bottom: 0.35rem;
+}
+
+.step-tab {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: #e8eef4;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.step-tab.active {
+  background: color-mix(in srgb, var(--accent) 28%, #1c252f);
+  border-color: var(--accent);
+}
+
+.continent-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(9.5rem, 1fr));
+  gap: 0.45rem;
+  margin-top: 0.5rem;
+}
+
+.continent-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.5rem 0.55rem;
+  background: color-mix(in srgb, #121820 70%, var(--panel));
+  min-width: 0;
+}
+
+.continent-card h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.88rem;
+  color: var(--text);
+}
+
+.bg-table {
+  margin-top: 0.55rem;
+  border: 1px solid #6b7c8d;
+  border-radius: 8px;
+  overflow: auto;
+  min-height: 0;
+  background: #0b1118;
+}
+
+.bg-row {
+  display: grid;
+  grid-template-columns: minmax(5.8rem, 7.2rem) repeat(5, minmax(7.5rem, 1fr));
+  min-width: 52rem;
+}
+
+.bg-row + .bg-row {
+  border-top: 1px solid #4d5d6c;
+}
+
+.bg-row:nth-child(odd):not(.bg-head) {
+  background: #151d27;
+}
+
+.bg-row:nth-child(even):not(.bg-head) {
+  background: #1c2632;
+}
+
+.bg-head {
+  background: #2d3d4e;
+}
+
+.bg-stub,
+.bg-cell {
+  padding: 0.48rem 0.55rem;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #f8fbff;
+}
+
+.bg-stub {
+  font-weight: 700;
+  color: #ffffff;
+  background: #3a4c5e;
+  border-right: 1px solid #6b7c8d;
+}
+
+.bg-head .bg-stub {
+  background: #44586b;
+}
+
+.bg-head .bg-cell {
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.bg-form .bg-cell {
+  display: flex;
+  align-items: center;
+  padding: 0.35rem 0.4rem;
+}
+
+.bg-form :deep(.p-dropdown) {
+  height: 2rem;
 }
 
 .conditions-section {
@@ -970,16 +1100,17 @@ h2 {
 
 .conditions-grid {
   display: grid;
-  gap: 0.55rem 1rem;
+  gap: 0.35rem 0.85rem;
   align-items: start;
 }
 
 .conditions-grid-stage {
-  grid-template-columns: minmax(0, 1.15fr) minmax(12rem, 1.1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.15fr) minmax(12rem, 1.1fr);
 }
 
-.conditions-grid-2 {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.conditions-grid-land {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 0.4rem;
 }
 
 .conditions-grid-4 {
@@ -992,33 +1123,36 @@ h2 {
 }
 
 .conditions-group {
-  margin: 0 0 0.2rem;
+  margin: 0 0 0.12rem;
   padding: 0;
   border: 0;
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--muted);
+  color: #e8eef4;
 }
 
 .conditions-lead {
-  margin: 0 0 0.4rem;
+  margin: 0 0 0.28rem;
   font-size: 0.72rem;
-  line-height: 1.35;
-  color: var(--muted);
+  line-height: 1.3;
+  color: #d0dae4;
 }
 
 .conditions-field label {
-  margin: 0 0 0.2rem;
+  margin: 0 0 0.15rem;
+  color: #f0f4f8;
 }
 
 .conditions-grid-stage .era-preview {
-  margin-top: 1.35rem;
+  margin-top: 0;
 }
 
 .conditions-modal .hint {
-  font-size: 0.68rem;
-  line-height: 1.3;
+  font-size: 0.66rem;
+  line-height: 1.25;
+  color: #cdd6e0;
+  opacity: 1;
 }
 
 .viewport {
@@ -1067,6 +1201,12 @@ h2 {
 
 .panel-heading h2 {
   margin: 0;
+  color: var(--text);
+}
+
+.conditions-modal .events-heading {
+  margin-bottom: 0.4rem;
+  flex: 0 0 auto;
 }
 
 .events-heading {
@@ -1088,6 +1228,7 @@ h2 {
   height: min(70vh, 36rem);
   display: flex;
   flex-direction: column;
+  background: #1c252f;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
@@ -1095,11 +1236,12 @@ h2 {
   margin: 0;
   border: 0;
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
   font-size: 1.25rem;
   line-height: 1;
   cursor: pointer;
   padding: 0.1rem 0.35rem;
+  opacity: 0.85;
 }
 
 .event-chat {
@@ -1137,7 +1279,7 @@ h2 {
 label {
   display: block;
   margin: 0.7rem 0 0.25rem;
-  color: var(--muted);
+  color: var(--text);
   font-size: 0.8rem;
 }
 
@@ -1146,7 +1288,7 @@ label {
   color: var(--muted);
   font-size: 0.72rem;
   line-height: 1.45;
-  opacity: 0.9;
+  opacity: 1;
 }
 
 .field-control {
@@ -1160,13 +1302,13 @@ label {
   max-width: 100%;
   display: inline-flex;
   align-items: stretch;
-  height: 2.5rem;
+  height: 2.15rem;
 }
 
 .year-row :deep(.p-dropdown),
 .year-row :deep(.p-inputnumber) {
   width: 100%;
-  height: 2.5rem;
+  height: 2.15rem;
 }
 
 .conditions-modal :deep(.p-inputnumber-input) {
@@ -1209,7 +1351,7 @@ label {
   flex-direction: column;
   gap: 0.5rem;
   margin-top: 0;
-  padding-bottom: 1.15rem;
+  padding-bottom: 0;
 }
 
 .action-btn {
@@ -1275,7 +1417,7 @@ label {
 
 .map-stats {
   margin: 0;
-  color: var(--muted);
+  color: var(--text);
   font-size: 0.75rem;
   text-align: right;
   line-height: 1.35;
@@ -1309,25 +1451,25 @@ label {
 }
 
 @media (max-width: 1100px) {
-  .conditions-grid-stage,
-  .conditions-grid-2,
-  .conditions-grid-4,
-  .conditions-grid-replay {
-    grid-template-columns: 1fr 1fr;
+  .continent-grid,
+  .continent-grid-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .conditions-modal {
-    width: min(52rem, calc(100vw - 1.5rem));
-    max-height: calc(100vh - 1.5rem);
-    overflow: auto;
+    width: min(52rem, calc(100vw - 1.25rem));
+    height: calc((100dvh - 1.25rem) * 0.8);
+    max-height: calc((100dvh - 1.25rem) * 0.8);
+    overflow: hidden;
   }
 }
 
 @media (max-width: 720px) {
   .conditions-grid-stage,
-  .conditions-grid-2,
+  .conditions-grid-land,
   .conditions-grid-4,
-  .conditions-grid-replay {
+  .conditions-grid-replay,
+  .continent-grid {
     grid-template-columns: 1fr;
   }
 }

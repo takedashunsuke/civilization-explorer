@@ -43,8 +43,32 @@
   "taxRateHint": "高いほど従う人は負担し、抵抗する人が出やすくなります（0〜1）。",
   "education": "教育",
   "educationHint": "高いほど協力が成功しやすく、資源も増えやすい（0〜1）。",
-  "resourcePool": "資源のゆとり",
-  "resourcePoolHint": "少ないと奪い合い、多いと分け合いやすい。配給のたとえ話の代わり。",
+  "resourcePool": "食資源の豊かさ",
+  "resourcePoolHint": "狩猟・採集・農耕のゆとり。少ないと奪い合い、多いと分け合いやすい。",
+  "theater": "広域",
+  "theaterHint": "観測する大陸圏です。集団は陸地へ寄せて投影されます。",
+  "geography": "広域",
+  "geographyHint": "観測する大陸圏です。集団は陸地へ寄せて投影されます。",
+  "conditionGroups": {
+    "geography": "地理的条件",
+    "nature": "自然・食資源",
+    "natureLead": "気候とあわせて、食と共有資源のゆとりを決めます。",
+    "disaster": "災害頻度",
+    "disasterLead": "台風・地震・水害・熱波・冷害などが起きやすいか。種類は地形と気候に寄ります。",
+    "society": "社会的制約",
+    "societyLead": "人口・制度・税・教育と、従いやすさの出発点です。",
+    "religion": "宗教観念",
+    "religionLead": "権威への従い方と、抵抗の起きやすさに効きます。"
+  },
+  "disasterFrequency": "頻度",
+  "disasterFrequencyHint": "0はほぼ起きず、1はたびたび起きます（0〜1）。",
+  "religion": "観念",
+  "religionHint": "組織宗教は服従しやすく、世俗は抵抗が出やすい。",
+  "religions": {
+    "folk": "民間信仰",
+    "organized": "組織宗教",
+    "secular": "世俗"
+  },
   "cooperation": "助け合い",
   "cooperationHint": "高いほど最初から協力しやすい気質になります（0〜1）。",
   "authorityAcceptance": "権威の受け入れ",
@@ -53,19 +77,6 @@
   "ambitionHint": "高いほどリーダー争いや政治競争が起きやすい（0〜1）。",
   "inequality": "初期の貧富差",
   "inequalityHint": "高いほど開始時の富のばらつきが大きい（0〜1）。",
-  "geography": "地理",
-  "geographyHint": "実験の舞台を広域で選びます。主体はその枠の中に投影されます。",
-  "geographyHint": "実験の舞台を広域で選びます。主体はその枠の中に投影されます。",
-  "calendarYearHint": "西暦を BC / AD で指定。1ターン＝1年進みます。",
-  "conditionGroups": {
-    "stage": "舞台",
-    "land": "土地",
-    "society": "制度",
-    "societyLead": "誰が得をし、誰が従うかを決めます。",
-    "people": "気質",
-    "peopleLead": "制度が次に有利な人物を選ぶ、出発点です。",
-    "replay": "再現"
-  },
   "landform": "地形",
   "landformHint": "大陸は内陸が広く、島国は海岸と分断が強く出ます。シミュレーション地形に効きます。",
   "landforms": {
@@ -82,18 +93,90 @@
   },
   "institutionHint": "誰が従い、誰が抵抗しやすいかに効きます。",
   "geographies": {
+    "africa": "アフリカ",
     "asia": "アジア",
     "europe": "ヨーロッパ",
-    "middle_east": "中東",
     "america": "アメリカ",
+    "oceania": "オセアニア",
+    "middle_east": "中東",
+    "world": "世界",
     "island": "アジア",
     "continent": "ヨーロッパ"
   },
   "theaters": {
+    "africa": "アフリカ",
     "asia": "アジア",
     "europe": "ヨーロッパ",
+    "america": "アメリカ",
+    "oceania": "オセアニア",
     "middle_east": "中東",
-    "america": "アメリカ"
+    "world": "世界"
+  },
+  "wizard": {
+    "step1": "STEP 1 背景",
+    "step2": "STEP 2 社会",
+    "step3": "STEP 3 観念",
+    "lead1": "地理・自然・食は固定です。内地・海側・島国の違いを表で見て、開始年だけ選んでください。",
+    "lead2": "大陸ごとに社会的制約を変えると、同じ世界でも未来が分かれます。",
+    "lead3": "宗教と気質を大陸ごとに選び、集団エージェントの性質を比較します。",
+    "next": "次へ",
+    "back": "戻る",
+    "axis": "項目",
+    "levels": {
+      "low": "低い",
+      "mid": "中くらい",
+      "high": "高い"
+    },
+    "rows": {
+      "inland": "内地",
+      "coast": "海側",
+      "island": "島国",
+      "climate": "気候",
+      "food": "食資源",
+      "disaster": "災害"
+    },
+    "table": {
+      "africa": {
+        "inland": "サハラ〜高原。乾燥し、移動と農は厳しい。",
+        "coast": "地中海・ギニア湾側。交易の入口になる。",
+        "island": "マダガスカルなど周辺島。本土から分断されやすい。",
+        "climate": "乾燥が主。熱波が出やすい。",
+        "food": "乏しめ。海岸と河谷に偏る。",
+        "disaster": "熱波・地震が食を削りやすい。"
+      },
+      "europe": {
+        "inland": "平野が広く、内陸でも人が集まりやすい。",
+        "coast": "北海・大西洋。漁と港が強い。",
+        "island": "ブリテンなど。海を挟み制度が分かれやすい。",
+        "climate": "温帯。冬は冷えるが極端は少ない。",
+        "food": "ゆとりがある。穀と牧が両立しやすい。",
+        "disaster": "比較的おだやか。"
+      },
+      "asia": {
+        "inland": "内陸高原とステップ。乾燥と寒さが強い。",
+        "coast": "モンスーン海岸。人口と稲作が集中する。",
+        "island": "日本列島など。海を渡りつつ分断も残る。",
+        "climate": "湿地・モンスーン。雨が多い。",
+        "food": "大河と湿地が支える。豊かな一方で水に弱い。",
+        "disaster": "水害・台風が出やすい。"
+      },
+      "america": {
+        "inland": "大平原。内陸でも広がれるが距離が長い。",
+        "coast": "両洋の海岸。港と漁場が分かれる。",
+        "island": "カリブなど。本土から離れ、嵐に弱い。",
+        "climate": "温帯が広い。南北で差が出る。",
+        "food": "ゆとりが大きい。平野の生産が厚い。",
+        "disaster": "中程度。地震と嵐が混ざる。"
+      },
+      "oceania": {
+        "inland": "内地は狭い。大陸的な奥行きはほとんどない。",
+        "coast": "ほぼ全域が海側。漁と航路が生活の軸。",
+        "island": "本体が島嶼。海を渡らないと隣へ行けない。",
+        "climate": "湿潤。サイクロン帯に近い。",
+        "food": "島ごとに偏る。余裕は小さめ。",
+        "disaster": "台風・水害が強い。"
+      }
+    }
   },
   "institution": "制度",
   "institutions": {
@@ -134,6 +217,7 @@
     "population": "人口 {alive}（初期 {initial} {delta} / 上限 {cap}）",
     "settlements": "集落 {count}",
     "resources": "共有資源 {value}",
+    "fiveContinents": "五大陸",
     "zoomHintFlat": "ドラッグで移動、スクロールまたはダブルクリックで拡大。",
     "zoomHintFlat": "ドラッグで移動、スクロールまたはダブルクリックで拡大。",
     "zoomHintGlobe": "ドラッグで地球を回し、スクロールまたはダブルクリックで拡大。",
@@ -172,7 +256,8 @@
     "birth": "出生",
     "death": "死",
     "lead": "交代",
-    "trait": "特異"
+    "trait": "特異",
+    "disaster": "災害"
   },
   "eventDetails": {
     "wait": "力を回復するために休んだ。",
@@ -212,7 +297,12 @@
     "group_trait_gain_charisma": "{group} にカリスマが現れた（{actor}）。",
     "group_trait_gain_genius": "{group} に天才が現れた（{actor}）。",
     "group_trait_lose_charisma": "{group} のカリスマは薄れた（{actor}）。",
-    "group_trait_lose_genius": "{group} の天才の輝きは衰えた（{actor}）。"
+    "group_trait_lose_genius": "{group} の天才の輝きは衰えた（{actor}）。",
+    "disaster_typhoon": "台風が襲い、沿岸の集団が傷を負った。",
+    "disaster_earthquake": "地震が起き、富と安心が揺らいだ。",
+    "disaster_flood": "水害で田畑と蓄えが流された。",
+    "disaster_heatwave": "熱波で体力が削られ、食資源も減った。",
+    "disaster_frost": "冷害で収穫が落ち、蓄えが減った。"
   },
   "yearLabel": {
     "bc": "BC {year}",

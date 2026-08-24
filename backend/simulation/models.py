@@ -13,10 +13,13 @@ class InstitutionType(str, Enum):
 
 
 class GeographyType(str, Enum):
+    africa = "africa"
     asia = "asia"
     europe = "europe"
-    middle_east = "middle_east"
     america = "america"
+    oceania = "oceania"
+    middle_east = "middle_east"
+    world = "world"
     # legacy values still accepted by the API
     island = "island"
     continent = "continent"
@@ -32,6 +35,12 @@ class ClimateType(str, Enum):
     cold = "cold"
     wetland = "wetland"
     arid = "arid"
+
+
+class ReligionType(str, Enum):
+    folk = "folk"
+    organized = "organized"
+    secular = "secular"
 
 
 def resolve_theater_and_landform(
@@ -68,6 +77,7 @@ class ActionType(str, Enum):
     death = "death"
     lead = "lead"
     trait = "trait"
+    disaster = "disaster"
 
 
 class Position(BaseModel):
@@ -88,6 +98,16 @@ class InitialValues(BaseModel):
     inequality: float = Field(ge=0, le=1, default=0.35)
 
 
+class RegionParams(BaseModel):
+    id: GeographyType
+    population: int = Field(default=4, ge=2, le=40)
+    institution: InstitutionType = InstitutionType.democracy
+    tax_rate: float = Field(default=0.1, ge=0, le=1)
+    education_level: float = Field(default=0.5, ge=0, le=1)
+    religion: ReligionType = ReligionType.folk
+    initial_values: InitialValues = Field(default_factory=InitialValues)
+
+
 class WorldParams(BaseModel):
     seed: int = 42
     population: int = Field(default=8, ge=2, le=100)
@@ -97,10 +117,13 @@ class WorldParams(BaseModel):
     institution: InstitutionType = InstitutionType.democracy
     # Astronomical year: AD 1 = 1, BC 1 = 0, BC 44 = -43
     start_year: int = Field(default=700, ge=-50000, le=3000)
-    geography: GeographyType = GeographyType.asia
+    geography: GeographyType = GeographyType.world
     landform: LandformType = LandformType.continent
     climate: ClimateType = ClimateType.temperate
+    disaster_frequency: float = Field(default=0.2, ge=0, le=1)
+    religion: ReligionType = ReligionType.folk
     initial_values: InitialValues = Field(default_factory=InitialValues)
+    regions: list[RegionParams] = Field(default_factory=list)
 
 
 class AgentState(BaseModel):
@@ -118,6 +141,7 @@ class AgentState(BaseModel):
     alive: bool = True
     traits: list[str] = Field(default_factory=list)
     age: int = 20
+    region_id: str | None = None
 
 
 class RelationshipState(BaseModel):
@@ -133,11 +157,27 @@ class SettlementState(BaseModel):
     member_ids: list[str] = Field(default_factory=list)
     shared_wealth: float = 0.0
     leader_id: str | None = None
+    region_id: str | None = None
 
 
 class InstitutionState(BaseModel):
     authority: float = Field(default=0.5, ge=0, le=1)
     treasury: float = 0.0
+
+
+class RegionState(BaseModel):
+    id: GeographyType
+    landform: LandformType = LandformType.continent
+    climate: ClimateType = ClimateType.temperate
+    disaster_frequency: float = Field(default=0.2, ge=0, le=1)
+    resource_pool: float = 100.0
+    education_level: float = 0.5
+    tax_rate: float = 0.1
+    institution: InstitutionType = InstitutionType.democracy
+    religion: ReligionType = ReligionType.folk
+    initial_values: InitialValues = Field(default_factory=InitialValues)
+    terrain: TerrainState = Field(default_factory=TerrainState)
+    institution_runtime: InstitutionState = Field(default_factory=InstitutionState)
 
 
 class WorldState(BaseModel):
@@ -151,12 +191,15 @@ class WorldState(BaseModel):
     tax_rate: float
     institution: InstitutionType
     start_year: int = 700
-    geography: GeographyType = GeographyType.asia
+    geography: GeographyType = GeographyType.world
     landform: LandformType = LandformType.continent
     climate: ClimateType = ClimateType.temperate
+    disaster_frequency: float = Field(default=0.2, ge=0, le=1)
+    religion: ReligionType = ReligionType.folk
     terrain: TerrainState = Field(default_factory=TerrainState)
     initial_values: InitialValues
     institution_runtime: InstitutionState = Field(default_factory=InstitutionState)
+    regions: list[RegionState] = Field(default_factory=list)
 
 
 class EventRecord(BaseModel):

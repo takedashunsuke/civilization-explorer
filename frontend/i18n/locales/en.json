@@ -43,8 +43,32 @@
   "taxRateHint": "Higher burden favors obedience costs and resistance (0–1).",
   "education": "Education",
   "educationHint": "Higher cooperation success and resource growth (0–1).",
-  "resourcePool": "Resource slack",
-  "resourcePoolHint": "Scarce worlds fight more; plenty makes sharing easier. Stand-in for grain doles.",
+  "resourcePool": "Food abundance",
+  "resourcePoolHint": "Slack in hunting, gathering, and farming. Scarcity favors grabbing; plenty favors sharing.",
+  "theater": "Region",
+  "theaterHint": "The continental theater. Groups are snapped onto land.",
+  "geography": "Region",
+  "geographyHint": "The continental theater. Groups are snapped onto land.",
+  "conditionGroups": {
+    "geography": "Geographic conditions",
+    "nature": "Nature and food",
+    "natureLead": "Together with climate, this sets how much food and shared resource slack there is.",
+    "disaster": "Disaster frequency",
+    "disasterLead": "How often typhoons, quakes, floods, heat waves, or cold snaps hit. The mix follows landform and climate.",
+    "society": "Social constraints",
+    "societyLead": "Population, institutions, tax, education, and how readily people obey.",
+    "religion": "Religious outlook",
+    "religionLead": "Shapes deference to authority and how often resistance appears."
+  },
+  "disasterFrequency": "Frequency",
+  "disasterFrequencyHint": "0 almost never; 1 fairly often (0–1).",
+  "religion": "Outlook",
+  "religionHint": "Organized faith favors obedience; secular outlooks make resistance easier.",
+  "religions": {
+    "folk": "Folk belief",
+    "organized": "Organized religion",
+    "secular": "Secular"
+  },
   "cooperation": "Mutual aid",
   "cooperationHint": "Higher starting tendency to cooperate (0–1).",
   "authorityAcceptance": "Deference to authority",
@@ -53,19 +77,6 @@
   "ambitionHint": "Higher leadership contests and political rivalry (0–1).",
   "inequality": "Starting wealth gap",
   "inequalityHint": "Higher spread of wealth at t=0 (0–1).",
-  "geography": "Geography",
-  "geographyHint": "Choose a wide theater. Actors are projected inside this frame.",
-  "geographyHint": "Choose a wide theater. Actors are projected inside this frame.",
-  "calendarYearHint": "Set a Gregorian year as BC or AD. Each turn advances one year.",
-  "conditionGroups": {
-    "stage": "Stage",
-    "land": "Land",
-    "society": "Institutions",
-    "societyLead": "Who benefits, and who is expected to obey.",
-    "people": "Disposition",
-    "peopleLead": "The starting mix of people the institution will select on.",
-    "replay": "Replay"
-  },
   "landform": "Landform",
   "landformHint": "Continents have more interior; island chains favor coasts and fragmentation. This shapes the sim grid.",
   "landforms": {
@@ -82,18 +93,90 @@
   },
   "institutionHint": "Affects how readily people obey or resist.",
   "geographies": {
+    "africa": "Africa",
     "asia": "Asia",
     "europe": "Europe",
-    "middle_east": "Middle East",
     "america": "Americas",
+    "oceania": "Oceania",
+    "middle_east": "Middle East",
+    "world": "World",
     "island": "Asia",
     "continent": "Europe"
   },
   "theaters": {
+    "africa": "Africa",
     "asia": "Asia",
     "europe": "Europe",
+    "america": "Americas",
+    "oceania": "Oceania",
     "middle_east": "Middle East",
-    "america": "Americas"
+    "world": "World"
+  },
+  "wizard": {
+    "step1": "STEP 1 Backdrop",
+    "step2": "STEP 2 Society",
+    "step3": "STEP 3 Outlook",
+    "lead1": "Geography, nature, and food are preset. Read inland, coast, and islands in the table, then pick a start year.",
+    "lead2": "Change social constraints per continent to see whether futures diverge in one world.",
+    "lead3": "Set religion and disposition per continent to compare group-agent character.",
+    "next": "Next",
+    "back": "Back",
+    "axis": "Item",
+    "levels": {
+      "low": "Low",
+      "mid": "Medium",
+      "high": "High"
+    },
+    "rows": {
+      "inland": "Inland",
+      "coast": "Coast",
+      "island": "Islands",
+      "climate": "Climate",
+      "food": "Food",
+      "disaster": "Disasters"
+    },
+    "table": {
+      "africa": {
+        "inland": "Sahara to plateau. Dry; farming and travel are hard.",
+        "coast": "Mediterranean and Guinea coasts. Gateways for trade.",
+        "island": "Madagascar and nearby isles. Easy to split from the mainland.",
+        "climate": "Mostly arid. Heat waves are common.",
+        "food": "Scarce, clustered in coasts and valleys.",
+        "disaster": "Heat and quakes often cut food slack."
+      },
+      "europe": {
+        "inland": "Broad plains. People can gather even inland.",
+        "coast": "North Sea and Atlantic. Ports and fishing are strong.",
+        "island": "Britain and others. Sea crossings split institutions.",
+        "climate": "Temperate. Winters bite, extremes are rarer.",
+        "food": "Slack is high. Grain and pasture mix well.",
+        "disaster": "Relatively mild."
+      },
+      "asia": {
+        "inland": "Plateaus and steppe. Dry and cold inland.",
+        "coast": "Monsoon coasts. People and rice concentrate here.",
+        "island": "Japan and others. Crossing is possible, splits remain.",
+        "climate": "Wet monsoon. Heavy rain.",
+        "food": "Rivers and wetlands feed many, but water can fail them.",
+        "disaster": "Floods and typhoons are common."
+      },
+      "america": {
+        "inland": "Great plains. Room to spread, but distances are long.",
+        "coast": "Two oceans. Ports and fisheries split east and west.",
+        "island": "Caribbean and others. Far from the mainland, storm-prone.",
+        "climate": "Mostly temperate, with a north–south spread.",
+        "food": "High slack. Plains produce thickly.",
+        "disaster": "Moderate mix of quakes and storms."
+      },
+      "oceania": {
+        "inland": "Little true interior. Almost no continental depth.",
+        "coast": "Nearly all coastal. Fishing and sea lanes dominate.",
+        "island": "The body is an archipelago. Neighbors sit across water.",
+        "climate": "Humid, near cyclone belts.",
+        "food": "Uneven by island. Slack is smaller.",
+        "disaster": "Typhoons and floods hit hard."
+      }
+    }
   },
   "institution": "Institution",
   "institutions": {
@@ -134,6 +217,7 @@
     "population": "Pop. {alive} (start {initial} {delta} / cap {cap})",
     "settlements": "Settlements {count}",
     "resources": "Shared resources {value}",
+    "fiveContinents": "Five continents",
     "zoomHintFlat": "Drag to pan. Scroll or double-click to zoom.",
     "zoomHintFlat": "Drag to pan. Scroll or double-click to zoom.",
     "zoomHintGlobe": "Drag to orbit. Scroll or double-click to zoom.",
@@ -172,7 +256,8 @@
     "birth": "Birth",
     "death": "Death",
     "lead": "Succession",
-    "trait": "Notable"
+    "trait": "Notable",
+    "disaster": "Disaster"
   },
   "eventDetails": {
     "wait": "Rested to recover energy.",
@@ -212,7 +297,12 @@
     "group_trait_gain_charisma": "Charisma appeared in {group} ({actor}).",
     "group_trait_gain_genius": "Genius appeared in {group} ({actor}).",
     "group_trait_lose_charisma": "Charisma faded in {group} ({actor}).",
-    "group_trait_lose_genius": "Genius dimmed in {group} ({actor})."
+    "group_trait_lose_genius": "Genius dimmed in {group} ({actor}).",
+    "disaster_typhoon": "A typhoon struck and coastal groups were hurt.",
+    "disaster_earthquake": "An earthquake shook wealth and security.",
+    "disaster_flood": "Floods washed away fields and stores.",
+    "disaster_heatwave": "A heat wave drained energy and food.",
+    "disaster_frost": "A cold snap cut the harvest and stores."
   },
   "yearLabel": {
     "bc": "BC {year}",
