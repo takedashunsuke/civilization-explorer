@@ -103,6 +103,11 @@ const population = ref(8)
 const seed = ref(42)
 const taxRate = ref(0.1)
 const education = ref(0.5)
+const resourcePool = ref(100)
+const cooperation = ref(0.5)
+const authorityAcceptance = ref(0.5)
+const ambition = ref(0.5)
+const inequality = ref(0.35)
 /** API には英語キーのまま送る */
 const institution = ref('democracy')
 const geography = ref('asia')
@@ -332,7 +337,13 @@ async function createSimulation() {
         geography: geography.value,
         landform: landform.value,
         climate: climate.value,
-        resource_pool: 100,
+        resource_pool: resourcePool.value,
+        initial_values: {
+          cooperation: cooperation.value,
+          authority_acceptance: authorityAcceptance.value,
+          ambition: ambition.value,
+          inequality: inequality.value,
+        },
       },
     })
     conditionsOpen.value = false
@@ -589,6 +600,7 @@ onBeforeUnmount(() => {
 
         <section class="conditions-section">
           <p class="conditions-group">{{ t('conditionGroups.society') }}</p>
+          <p class="conditions-lead">{{ t('conditionGroups.societyLead') }}</p>
           <div class="conditions-grid conditions-grid-4">
             <div class="conditions-field">
               <label>{{ t('population') }}</label>
@@ -609,6 +621,38 @@ onBeforeUnmount(() => {
               <label>{{ t('education') }}</label>
               <InputNumber v-model="education" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
               <p class="hint">{{ t('educationHint') }}</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="conditions-section">
+          <p class="conditions-group">{{ t('conditionGroups.people') }}</p>
+          <p class="conditions-lead">{{ t('conditionGroups.peopleLead') }}</p>
+          <div class="conditions-grid conditions-grid-4">
+            <div class="conditions-field">
+              <label>{{ t('resourcePool') }}</label>
+              <InputNumber v-model="resourcePool" :min="20" :max="300" :step="10" show-buttons class="field-control" />
+              <p class="hint">{{ t('resourcePoolHint') }}</p>
+            </div>
+            <div class="conditions-field">
+              <label>{{ t('cooperation') }}</label>
+              <InputNumber v-model="cooperation" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+              <p class="hint">{{ t('cooperationHint') }}</p>
+            </div>
+            <div class="conditions-field">
+              <label>{{ t('authorityAcceptance') }}</label>
+              <InputNumber v-model="authorityAcceptance" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+              <p class="hint">{{ t('authorityAcceptanceHint') }}</p>
+            </div>
+            <div class="conditions-field">
+              <label>{{ t('ambition') }}</label>
+              <InputNumber v-model="ambition" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+              <p class="hint">{{ t('ambitionHint') }}</p>
+            </div>
+            <div class="conditions-field">
+              <label>{{ t('inequality') }}</label>
+              <InputNumber v-model="inequality" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+              <p class="hint">{{ t('inequalityHint') }}</p>
             </div>
           </div>
         </section>
@@ -948,12 +992,19 @@ h2 {
 }
 
 .conditions-group {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.2rem;
   padding: 0;
   border: 0;
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  color: var(--muted);
+}
+
+.conditions-lead {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
   color: var(--muted);
 }
 

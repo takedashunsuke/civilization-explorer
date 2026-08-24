@@ -76,6 +76,8 @@ def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
             authority_acceptance=body.initial_values.get(
                 "authority_acceptance", initial.authority_acceptance
             ),
+            ambition=body.initial_values.get("ambition", initial.ambition),
+            inequality=body.initial_values.get("inequality", initial.inequality),
         )
 
     params = WorldParams(

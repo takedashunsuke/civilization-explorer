@@ -91,11 +91,12 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
     for i in range(params.population):
         coop = clamp(params.initial_values.cooperation + rng.uniform(-0.2, 0.2))
         aggr = clamp(0.4 + rng.uniform(-0.25, 0.25))
-        ambi = clamp(0.4 + rng.uniform(-0.25, 0.25))
+        ambi = clamp(params.initial_values.ambition + rng.uniform(-0.2, 0.2))
         traits = roll_traits(rng)
         if "charisma" in traits:
             ambi = max(ambi, 0.68)
-        wealth = rng.uniform(8, 20)
+        spread = 4.0 + 28.0 * params.initial_values.inequality
+        wealth = rng.uniform(max(2.0, 14.0 - spread / 2), 14.0 + spread / 2)
         if "genius" in traits:
             wealth += 4
         agents.append(

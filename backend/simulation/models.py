@@ -84,6 +84,8 @@ class Personality(BaseModel):
 class InitialValues(BaseModel):
     cooperation: float = Field(ge=0, le=1, default=0.5)
     authority_acceptance: float = Field(ge=0, le=1, default=0.5)
+    ambition: float = Field(ge=0, le=1, default=0.5)
+    inequality: float = Field(ge=0, le=1, default=0.35)
 
 
 class WorldParams(BaseModel):
