@@ -3,11 +3,11 @@ from __future__ import annotations
 import math
 import random
 
-from simulation.models import GeographyType, Position, TerrainState
+from simulation.models import ClimateType, LandformType, Position, TerrainState
 
 TERRAIN_COLS = 48
 TERRAIN_ROWS = 48
-LAND_BIOMES = ("coast", "river", "plain", "mountain")
+LAND_BIOMES = ("coast", "river", "plain", "mountain", "marsh", "tundra", "desert")
 
 
 def _hash_noise(ix: int, iy: int, seed: int) -> float:
@@ -60,14 +60,14 @@ def _neighbors(col: int, row: int, cols: int, rows: int) -> list[tuple[int, int]
     return out
 
 
-def generate_terrain(geography: GeographyType, seed: int) -> TerrainState:
+def generate_terrain(landform: LandformType, climate: ClimateType, seed: int) -> TerrainState:
     rng = random.Random(seed * 9176 + 13)
     cols, rows = TERRAIN_COLS, TERRAIN_ROWS
     land = [[False] * cols for _ in range(rows)]
     elev = [[0.0] * cols for _ in range(rows)]
     nseed = rng.randint(1, 10**9)
 
-    if geography == GeographyType.island:
+    if landform == LandformType.island:
         blobs: list[tuple[float, float, float, float, float]] = []
         n_islands = rng.randint(3, 4)
         for i in range(n_islands):
@@ -129,19 +129,30 @@ def generate_terrain(geography: GeographyType, seed: int) -> TerrainState:
             if not land[row][col]:
                 continue
             near_ocean = any(not land[nr][nc] for nc, nr in _neighbors(col, row, cols, rows))
-            mountain_cut = 0.74 if geography == GeographyType.island else 0.64
+            mountain_cut = 0.74 if landform == LandformType.island else 0.64
+            if climate == ClimateType.cold:
+                mountain_cut -= 0.08
+            elif climate == ClimateType.arid:
+                mountain_cut += 0.04
             if elev[row][col] > mountain_cut and not near_ocean:
                 biomes[row][col] = "mountain"
             else:
                 biomes[row][col] = "plain"
 
-    _carve_rivers(biomes, elev, land, rng)
+    river_count = {
+        ClimateType.temperate: rng.randint(3, 6),
+        ClimateType.cold: rng.randint(2, 4),
+        ClimateType.wetland: rng.randint(6, 9),
+        ClimateType.arid: rng.randint(1, 2),
+    }[climate]
+    _carve_rivers(biomes, elev, land, rng, river_count)
     for row in range(rows):
         for col in range(cols):
             if biomes[row][col] != "plain":
                 continue
             if any(biomes[nr][nc] == "ocean" for nc, nr in _neighbors(col, row, cols, rows)):
                 biomes[row][col] = "coast"
+    _apply_climate(biomes, climate, rng)
 
     return TerrainState(
         cols=cols,
@@ -155,6 +166,7 @@ def _carve_rivers(
     elev: list[list[float]],
     land: list[list[bool]],
     rng: random.Random,
+    river_count: int,
 ) -> None:
     rows = len(biomes)
     cols = len(biomes[0])
@@ -162,7 +174,7 @@ def _carve_rivers(
     if not mountains:
         return
     rng.shuffle(mountains)
-    sources = mountains[: rng.randint(3, 6)]
+    sources = mountains[: max(1, min(river_count, len(mountains)))]
     for start in sources:
         col, row = start
         seen: set[tuple[int, int]] = set()
@@ -185,6 +197,32 @@ def _carve_rivers(
                 else:
                     break
             col, row = nxt
+
+
+def _apply_climate(biomes: list[list[str]], climate: ClimateType, rng: random.Random) -> None:
+    if climate == ClimateType.temperate:
+        return
+    rows = len(biomes)
+    cols = len(biomes[0])
+    for row in range(rows):
+        for col in range(cols):
+            cell = biomes[row][col]
+            if cell in ("ocean", "mountain"):
+                continue
+            neigh = [biomes[nr][nc] for nc, nr in _neighbors(col, row, cols, rows)]
+            if climate == ClimateType.wetland:
+                if cell in ("plain", "coast", "river") and (
+                    "river" in neigh or "ocean" in neigh or rng.random() < 0.18
+                ):
+                    biomes[row][col] = "marsh"
+            elif climate == ClimateType.cold:
+                if cell == "plain" or (cell == "coast" and rng.random() < 0.45):
+                    biomes[row][col] = "tundra"
+            elif climate == ClimateType.arid:
+                if cell == "plain" and "ocean" not in neigh:
+                    biomes[row][col] = "desert"
+                elif cell == "river" and rng.random() < 0.35:
+                    biomes[row][col] = "desert"
 
 
 def biome_at(terrain: TerrainState | None, x: float, y: float) -> str:
@@ -215,9 +253,19 @@ def _land_cells(terrain: TerrainState, preferred: tuple[str, ...] | None = None)
 def random_land_position(
     terrain: TerrainState,
     rng: random.Random,
-    geography: GeographyType | None = None,
+    landform: LandformType | None = None,
+    climate: ClimateType | None = None,
 ) -> Position:
-    preferred = ("coast", "river", "plain") if geography == GeographyType.island else ("plain", "river", "coast")
+    if climate == ClimateType.wetland:
+        preferred = ("marsh", "river", "coast", "plain")
+    elif climate == ClimateType.cold:
+        preferred = ("tundra", "plain", "coast", "river")
+    elif climate == ClimateType.arid:
+        preferred = ("coast", "river", "plain", "desert")
+    elif landform == LandformType.island:
+        preferred = ("coast", "river", "plain")
+    else:
+        preferred = ("plain", "river", "coast")
     cells = _land_cells(terrain, preferred) or _land_cells(terrain)
     if not cells:
         return Position(x=50.0, y=50.0)
@@ -249,3 +297,9 @@ def snap_to_land(terrain: TerrainState | None, x: float, y: float) -> Position:
         return Position(x=50.0, y=50.0)
     cx, cy = _tile_center(terrain, best[1], best[2])
     return Position(x=cx, y=cy)
+
+
+generate_terrain = generate_terrain
+random_land_position = random_land_position
+snap_to_land = snap_to_land
+biome_at = biome_at

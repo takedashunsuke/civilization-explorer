@@ -45,6 +45,29 @@
   "educationHint": "0〜1。協力の成功しやすさと資源の増え方に影響します。",
   "geography": "地理",
   "geographyHint": "実験の舞台を広域で選びます。主体はその枠の中に投影されます。",
+  "geographyHint": "実験の舞台を広域で選びます。主体はその枠の中に投影されます。",
+  "calendarYearHint": "西暦を BC / AD で指定。1ターン＝1年進みます。",
+  "conditionGroups": {
+    "stage": "舞台",
+    "land": "土地",
+    "society": "社会",
+    "replay": "再現"
+  },
+  "landform": "地形",
+  "landformHint": "大陸は内陸が広く、島国は海岸と分断が強く出ます。シミュレーション地形に効きます。",
+  "landforms": {
+    "continent": "大陸",
+    "island": "島国"
+  },
+  "climate": "気候",
+  "climateHint": "舞台枠の色と、移動コスト・資源の増え方に効きます。精密な気象モデルではありません。",
+  "climates": {
+    "temperate": "温帯",
+    "cold": "寒冷",
+    "wetland": "湿地",
+    "arid": "乾燥"
+  },
+  "institutionHint": "誰が従い、誰が抵抗しやすいかに効きます。",
   "geographies": {
     "asia": "アジア",
     "europe": "ヨーロッパ",
@@ -98,6 +121,7 @@
     "population": "人口 {alive}（初期 {initial} {delta} / 上限 {cap}）",
     "settlements": "集落 {count}",
     "resources": "共有資源 {value}",
+    "zoomHintFlat": "ドラッグで移動、スクロールまたはダブルクリックで拡大。",
     "zoomHintFlat": "ドラッグで移動、スクロールまたはダブルクリックで拡大。",
     "zoomHintGlobe": "ドラッグで地球を回し、スクロールまたはダブルクリックで拡大。",
     "fit": "集団",

@@ -22,6 +22,29 @@ class GeographyType(str, Enum):
     continent = "continent"
 
 
+class LandformType(str, Enum):
+    continent = "continent"
+    island = "island"
+
+
+class ClimateType(str, Enum):
+    temperate = "temperate"
+    cold = "cold"
+    wetland = "wetland"
+    arid = "arid"
+
+
+def resolve_theater_and_landform(
+    geography: GeographyType,
+    landform: LandformType,
+) -> tuple[GeographyType, LandformType]:
+    if geography == GeographyType.island:
+        return GeographyType.asia, LandformType.island
+    if geography == GeographyType.continent:
+        return GeographyType.europe, LandformType.continent
+    return geography, landform
+
+
 class TerrainState(BaseModel):
     cols: int = 48
     rows: int = 48
@@ -73,6 +96,8 @@ class WorldParams(BaseModel):
     # Astronomical year: AD 1 = 1, BC 1 = 0, BC 44 = -43
     start_year: int = Field(default=700, ge=-50000, le=3000)
     geography: GeographyType = GeographyType.asia
+    landform: LandformType = LandformType.continent
+    climate: ClimateType = ClimateType.temperate
     initial_values: InitialValues = Field(default_factory=InitialValues)
 
 
@@ -125,6 +150,8 @@ class WorldState(BaseModel):
     institution: InstitutionType
     start_year: int = 700
     geography: GeographyType = GeographyType.asia
+    landform: LandformType = LandformType.continent
+    climate: ClimateType = ClimateType.temperate
     terrain: TerrainState = Field(default_factory=TerrainState)
     initial_values: InitialValues
     institution_runtime: InstitutionState = Field(default_factory=InstitutionState)
@@ -172,3 +199,7 @@ class SimulationState(BaseModel):
     events: list[EventRecord] = Field(default_factory=list)
     history: list[HistoryRecord] = Field(default_factory=list)
     last_metrics: MetricsSnapshot | None = None
+
+
+WorldParams = WorldParams
+resolve_theater_and_landform = resolve_theater_and_landform

@@ -4,7 +4,6 @@ import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Tag from 'primevue/tag'
 import { polityKind, settlementColor } from '~/utils/groupColors'
-import WorldGlobe from '~/components/WorldGlobe.vue'
 import WorldMap2D from '~/components/WorldMap2D.vue'
 
 type Agent = {
@@ -64,6 +63,8 @@ type Simulation = {
     resource_pool: number
     start_year: number
     geography?: string
+    landform?: string
+    climate?: string
     terrain?: Terrain
     initial_population?: number
     initial_total_wealth?: number
@@ -105,8 +106,8 @@ const education = ref(0.5)
 /** API には英語キーのまま送る */
 const institution = ref('democracy')
 const geography = ref('asia')
-const mapMode = ref<'flat' | 'globe'>('flat')
-const globeReady = ref(false)
+const landform = ref('continent')
+const climate = ref('temperate')
 
 const institutionOptions = computed(() => [
   { label: t('institutions.democracy'), value: 'democracy' },
@@ -119,6 +120,18 @@ const geographyOptions = computed(() => [
   { label: t('geographies.europe'), value: 'europe' },
   { label: t('geographies.middle_east'), value: 'middle_east' },
   { label: t('geographies.america'), value: 'america' },
+])
+
+const landformOptions = computed(() => [
+  { label: t('landforms.continent'), value: 'continent' },
+  { label: t('landforms.island'), value: 'island' },
+])
+
+const climateOptions = computed(() => [
+  { label: t('climates.temperate'), value: 'temperate' },
+  { label: t('climates.cold'), value: 'cold' },
+  { label: t('climates.wetland'), value: 'wetland' },
+  { label: t('climates.arid'), value: 'arid' },
 ])
 
 const calendarEraOptions = computed(() => [
@@ -317,6 +330,8 @@ async function createSimulation() {
         institution: institution.value,
         start_year: draftAstroYear.value,
         geography: geography.value,
+        landform: landform.value,
+        climate: climate.value,
         resource_pool: 100,
       },
     })
@@ -361,10 +376,6 @@ async function toggleAutoPlay() {
     void tick(1, { silent: true })
   }, AUTO_INTERVAL_MS)
 }
-
-watch(mapMode, (mode) => {
-  if (mode === 'globe') globeReady.value = true
-})
 
 onBeforeUnmount(() => {
   stopAutoPlay()
@@ -477,28 +488,6 @@ onBeforeUnmount(() => {
         <div class="panel-heading">
           <div class="map-heading">
             <h2>{{ t('map.title') }}</h2>
-            <div class="map-tabs" role="tablist">
-              <button
-                type="button"
-                role="tab"
-                class="map-tab"
-                :aria-selected="mapMode === 'flat'"
-                :class="{ active: mapMode === 'flat' }"
-                @click="mapMode = 'flat'"
-              >
-                {{ t('map.modes.flat') }}
-              </button>
-              <button
-                type="button"
-                role="tab"
-                class="map-tab"
-                :aria-selected="mapMode === 'globe'"
-                :class="{ active: mapMode === 'globe' }"
-                @click="mapMode = 'globe'"
-              >
-                {{ t('map.modes.globe') }}
-              </button>
-            </div>
           </div>
           <p v-if="sim" class="map-stats">
             {{ t('map.population', {
@@ -513,12 +502,15 @@ onBeforeUnmount(() => {
             {{ t('map.resources', { value: sim.world.resource_pool.toFixed(1) }) }}
             ·
             {{ t(`geographies.${sim.world.geography}`) }}
+            ·
+            {{ t(`landforms.${sim.world.landform ?? 'continent'}`) }}
+            ·
+            {{ t(`climates.${sim.world.climate ?? 'temperate'}`) }}
           </p>
         </div>
-        <p class="hint map-legend">{{ t('map.legend') }} {{ mapMode === 'globe' ? t('map.zoomHintGlobe') : t('map.zoomHintFlat') }}</p>
+        <p class="hint map-legend">{{ t('map.legend') }} {{ t('map.zoomHintFlat') }}</p>
         <div class="map-stage">
-          <WorldMap2D v-show="mapMode === 'flat'" :sim="sim" :geography="geography" :seed="seed" />
-          <WorldGlobe v-if="globeReady" v-show="mapMode === 'globe'" :sim="sim" :geography="geography" :seed="seed" />
+          <WorldMap2D :sim="sim" :geography="geography" :landform="landform" :climate="climate" :seed="seed" />
         </div>
         <div v-if="metricItems.length" class="metrics">
           <h2>{{ t('metrics.title') }}</h2>
@@ -548,58 +540,92 @@ onBeforeUnmount(() => {
         <button type="button" class="events-close" :aria-label="t('layout.closeConditions')" @click="conditionsOpen = false">×</button>
       </div>
       <div class="conditions-form">
-        <div class="conditions-field">
-          <label>{{ t('calendarYear') }}</label>
-          <div class="year-row">
-            <Dropdown
-              v-model="calendarEra"
-              :options="calendarEraOptions"
-              option-label="label"
-              option-value="value"
-              class="era-select"
-            />
-            <InputNumber v-model="calendarYear" :min="1" :max="50000" show-buttons class="year-input" />
+        <section class="conditions-section">
+          <p class="conditions-group">{{ t('conditionGroups.stage') }}</p>
+          <div class="conditions-grid conditions-grid-stage">
+            <div class="conditions-field">
+              <label>{{ t('calendarYear') }}</label>
+              <div class="year-row">
+                <Dropdown
+                  v-model="calendarEra"
+                  :options="calendarEraOptions"
+                  option-label="label"
+                  option-value="value"
+                  class="era-select"
+                />
+                <InputNumber v-model="calendarYear" :min="1" :max="50000" show-buttons class="year-input" />
+              </div>
+              <p class="hint">{{ t('calendarYearHint') }}</p>
+            </div>
+            <div class="era-preview">
+              <p class="era-preview-title">{{ t('eraPreview.title') }}</p>
+              <p><span class="era-k">{{ t('eraPreview.year', { label: draftYearLabel }) }}</span></p>
+              <p><span class="era-k">{{ t('eraPreview.japan') }}</span> {{ draftJapanEra }}</p>
+              <p><span class="era-k">{{ t('eraPreview.world') }}</span> {{ draftWorldEra }}</p>
+            </div>
+            <div class="conditions-field">
+              <label>{{ t('geography') }}</label>
+              <Dropdown v-model="geography" :options="geographyOptions" option-label="label" option-value="value" class="field-control" />
+              <p class="hint">{{ t('geographyHint') }}</p>
+            </div>
           </div>
-          <p class="hint">{{ t('calendarYearHint') }}</p>
-        </div>
-        <div class="era-preview">
-          <p class="era-preview-title">{{ t('eraPreview.title') }}</p>
-          <p><span class="era-k">{{ t('eraPreview.year', { label: draftYearLabel }) }}</span></p>
-          <p><span class="era-k">{{ t('eraPreview.japan') }}</span> {{ draftJapanEra }}</p>
-          <p><span class="era-k">{{ t('eraPreview.world') }}</span> {{ draftWorldEra }}</p>
-        </div>
-        <div class="conditions-field">
-          <label>{{ t('population') }}</label>
-          <InputNumber v-model="population" :min="2" :max="100" show-buttons class="field-control" />
-          <p class="hint">{{ t('populationHint') }}</p>
-        </div>
-        <div class="conditions-field">
-          <label>{{ t('seed') }}</label>
-          <InputNumber v-model="seed" show-buttons class="field-control" />
-          <p class="hint">{{ t('seedHint') }}</p>
-        </div>
-        <div class="conditions-field">
-          <label>{{ t('taxRate') }}</label>
-          <InputNumber v-model="taxRate" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
-          <p class="hint">{{ t('taxRateHint') }}</p>
-        </div>
-        <div class="conditions-field">
-          <label>{{ t('education') }}</label>
-          <InputNumber v-model="education" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
-          <p class="hint">{{ t('educationHint') }}</p>
-        </div>
-        <div class="conditions-field">
-          <label>{{ t('geography') }}</label>
-          <Dropdown v-model="geography" :options="geographyOptions" option-label="label" option-value="value" class="field-control" />
-          <p class="hint">{{ t('geographyHint') }}</p>
-        </div>
-        <div class="conditions-field">
-          <label>{{ t('institution') }}</label>
-          <Dropdown v-model="institution" :options="institutionOptions" option-label="label" option-value="value" class="field-control" />
-        </div>
-        <div class="actions">
-          <Button :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy && !autoPlaying" @click="createSimulation" />
-        </div>
+        </section>
+
+        <section class="conditions-section">
+          <p class="conditions-group">{{ t('conditionGroups.land') }}</p>
+          <div class="conditions-grid conditions-grid-2">
+            <div class="conditions-field">
+              <label>{{ t('landform') }}</label>
+              <Dropdown v-model="landform" :options="landformOptions" option-label="label" option-value="value" class="field-control" />
+              <p class="hint">{{ t('landformHint') }}</p>
+            </div>
+            <div class="conditions-field">
+              <label>{{ t('climate') }}</label>
+              <Dropdown v-model="climate" :options="climateOptions" option-label="label" option-value="value" class="field-control" />
+              <p class="hint">{{ t('climateHint') }}</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="conditions-section">
+          <p class="conditions-group">{{ t('conditionGroups.society') }}</p>
+          <div class="conditions-grid conditions-grid-4">
+            <div class="conditions-field">
+              <label>{{ t('population') }}</label>
+              <InputNumber v-model="population" :min="2" :max="100" show-buttons class="field-control" />
+              <p class="hint">{{ t('populationHint') }}</p>
+            </div>
+            <div class="conditions-field">
+              <label>{{ t('institution') }}</label>
+              <Dropdown v-model="institution" :options="institutionOptions" option-label="label" option-value="value" class="field-control" />
+              <p class="hint">{{ t('institutionHint') }}</p>
+            </div>
+            <div class="conditions-field">
+              <label>{{ t('taxRate') }}</label>
+              <InputNumber v-model="taxRate" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+              <p class="hint">{{ t('taxRateHint') }}</p>
+            </div>
+            <div class="conditions-field">
+              <label>{{ t('education') }}</label>
+              <InputNumber v-model="education" :min="0" :max="1" :step="0.05" :max-fraction-digits="2" show-buttons class="field-control" />
+              <p class="hint">{{ t('educationHint') }}</p>
+            </div>
+          </div>
+        </section>
+
+        <section class="conditions-section">
+          <p class="conditions-group">{{ t('conditionGroups.replay') }}</p>
+          <div class="conditions-grid conditions-grid-replay">
+            <div class="conditions-field">
+              <label>{{ t('seed') }}</label>
+              <InputNumber v-model="seed" show-buttons class="field-control" />
+              <p class="hint">{{ t('seedHint') }}</p>
+            </div>
+            <div class="actions">
+              <Button :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy && !autoPlaying" @click="createSimulation" />
+            </div>
+          </div>
+        </section>
         <p v-if="error" class="error">{{ error }}</p>
       </div>
     </aside>
@@ -762,11 +788,12 @@ onBeforeUnmount(() => {
 }
 
 .era-preview {
-  margin-top: 0.55rem;
-  padding: 0.55rem 0.65rem;
+  margin-top: 0;
+  padding: 0.45rem 0.6rem;
   border-radius: 8px;
   border: 1px dashed var(--line);
   background: color-mix(in srgb, var(--panel) 70%, #121820);
+  min-width: 0;
 }
 
 .era-preview-title {
@@ -877,30 +904,70 @@ h2 {
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 40;
-  width: min(44rem, calc(100vw - 2rem));
-  max-height: min(86vh, 40rem);
+  width: min(84rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
   display: flex;
   flex-direction: column;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
 }
 
 .conditions-form {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 0 1.1rem;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+  overflow: visible;
   min-height: 0;
-  flex: 1 1 auto;
-  padding-right: 0.15rem;
+  flex: 0 0 auto;
 }
 
-.conditions-form .actions,
-.conditions-form .error {
-  grid-column: 1 / -1;
+.conditions-section {
+  min-width: 0;
+}
+
+.conditions-grid {
+  display: grid;
+  gap: 0.55rem 1rem;
+  align-items: start;
+}
+
+.conditions-grid-stage {
+  grid-template-columns: minmax(0, 1.15fr) minmax(12rem, 1.1fr) minmax(0, 1fr);
+}
+
+.conditions-grid-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.conditions-grid-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.conditions-grid-replay {
+  grid-template-columns: minmax(0, 1fr) minmax(12rem, 16rem);
+  align-items: end;
+}
+
+.conditions-group {
+  margin: 0 0 0.35rem;
+  padding: 0;
+  border: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
 }
 
 .conditions-field label {
-  margin-top: 0.45rem;
+  margin: 0 0 0.2rem;
+}
+
+.conditions-grid-stage .era-preview {
+  margin-top: 1.35rem;
+}
+
+.conditions-modal .hint {
+  font-size: 0.68rem;
+  line-height: 1.3;
 }
 
 .viewport {
@@ -1090,7 +1157,8 @@ label {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  margin-top: 1rem;
+  margin-top: 0;
+  padding-bottom: 1.15rem;
 }
 
 .action-btn {
@@ -1190,7 +1258,25 @@ label {
 }
 
 @media (max-width: 1100px) {
-  .conditions-form {
+  .conditions-grid-stage,
+  .conditions-grid-2,
+  .conditions-grid-4,
+  .conditions-grid-replay {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .conditions-modal {
+    width: min(52rem, calc(100vw - 1.5rem));
+    max-height: calc(100vh - 1.5rem);
+    overflow: auto;
+  }
+}
+
+@media (max-width: 720px) {
+  .conditions-grid-stage,
+  .conditions-grid-2,
+  .conditions-grid-4,
+  .conditions-grid-replay {
     grid-template-columns: 1fr;
   }
 }

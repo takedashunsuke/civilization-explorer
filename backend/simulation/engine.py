@@ -9,9 +9,11 @@ from simulation.models import (
     AgentState,
     Allegiance,
     ChosenAction,
+    ClimateType,
     EventRecord,
     HistoryRecord,
     InstitutionState,
+    LandformType,
     MetricsSnapshot,
     Personality,
     Position,
@@ -20,8 +22,9 @@ from simulation.models import (
     SimulationState,
     WorldParams,
     WorldState,
+    resolve_theater_and_landform,
 )
-from simulation.terrain import generate_terrain, random_land_position, snap_to_land
+from simulation.terrain import biome_at, generate_terrain, random_land_position, snap_to_land
 
 
 SETTLEMENT_DISTANCE = 10.0
@@ -82,7 +85,8 @@ def leadership_score(agent: AgentState, rng: random.Random | None = None) -> flo
 
 def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
     rng = random.Random(params.seed)
-    terrain = generate_terrain(params.geography, params.seed)
+    theater, landform = resolve_theater_and_landform(params.geography, params.landform)
+    terrain = generate_terrain(landform, params.climate, params.seed)
     agents: list[AgentState] = []
     for i in range(params.population):
         coop = clamp(params.initial_values.cooperation + rng.uniform(-0.2, 0.2))
@@ -98,7 +102,7 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
             AgentState(
                 id=f"a{i + 1}",
                 name=f"a{i + 1}",
-                position=random_land_position(terrain, rng, params.geography),
+                position=random_land_position(terrain, rng, landform, params.climate),
                 wealth=wealth,
                 energy=clamp(0.7 + rng.uniform(-0.2, 0.2)),
                 happiness=clamp(0.5 + rng.uniform(-0.15, 0.15)),
@@ -132,7 +136,9 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
         tax_rate=params.tax_rate,
         institution=params.institution,
         start_year=params.start_year,
-        geography=params.geography,
+        geography=theater,
+        landform=landform,
+        climate=params.climate,
         terrain=terrain,
         initial_values=params.initial_values,
         institution_runtime=InstitutionState(
@@ -399,7 +405,15 @@ def resolve_actions(
                 nx += rng.uniform(-10, 10)
                 ny += rng.uniform(-10, 10)
             actor.position = snap_to_land(sim.world.terrain, nx, ny)
-            actor.energy = clamp(actor.energy - 0.2)
+            cost = 0.2
+            if sim.world.landform == LandformType.island:
+                cost += 0.04
+            if sim.world.climate == ClimateType.cold:
+                cost += 0.03
+            biome = biome_at(sim.world.terrain, actor.position.x, actor.position.y)
+            if biome in ("marsh", "mountain", "tundra"):
+                cost += 0.05
+            actor.energy = clamp(actor.energy - cost)
             detail = f"migrated to ({actor.position.x:.1f},{actor.position.y:.1f})"
             events.append(
                 EventRecord(
@@ -967,7 +981,17 @@ def end_of_turn(
     specials = sim.events[marker:]
     grouped = summarize_group_events(sim, micro_events or [], specials, snapshot)
     sim.events = sim.events[:marker] + grouped
-    sim.world.resource_pool += 2.0 + 3.0 * sim.world.education_level
+    regen = 2.0 + 3.0 * sim.world.education_level
+    if sim.world.climate == ClimateType.arid:
+        regen *= 0.45
+    elif sim.world.climate == ClimateType.wetland:
+        regen *= 1.15
+    elif sim.world.climate == ClimateType.cold:
+        regen *= 0.7
+        for agent in sim.agents:
+            if agent.alive:
+                agent.energy = clamp(agent.energy - 0.03)
+    sim.world.resource_pool += regen
     sim.world.institution_runtime.authority = clamp(sim.world.institution_runtime.authority)
     metrics = compute_metrics(sim, cooperate_successes, action_count)
     sim.last_metrics = metrics
@@ -993,3 +1017,6 @@ def tick(sim: SimulationState, n: int = 1) -> SimulationState:
         end_of_turn(sim, coop_ok, action_count, rng, micro_events)
         rng = random.Random(sim.world.seed + sim.world.turn * 1009)
     return sim
+
+
+create_simulation = create_simulation

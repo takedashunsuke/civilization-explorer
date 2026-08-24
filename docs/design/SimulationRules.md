@@ -44,8 +44,10 @@ MVP 向けの最小ルール。
 | `education_level` | number (0–1) | 教育水準。協力成功率などに影響 |
 | `tax_rate` | number (0–1) | 税率。従う選択時の徴収率 |
 | `institution` | enum | `anarchy` / `autocracy` / `democracy` |
-| `geography` | enum | `asia` / `europe` / `middle_east` / `america`。平面地図・地球儀に投影する広域舞台。地形タイルは大陸型で生成 |
-| `terrain` | object | 粗いタイル（既定 48×48）。各マスの biome は `ocean` / `coast` / `river` / `plain` / `mountain` |
+| `geography` | enum | `asia` / `europe` / `middle_east` / `america`。平面地図に投影する広域舞台 |
+| `landform` | enum | `continent` / `island`。シミュレーション用の粗い地形グリッドの形 |
+| `climate` | enum | `temperate` / `cold` / `wetland` / `arid`。地形バイオームと移動コスト・資源回復に効く。地図の舞台枠に薄い色を重ねる |
+| `terrain` | object | 粗いタイル（既定 48×48）。biome は `ocean` / `coast` / `river` / `plain` / `mountain` / `marsh` / `tundra` / `desert` |
 | `initial_values` | object | 初期価値観（例: 協力傾向・権威受容） |
 
 ### 2.2 Agent
@@ -277,7 +279,7 @@ power(x) = x.wealth * 0.4 + x.energy * 0.3 + x.aggression * 0.3 + noise()
 
 1. `seed` から RNG を初期化
 2. World パラメータを適用
-3. `geography` でアジア／ヨーロッパ／中東／アメリカの広域舞台を選び、観測 UI の平面地図（補助で地球儀）に投影する
+3. `geography` でアジア／ヨーロッパ／中東／アメリカの広域舞台を選び、観測 UI の平面地図に投影する。`landform`（大陸／島）と `climate`（温帯／寒冷／湿地／乾燥）でシミュレーション地形を変える
 4. Agent を `population` 人生成  
    * position は陸タイル上（平野・川・海岸寄り）  
    * personality / wealth / goal を初期価値観からサンプリング  

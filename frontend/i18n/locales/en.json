@@ -45,6 +45,29 @@
   "educationHint": "0–1. Raises cooperation success chance and resource growth.",
   "geography": "Geography",
   "geographyHint": "Choose a wide theater. Actors are projected inside this frame.",
+  "geographyHint": "Choose a wide theater. Actors are projected inside this frame.",
+  "calendarYearHint": "Set a Gregorian year as BC or AD. Each turn advances one year.",
+  "conditionGroups": {
+    "stage": "Stage",
+    "land": "Land",
+    "society": "Society",
+    "replay": "Replay"
+  },
+  "landform": "Landform",
+  "landformHint": "Continents have more interior; island chains favor coasts and fragmentation. This shapes the sim grid.",
+  "landforms": {
+    "continent": "Continent",
+    "island": "Island"
+  },
+  "climate": "Climate",
+  "climateHint": "Tints the theater and changes movement cost and resource growth. Not a full weather model.",
+  "climates": {
+    "temperate": "Temperate",
+    "cold": "Cold",
+    "wetland": "Wetland",
+    "arid": "Arid"
+  },
+  "institutionHint": "Affects how readily people obey or resist.",
   "geographies": {
     "asia": "Asia",
     "europe": "Europe",
@@ -98,6 +121,7 @@
     "population": "Pop. {alive} (start {initial} {delta} / cap {cap})",
     "settlements": "Settlements {count}",
     "resources": "Shared resources {value}",
+    "zoomHintFlat": "Drag to pan. Scroll or double-click to zoom.",
     "zoomHintFlat": "Drag to pan. Scroll or double-click to zoom.",
     "zoomHintGlobe": "Drag to orbit. Scroll or double-click to zoom.",
     "fit": "Groups",

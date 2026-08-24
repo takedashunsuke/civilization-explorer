@@ -46,7 +46,7 @@ AI 文明そのものが目的ではなく、**人間社会の問い（格差・
 | Auth（将来） | [Better Auth](https://www.better-auth.com/) + Drizzle（MVP では未実装） |
 
 詳細な実装手順は [docs/design/Architecture.md](./docs/design/Architecture.md) を参照。  
-ローカル起動: [docs/guides/setup.md](./docs/guides/setup.md)
+ローカル起動・Ollama: [docs/guides/setup.md](./docs/guides/setup.md)
 
 ### いま動くもの（スタブ）
 
@@ -65,7 +65,15 @@ npm run dev -- --host 127.0.0.1 --port 3000
 * API docs: http://127.0.0.1:8000/docs
 
 Create → Tick でヒューリスティック意思決定の文明が回り、2D マップと Event が更新される。  
-LLM / Drizzle 永続化は未接続（Phase 2 / 4）。
+LLM の実呼び出しは Phase 2。Ollama は **ホストで動かす**（Docker 不要）。
+
+```bash
+# インストール後
+ollama pull llama3.2:1b
+```
+
+`backend/.env` で `LLM_PROVIDER=ollama`、`OLLAMA_BASE_URL=http://127.0.0.1:11434`、`OLLAMA_MODEL=llama3.2:1b`。詳細は [docs/guides/setup.md](./docs/guides/setup.md)。
+
 
 ---
 
@@ -120,7 +128,7 @@ frontend/        # Nuxt 4 + PrimeVue + 2D マップ（Drizzle は Phase 4）
 backend/         # FastAPI + シミュレーションエンジン
 ```
 
-スタブ実装が動作中。次は LLM 接続（Phase 2）と永続化（Phase 4）。
+スタブ実装が動作中。次は LLM 接続（Phase 2）。結果の一時保存はブラウザ JSON（1日）。Drizzle は Phase 4。
 
 ---
 

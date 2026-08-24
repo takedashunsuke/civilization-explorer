@@ -33,7 +33,7 @@ type MapEvent = {
 }
 
 type MapSim = {
-  world: { seed: number; geography?: string; turn?: number }
+  world: { seed: number; geography?: string; landform?: string; climate?: string; turn?: number }
   agents: MapAgent[]
   settlements?: MapSettlement[]
   events?: MapEvent[]
@@ -42,6 +42,8 @@ type MapSim = {
 const props = defineProps<{
   sim: MapSim | null
   geography: string
+  landform?: string
+  climate?: string
   seed: number
 }>()
 
@@ -176,6 +178,18 @@ function draw() {
   ctx.strokeStyle = 'rgba(255, 214, 120, 0.9)'
   ctx.lineWidth = 1.25 / scale
   ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
+  const climate = props.sim?.world.climate ?? props.climate ?? 'temperate'
+  const tint: Record<string, string | null> = {
+    temperate: null,
+    cold: 'rgba(186, 214, 238, 0.28)',
+    wetland: 'rgba(64, 130, 88, 0.22)',
+    arid: 'rgba(214, 176, 96, 0.24)',
+  }
+  const overlay = tint[climate]
+  if (overlay) {
+    ctx.fillStyle = overlay
+    ctx.fillRect(x1, y1, x2 - x1, y2 - y1)
+  }
 
   const settlements = props.sim?.settlements ?? []
   const agentsById = new Map((props.sim?.agents ?? []).map((a) => [a.id, a]))

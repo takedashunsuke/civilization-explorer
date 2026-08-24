@@ -8,7 +8,15 @@ from pydantic import BaseModel, Field
 
 from simulation import create_simulation, tick
 from simulation.llm import describe_provider
-from simulation.models import GeographyType, InitialValues, InstitutionType, SimulationState, WorldParams
+from simulation.models import (
+    ClimateType,
+    GeographyType,
+    InitialValues,
+    InstitutionType,
+    LandformType,
+    SimulationState,
+    WorldParams,
+)
 
 router = APIRouter()
 
@@ -24,6 +32,8 @@ class CreateSimulationRequest(BaseModel):
     institution: str = "democracy"
     start_year: int = Field(default=700, ge=-50000, le=3000)
     geography: str = "asia"
+    landform: str = "continent"
+    climate: str = "temperate"
     initial_values: dict[str, float] | None = None
 
 
@@ -50,6 +60,14 @@ def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
         geography = GeographyType(body.geography)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=f"invalid geography: {body.geography}") from exc
+    try:
+        landform = LandformType(body.landform)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"invalid landform: {body.landform}") from exc
+    try:
+        climate = ClimateType(body.climate)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"invalid climate: {body.climate}") from exc
 
     initial = InitialValues()
     if body.initial_values:
@@ -69,6 +87,8 @@ def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
         institution=institution,
         start_year=body.start_year,
         geography=geography,
+        landform=landform,
+        climate=climate,
         initial_values=initial,
     )
     sim_id = str(uuid.uuid4())
@@ -159,5 +179,7 @@ def get_replay(sim_id: str) -> dict[str, Any]:
         "institution": sim.world.institution.value,
         "start_year": sim.world.start_year,
         "geography": sim.world.geography.value,
+        "landform": sim.world.landform.value,
+        "climate": sim.world.climate.value,
         "initial_values": sim.world.initial_values.model_dump(),
     }

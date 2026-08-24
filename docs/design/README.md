@@ -9,6 +9,7 @@
 | [SimulationRules.md](./SimulationRules.md) | 行動・ターン・状態の最小定義 | 整備済 |
 | [DesignDoc.md](./DesignDoc.md) | 技術別の使い方・機能要件・画面分担 | 初版 |
 | [AGENTS.md](./AGENTS.md) | AI（開発エージェント）向け実装指針 | 初版 |
+| [memo.md](./memo.md) | テーマ原案と提出1週間前の方針圧縮・TODO | メモ（仕様の正ではない） |
 
 テーマ根拠（ハッカソン）: [../hackathon/review.md](../hackathon/review.md)
 
