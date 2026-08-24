@@ -23,6 +23,7 @@ type GlobeAgent = {
   settlement_id: string | null
   alive: boolean
   traits?: string[]
+  region_id?: string | null
 }
 
 type GlobeSettlement = {

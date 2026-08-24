@@ -100,6 +100,7 @@ class InitialValues(BaseModel):
 
 class RegionParams(BaseModel):
     id: GeographyType
+    subregion_id: str | None = None
     population: int = Field(default=4, ge=2, le=40)
     institution: InstitutionType = InstitutionType.democracy
     tax_rate: float = Field(default=0.1, ge=0, le=1)
@@ -142,6 +143,7 @@ class AgentState(BaseModel):
     traits: list[str] = Field(default_factory=list)
     age: int = 20
     region_id: str | None = None
+    subregion_id: str | None = None
 
 
 class RelationshipState(BaseModel):
@@ -158,6 +160,7 @@ class SettlementState(BaseModel):
     shared_wealth: float = 0.0
     leader_id: str | None = None
     region_id: str | None = None
+    subregion_id: str | None = None
 
 
 class InstitutionState(BaseModel):
@@ -167,9 +170,11 @@ class InstitutionState(BaseModel):
 
 class RegionState(BaseModel):
     id: GeographyType
+    subregion_id: str | None = None
     landform: LandformType = LandformType.continent
     climate: ClimateType = ClimateType.temperate
     disaster_frequency: float = Field(default=0.2, ge=0, le=1)
+    sanitation: float = Field(default=0.5, ge=0, le=1)
     resource_pool: float = 100.0
     education_level: float = 0.5
     tax_rate: float = 0.1
@@ -200,6 +205,7 @@ class WorldState(BaseModel):
     initial_values: InitialValues
     institution_runtime: InstitutionState = Field(default_factory=InstitutionState)
     regions: list[RegionState] = Field(default_factory=list)
+    fired_shock_ids: list[str] = Field(default_factory=list)
 
 
 class EventRecord(BaseModel):
@@ -211,6 +217,10 @@ class EventRecord(BaseModel):
     detail_key: str = "wait"
     detail: str
     deltas: dict[str, float] = Field(default_factory=dict)
+    lon: float | None = None
+    lat: float | None = None
+    alert: str | None = None
+    extra: dict[str, str] = Field(default_factory=dict)
 
 
 class MetricsSnapshot(BaseModel):

@@ -103,6 +103,30 @@
     "island": "Asia",
     "continent": "Europe"
   },
+  "subregions": {
+    "northern_africa": "Northern Africa",
+    "eastern_africa": "Eastern Africa",
+    "middle_africa": "Middle Africa",
+    "western_africa": "Western Africa",
+    "southern_africa": "Southern Africa",
+    "eastern_asia": "Eastern Asia",
+    "south_eastern_asia": "South-eastern Asia",
+    "southern_asia": "Southern Asia",
+    "central_asia": "Central Asia",
+    "western_asia": "Western Asia",
+    "western_europe": "Western Europe",
+    "eastern_europe": "Eastern Europe",
+    "northern_europe": "Northern Europe",
+    "southern_europe": "Southern Europe",
+    "northern_america": "Northern America",
+    "central_america": "Central America",
+    "caribbean": "Caribbean",
+    "south_america": "South America",
+    "australasia": "Australasia",
+    "melanesia": "Melanesia",
+    "micronesia": "Micronesia",
+    "polynesia": "Polynesia"
+  },
   "theaters": {
     "africa": "Africa",
     "asia": "Asia",
@@ -116,9 +140,9 @@
     "step1": "STEP 1 Backdrop",
     "step2": "STEP 2 Society",
     "step3": "STEP 3 Outlook",
-    "lead1": "Geography, nature, and food are preset. Read inland, coast, and islands in the table, then pick a start year.",
-    "lead2": "Change social constraints per continent to see whether futures diverge in one world.",
-    "lead3": "Set religion and disposition per continent to compare group-agent character.",
+    "lead1": "Geography, nature, and food are preset per chosen subregion. Read inland, coast, and islands in the table.",
+    "lead2": "Change social constraints per selected subregion to see whether futures diverge in one world.",
+    "lead3": "Set religion and disposition per column to compare group agents in the chosen subregions.",
     "next": "Next",
     "back": "Back",
     "axis": "Item",
@@ -128,53 +152,238 @@
       "high": "High"
     },
     "rows": {
+      "subregion": "Subregion",
+      "focus": "This run",
       "inland": "Inland",
       "coast": "Coast",
       "island": "Islands",
       "climate": "Climate",
       "food": "Food",
-      "disaster": "Disasters"
+      "disaster": "Disasters",
+      "sanitation": "Sanitation"
+    },
+    "blurbs": {
+      "northern_africa": "Mediterranean to Sahara edge. Coast trade next to inland drought.",
+      "eastern_africa": "Rift to Indian Ocean. Highlands and savanna.",
+      "middle_africa": "Congo basin. Forest and rivers constrain travel.",
+      "western_africa": "Guinea coast and Sahel. Sharp coast–inland contrast.",
+      "southern_africa": "Plateau toward the Cape. Temperate mixed with arid.",
+      "eastern_asia": "East Asian temperate–monsoon belt. Plains and archipelagos.",
+      "south_eastern_asia": "Peninsula and islands. Seas and wet seasons steer people.",
+      "southern_asia": "Indian subcontinent. Monsoon and great rivers.",
+      "central_asia": "Steppe interior. Drought and distance dominate.",
+      "western_asia": "Western Asia. Arid lands meet trade routes.",
+      "western_europe": "Atlantic temperate west. Ports sit near plains.",
+      "eastern_europe": "Wide plains. Inland distances are long.",
+      "northern_europe": "Northern seas and cold. Fishing, short growing seasons.",
+      "southern_europe": "Mediterranean. Peninsulas and islands split easily.",
+      "northern_america": "North American temperate belt. Plains and two oceans.",
+      "central_america": "Isthmus. Short distances, seas on both sides.",
+      "caribbean": "Island chain. Storms and sea lanes dominate.",
+      "south_america": "Andes, Amazon, then temperate south. Long north–south span.",
+      "australasia": "Australia and New Zealand. Island-continent plus temperate isles.",
+      "melanesia": "Island arc around New Guinea. Mountains meet sea.",
+      "micronesia": "Tiny North Pacific islands. Land is dots.",
+      "polynesia": "Islands scattered over a huge ocean. Distance is the constraint."
     },
     "table": {
-      "africa": {
-        "inland": "Sahara to plateau. Dry; farming and travel are hard.",
-        "coast": "Mediterranean and Guinea coasts. Gateways for trade.",
-        "island": "Madagascar and nearby isles. Easy to split from the mainland.",
-        "climate": "Mostly arid. Heat waves are common.",
-        "food": "Scarce, clustered in coasts and valleys.",
-        "disaster": "Heat and quakes often cut food slack."
+      "northern_africa": {
+        "inland": "Sahara and oasis points. Travel is long; farms are dots.",
+        "coast": "Mediterranean shore. Ports and irrigation gather people.",
+        "island": "Few islands. Outposts like the Canaries sit off-stage.",
+        "climate": "Mostly arid. Only the coast gets winter rain.",
+        "food": "Scarce, clustered on the Nile and the coast.",
+        "disaster": "Heat and dust. Quakes more often on the shore.",
+        "sanitation": "Oases and towns lean on wells. Cleanliness varies sharply by place."
       },
-      "europe": {
-        "inland": "Broad plains. People can gather even inland.",
-        "coast": "North Sea and Atlantic. Ports and fishing are strong.",
+      "eastern_africa": {
+        "inland": "Highlands and the Rift. Livable inland, but valleys split groups.",
+        "coast": "Indian Ocean. Monsoon sea lanes are the doorway.",
+        "island": "Madagascar and large isles. Easy to diverge from the mainland.",
+        "climate": "Highlands cool; lowlands hot and dry.",
+        "food": "River valleys and highland herds, plus coastal fish.",
+        "disaster": "Long droughts. Rift quakes.",
+        "sanitation": "Water quality splits highland vs valley. Outbreaks favor the lowlands."
+      },
+      "middle_africa": {
+        "inland": "Congo forest. Few roads; the interior closes in.",
+        "coast": "Gulf of Guinea. River-mouth ports are the thick exit.",
+        "island": "Mainland-centered. Islands are not the main split.",
+        "climate": "Wet rainforest. Hot and humid.",
+        "food": "Forest and river yield. Clearing land is heavy.",
+        "disaster": "Floods and disease cut food slack.",
+        "sanitation": "Forest rivers. Drainage is weak; disease lingers."
+      },
+      "western_africa": {
+        "inland": "Sahel. Rain is unreliable; herding stays mobile.",
+        "coast": "Guinea coast. Wet ports and thick trade.",
+        "island": "Small coastal isles. Extensions of the mainland.",
+        "climate": "Wet season on the coast; long dry inland.",
+        "food": "Clustered on the coast and the Niger.",
+        "disaster": "Drought and heat. Storms also hit the coast.",
+        "sanitation": "Coast and interior differ. Rainy seasons foul the water."
+      },
+      "southern_africa": {
+        "inland": "Plateau and Kalahari. Room to spread, but water is thin.",
+        "coast": "Atlantic and Indian oceans. Fishing and ports.",
+        "island": "The mainland dominates. Isles are outposts.",
+        "climate": "More temperate. Winter rain in the southwest; dry inland.",
+        "food": "Highland grain and herds, plus coastal fish.",
+        "disaster": "Drought first. Coastal storms.",
+        "sanitation": "Plateau water is steadier. Dense spots still see outbreaks."
+      },
+      "eastern_asia": {
+        "inland": "Loess and interior plateau. Cold and dry inland.",
+        "coast": "East China Sea side. Plains and ports hold people.",
+        "island": "Japan and others. Crossing is possible; institutions split.",
+        "climate": "Temperate monsoon. Summer rain; cold inland winters.",
+        "food": "Thick grain on river plains. Islands add fishing.",
+        "disaster": "Floods and quakes. Typhoons on the coast.",
+        "sanitation": "Rivers and cities can keep cleaner. Density also speeds contagion."
+      },
+      "south_eastern_asia": {
+        "inland": "Peninsula mountains. Valleys cut settlements apart.",
+        "coast": "Monsoon coasts. Ports and deltas are the core.",
+        "island": "Archipelago is nearly the body. Neighbors sit across water.",
+        "climate": "Tropical wetland. Long rains, high heat.",
+        "food": "Rice and fish. Rich, but water can fail them.",
+        "disaster": "Typhoons, floods, volcanoes. High frequency.",
+        "sanitation": "Heat and wet spoil water. Ports and deltas carry infection."
+      },
+      "southern_asia": {
+        "inland": "Deccan and dry interior. Monsoon reach splits.",
+        "coast": "Arabian Sea and Bay of Bengal. Ports and fishing.",
+        "island": "Sri Lanka and others. Cut off by sea.",
+        "climate": "Monsoon. Dry spells alternate with downpours.",
+        "food": "Great rivers and deltas. Interior has lean years.",
+        "disaster": "Floods and cyclones, then drought in turn.",
+        "sanitation": "Monsoon and great rivers. Epidemics follow floods."
+      },
+      "central_asia": {
+        "inland": "Steppe and basins. Long distances; oases are points.",
+        "coast": "Almost no sea. Closed interior is the given.",
+        "island": "No real islands. Lakes are the edges.",
+        "climate": "Arid with hard winters and swings.",
+        "food": "Herding first. Irrigated oases are narrow.",
+        "disaster": "Drought and cold snaps. Quakes in the mountains.",
+        "sanitation": "Water is scarce. A fouled oasis is fatal."
+      },
+      "western_asia": {
+        "inland": "Plateau and desert. Caravan routes are the inland axis.",
+        "coast": "Mediterranean, Red Sea, Gulf. Ports are the door.",
+        "island": "A few isles like Cyprus. Easy to sit outside mainland politics.",
+        "climate": "Arid. Winter-rain coasts next to interior desert.",
+        "food": "Clustered on irrigated valleys. Herds are wide but thin.",
+        "disaster": "Drought and heat. Fault-line quakes.",
+        "sanitation": "Irrigation and caravan wells. Contamination hits settlements."
+      },
+      "western_europe": {
+        "inland": "Plains continue. People gather even inland.",
+        "coast": "Atlantic. Fishing and ports sit close.",
         "island": "Britain and others. Sea crossings split institutions.",
-        "climate": "Temperate. Winters bite, extremes are rarer.",
-        "food": "Slack is high. Grain and pasture mix well.",
-        "disaster": "Relatively mild."
+        "climate": "Temperate west-coast. Steady rain, fewer extremes.",
+        "food": "High slack. Grain and pasture mix well.",
+        "disaster": "Relatively mild. Atlantic storms on the west.",
+        "sanitation": "Sewers and hygiene come earlier. Outbreaks are easier to contain."
       },
-      "asia": {
-        "inland": "Plateaus and steppe. Dry and cold inland.",
-        "coast": "Monsoon coasts. People and rice concentrate here.",
-        "island": "Japan and others. Crossing is possible, splits remain.",
-        "climate": "Wet monsoon. Heavy rain.",
-        "food": "Rivers and wetlands feed many, but water can fail them.",
-        "disaster": "Floods and typhoons are common."
+      "eastern_europe": {
+        "inland": "Great plains. Long distances; winters close the land.",
+        "coast": "Baltic and Black Sea. Ports sit at the edges.",
+        "island": "Mainland-centered. Few islands.",
+        "climate": "Colder, continental. Long winters.",
+        "food": "Thick on the black earth. Short seasons in the north.",
+        "disaster": "Cold snaps. Drought on the southern steppe.",
+        "sanitation": "Wells on the plain. Winter crowding keeps indoor infection."
       },
-      "america": {
+      "northern_europe": {
+        "inland": "Forest and lakes. Inland farming is bound to a short summer.",
+        "coast": "North Sea and Baltic. Fish and sea lanes are the core.",
+        "island": "Many isles and fjords. Splits are normal.",
+        "climate": "Cold. High latitude, short daylight.",
+        "food": "Fish and herds. Little grain slack.",
+        "disaster": "Winter storms and cold. Famine years happen.",
+        "sanitation": "Cold slows rot. Famine years and crowding still bite."
+      },
+      "southern_europe": {
+        "inland": "Mountains. Valleys split settlements.",
+        "coast": "Mediterranean. Ports and fishing sit close.",
+        "island": "Peninsulas and isles are the body. Crossing is daily.",
+        "climate": "Dry summers, winter rain. Hot inland.",
+        "food": "Olive, grain, fish. Water runs short in summer.",
+        "disaster": "Drought and quakes. Wildfires too.",
+        "sanitation": "Dense ports. Summer drought drops hygiene."
+      },
+      "northern_america": {
         "inland": "Great plains. Room to spread, but distances are long.",
         "coast": "Two oceans. Ports and fisheries split east and west.",
-        "island": "Caribbean and others. Far from the mainland, storm-prone.",
-        "climate": "Mostly temperate, with a north–south spread.",
-        "food": "High slack. Plains produce thickly.",
-        "disaster": "Moderate mix of quakes and storms."
+        "island": "Mainland dominates. Isles are outposts.",
+        "climate": "Mostly temperate. Cold north; drier interior.",
+        "food": "Thick plains production. High slack.",
+        "disaster": "Storms and cold snaps. West-coast quakes mix in.",
+        "sanitation": "Water is plentiful. Urban crowding speeds outbreaks."
       },
-      "oceania": {
-        "inland": "Little true interior. Almost no continental depth.",
-        "coast": "Nearly all coastal. Fishing and sea lanes dominate.",
-        "island": "The body is an archipelago. Neighbors sit across water.",
-        "climate": "Humid, near cyclone belts.",
-        "food": "Uneven by island. Slack is smaller.",
-        "disaster": "Typhoons and floods hit hard."
+      "central_america": {
+        "inland": "Isthmus mountains. Little interior depth.",
+        "coast": "Two oceans close by. Short runs to port.",
+        "island": "A thin mainland. Offshore isles add splits.",
+        "climate": "Humid tropics. Long wet season.",
+        "food": "Clustered in valleys and coasts. Medium slack.",
+        "disaster": "Hurricanes, quakes, volcanoes. High frequency.",
+        "sanitation": "Rainy-season water fouls easily. The isthmus moves contagion."
+      },
+      "caribbean": {
+        "inland": "Islands are small. Almost no interior.",
+        "coast": "Nearly all coastal. Sea lanes are the lifeline.",
+        "island": "The stage is the archipelago. Neighbors sit across water.",
+        "climate": "Tropical marine. Hot and wet.",
+        "food": "Fish and thin farms. Uneven by island.",
+        "disaster": "Hurricanes hit hard and wipe food slack.",
+        "sanitation": "Fresh water is thin. Outbreaks race around an island."
+      },
+      "south_america": {
+        "inland": "Amazon and highlands. Wide interior; slow to reach.",
+        "coast": "Narrow Pacific, broad Atlantic harbors.",
+        "island": "Mainland first. Offshore isles at the edge.",
+        "climate": "Equatorial wetland to southern temperate. Long span.",
+        "food": "Rich lowlands. Thin in highlands and dry belts.",
+        "disaster": "Floods and quakes. Cold snaps in the south.",
+        "sanitation": "Wet lowlands favor disease. Highlands stay drier."
+      },
+      "australasia": {
+        "inland": "Australian interior is arid. People live in dots.",
+        "coast": "Southeast and New Zealand. Ports and fishing hold people.",
+        "island": "NZ is an island country. Australia is an island-continent.",
+        "climate": "Arid inland, temperate south. Fire-prone.",
+        "food": "Clustered on coasts and rivers. Thin inland herds.",
+        "disaster": "Drought and wildfire. Quakes on the island side.",
+        "sanitation": "Coastal towns can stay cleaner. Inland water is dots."
+      },
+      "melanesia": {
+        "inland": "High-island mountains. Valleys close the interior.",
+        "coast": "Reefs and bays. Fish and canoe routes.",
+        "island": "The arc is the body. Crossing is required.",
+        "climate": "Wet tropics. Heavy rain and heat.",
+        "food": "Roots and fish. Slack is small per island.",
+        "disaster": "Cyclones, quakes, volcanoes.",
+        "sanitation": "Valley water splits by village; hygiene is uneven."
+      },
+      "micronesia": {
+        "inland": "Land is dots. Interior is the lagoon, not a hinterland.",
+        "coast": "Almost all coastal. Fresh water is the limit.",
+        "island": "Tiny chained isles. Distance is the wall.",
+        "climate": "Marine tropics. Typhoon belt.",
+        "food": "Fishing first. Farmland is extremely thin.",
+        "disaster": "Typhoons and surge. A whole island can be hit.",
+        "sanitation": "Atoll freshwater is thin. Contamination spreads at once."
+      },
+      "polynesia": {
+        "inland": "Volcanic slopes. Little flat hinterland.",
+        "coast": "Lagoons and open ocean. Fishing is the center.",
+        "island": "Scattered over a huge sea. Voyaging is assumed.",
+        "climate": "Oceanic. Trades and cyclones.",
+        "food": "Fish and thin farms. Stores matter.",
+        "disaster": "Storms and tsunami. Isolation stretches the damage.",
+        "sanitation": "Islands isolate, but boats still carry pathogens."
       }
     }
   },
@@ -218,7 +427,6 @@
     "settlements": "Settlements {count}",
     "resources": "Shared resources {value}",
     "fiveContinents": "Five continents",
-    "zoomHintFlat": "Drag to pan. Scroll or double-click to zoom.",
     "zoomHintFlat": "Drag to pan. Scroll or double-click to zoom.",
     "zoomHintGlobe": "Drag to orbit. Scroll or double-click to zoom.",
     "fit": "Groups",
@@ -283,7 +491,7 @@
     "trait_gain_genius": "{actor} began to show genius.",
     "trait_lose_charisma": "{actor}'s charisma faded.",
     "trait_lose_genius": "{actor}'s genius dimmed.",
-    "group_quiet": "No group made a major move.",
+    "group_quiet": "No regional set made a major move.",
     "group_cooperate": "{group} shared work and wealth ({n}).",
     "group_cooperate_out": "{group} cooperated with {other} ({n}).",
     "group_conflict_in": "Strife broke out inside {group} ({n}).",
@@ -298,11 +506,17 @@
     "group_trait_gain_genius": "Genius appeared in {group} ({actor}).",
     "group_trait_lose_charisma": "Charisma faded in {group} ({actor}).",
     "group_trait_lose_genius": "Genius dimmed in {group} ({actor}).",
-    "disaster_typhoon": "A typhoon struck and coastal groups were hurt.",
-    "disaster_earthquake": "An earthquake shook wealth and security.",
-    "disaster_flood": "Floods washed away fields and stores.",
-    "disaster_heatwave": "A heat wave drained energy and food.",
-    "disaster_frost": "A cold snap cut the harvest and stores."
+    "disaster_typhoon": "A typhoon hit {group} and the coast was hurt.",
+    "disaster_earthquake": "An earthquake shook {group}; wealth and security fell.",
+    "disaster_flood": "Floods in {group} washed away fields and stores.",
+    "disaster_heatwave": "A heat wave hit {group}; energy and food fell.",
+    "disaster_frost": "A cold snap in {group} cut the harvest and stores.",
+    "epidemic": "An epidemic spread in {group} ({n} affected). Weaker sanitation makes it worse.",
+    "weather_drought": "Abnormal drought lingered in {group}; food and energy fell.",
+    "weather_blizzard": "A severe cold snap and blizzard hit {group}.",
+    "weather_storm": "Abnormal storms struck coasts and islands in {group}.",
+    "weather_heat": "An abnormal heat wave hit {group}.",
+    "historic_quake": "In {year}, a recorded great earthquake near {group} ({name}, M{mag}). From Wikipedia."
   },
   "yearLabel": {
     "bc": "BC {year}",

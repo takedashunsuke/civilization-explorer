@@ -1,3 +1,5 @@
+import { CONTINENT_IDS, macroOf } from '~/utils/continents'
+
 const PALETTE = [
   '#3d8bfd',
   '#e85d4c',
@@ -45,13 +47,20 @@ function mixHex(hex: string, toward: number, t: number): string {
 
 export function settlementColor(id: string | null, role: 'base' | 'member' | 'leader' = 'base'): string {
   if (!id) return LONE
-  const hex = PALETTE[settlementIndex(id)] ?? PALETTE[0]
+  const macro = macroOf(id)
+  const hex = macro
+    ? (PALETTE[CONTINENT_IDS.indexOf(macro)] ?? PALETTE[0])
+    : (PALETTE[settlementIndex(id)] ?? PALETTE[0])
   if (role === 'leader') return mixHex(hex, 0, 0.28)
   if (role === 'member') return mixHex(hex, 255, 0.22)
   return hex
 }
 
-export function agentFill(agent: { id: string; settlement_id: string | null; traits?: string[] }, isLeader: boolean): string {
+export function agentFill(
+  agent: { id: string; settlement_id: string | null; region_id?: string | null; traits?: string[] },
+  isLeader: boolean,
+): string {
+  if (agent.region_id) return settlementColor(agent.region_id, isLeader ? 'leader' : 'member')
   if (agent.settlement_id) return settlementColor(agent.settlement_id, isLeader ? 'leader' : 'member')
   let hash = 0
   for (let i = 0; i < agent.id.length; i++) hash = (hash * 31 + agent.id.charCodeAt(i)) >>> 0

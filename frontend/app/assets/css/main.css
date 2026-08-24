@@ -42,3 +42,7 @@ button,
 input {
   font: inherit;
 }
+
+.p-toast {
+  z-index: 5000;
+}

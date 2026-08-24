@@ -44,10 +44,12 @@ MVP 向けの最小ルール。
 | `education_level` | number (0–1) | 教育水準。協力成功率などに影響 |
 | `tax_rate` | number (0–1) | 税率。従う選択時の徴収率 |
 | `institution` | enum | `anarchy` / `autocracy` / `democracy` |
-| `geography` | enum | `asia` / `europe` / `middle_east` / `america`。平面地図に投影する広域舞台 |
+| `geography` | enum | 単一舞台時の広域。五大陸実験では `world` を送り、実体は `regions[]` |
+| `regions` | list | マクロ5列。各要素に `id`（大陸）と `subregion_id`。気候・資源・災害頻度・衛生はサブ地域プリセット。配置と地図投影もこのサブ枠 |
 | `landform` | enum | `continent` / `island`。シミュレーション用の粗い地形グリッドの形 |
 | `climate` | enum | `temperate` / `cold` / `wetland` / `arid`。地形バイオームと移動コスト・資源回復に効く。地図の舞台枠に薄い色を重ねる |
 | `disaster_frequency` | number (0–1) | 災害の起きやすさ。種類（台風・地震・水害・熱波・冷害）は地形・気候で偏る |
+| `sanitation` | number (0–1) | サブ地域の衛生。低いほど疫病が出やすい |
 | `religion` | enum | `folk` / `organized` / `secular`。服従・抵抗の出やすさ |
 | `terrain` | object | 粗いタイル（既定 48×48）。biome は `ocean` / `coast` / `river` / `plain` / `mountain` / `marsh` / `tundra` / `desert` |
 | `initial_values` | object | 初期価値観（例: 協力傾向・権威受容） |
@@ -70,6 +72,8 @@ MVP 向けの最小ルール。
 | `alive` | bool | 生存フラグ |
 | `traits` | string[] | 稀少特性。`charisma` / `genius`（生涯で得たり失ったりする） |
 | `age` | int | 年齢。1ターンで +1。高齢で死亡し世代が入れ替わる |
+| `region_id` | string | 所属マクロ（制度・大陸内相互作用） |
+| `subregion_id` | string | 今回の舞台。地図投影と陸地スナップの枠 |
 
 ### 2.3 Relationship
 

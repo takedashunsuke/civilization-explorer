@@ -4,7 +4,8 @@ import math
 import random
 from collections import defaultdict
 
-from simulation.continents import CONTINENT_PRESETS
+from simulation.continents import CONTINENT_PRESETS, SUBREGION_CENTERS, resolve_preset, resolve_subregion
+from simulation.shocks import apply_epidemics, apply_historic_quakes, apply_weather_shocks
 from simulation.models import (
     ActionType,
     AgentState,
@@ -93,23 +94,20 @@ def _region_seed(base: int, region_id: str) -> int:
 
 
 def _build_region(params: RegionParams, seed: int) -> RegionState:
-    preset = CONTINENT_PRESETS.get(params.id)
-    if preset:
-        landform = preset["landform"]
-        climate = preset["climate"]
-        resource_pool = float(preset["resource_pool"])
-        disaster_frequency = float(preset["disaster_frequency"])
-    else:
-        landform = LandformType.continent
-        climate = ClimateType.temperate
-        resource_pool = 100.0
-        disaster_frequency = 0.2
-    terrain = generate_terrain(landform, climate, _region_seed(seed, params.id.value))
+    preset = resolve_preset(params.id, params.subregion_id)
+    landform = preset["landform"]
+    climate = preset["climate"]
+    resource_pool = float(preset["resource_pool"])
+    disaster_frequency = float(preset["disaster_frequency"])
+    sanitation = float(preset.get("sanitation", 0.5))
+    terrain = generate_terrain(landform, climate, _region_seed(seed, params.subregion_id or params.id.value))
     return RegionState(
         id=params.id,
+        subregion_id=params.subregion_id,
         landform=landform,
         climate=climate,
         disaster_frequency=disaster_frequency,
+        sanitation=sanitation,
         resource_pool=resource_pool,
         education_level=params.education_level,
         tax_rate=params.tax_rate,
@@ -146,6 +144,10 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
         region_params = [
             RegionParams(
                 id=theater if theater in CONTINENT_PRESETS else GeographyType.asia,
+                subregion_id=resolve_subregion(
+                    theater if theater in CONTINENT_PRESETS else GeographyType.asia,
+                    None,
+                ),
                 population=params.population,
                 institution=params.institution,
                 tax_rate=params.tax_rate,
@@ -183,6 +185,7 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
                     traits=traits,
                     age=rng.randint(16, 52),
                     region_id=region.id.value,
+                    subregion_id=region.subregion_id,
                 )
             )
 
@@ -651,6 +654,7 @@ def apply_births(sim: SimulationState, rng: random.Random) -> None:
         traits=traits,
         age=0,
         region_id=parent.region_id,
+        subregion_id=parent.subregion_id,
     )
     parent.wealth = max(0.0, parent.wealth - BIRTH_COST)
     parent.energy = clamp(parent.energy - 0.08)
@@ -881,6 +885,7 @@ def recompute_settlements(sim: SimulationState, rng: random.Random | None = None
                 shared_wealth=sum(m.wealth for m in members) * 0.05,
                 leader_id=leader.id,
                 region_id=members[0].region_id,
+                subregion_id=members[0].subregion_id,
             )
         )
     sim.settlements = settlements
@@ -912,6 +917,12 @@ def compute_metrics(sim: SimulationState, cooperate_successes: int, action_count
     )
 
 
+def _set_id(agent: AgentState | None) -> str:
+    if not agent:
+        return "lone"
+    return agent.subregion_id or agent.region_id or agent.settlement_id or "lone"
+
+
 def _group_id(
     sim: SimulationState, agent_id: str | None, snapshot: dict[str, str] | None = None
 ) -> str:
@@ -920,9 +931,7 @@ def _group_id(
     if snapshot and agent_id in snapshot:
         return snapshot[agent_id] or "lone"
     agent = next((a for a in sim.agents if a.id == agent_id), None)
-    if agent and agent.settlement_id:
-        return agent.settlement_id
-    return "lone"
+    return _set_id(agent)
 
 
 def summarize_group_events(
@@ -1097,8 +1106,9 @@ def _pick_disaster(region: RegionState, rng: random.Random) -> str:
     return kinds[-1]
 
 
-def apply_disasters(sim: SimulationState, rng: random.Random) -> list[EventRecord]:
+def apply_disasters(sim: SimulationState, rng: random.Random, skip_quake: set[str] | None = None) -> list[EventRecord]:
     events: list[EventRecord] = []
+    skip_quake = skip_quake or set()
     targets = sim.world.regions or []
     if not targets:
         fake = RegionState(
@@ -1114,6 +1124,9 @@ def apply_disasters(sim: SimulationState, rng: random.Random) -> list[EventRecor
         if freq <= 0 or rng.random() >= freq * 0.28:
             continue
         kind = _pick_disaster(region, rng)
+        sid = region.subregion_id or region.id.value
+        if kind == "earthquake" and sid in skip_quake:
+            continue
         hit = [a for a in sim.agents if a.alive and (a.region_id == region.id.value or not sim.world.regions)]
         if not hit:
             continue
@@ -1143,14 +1156,19 @@ def apply_disasters(sim: SimulationState, rng: random.Random) -> list[EventRecor
         food_hit = 4.0 + 10.0 * freq
         if kind in ("flood", "frost", "heatwave"):
             region.resource_pool = max(0.0, region.resource_pool - food_hit)
+        lon, lat = SUBREGION_CENTERS.get(sid, (0.0, 0.0))
+        alert = "red" if kind in ("earthquake", "typhoon") else "yellow"
         events.append(
             EventRecord(
                 turn=sim.world.turn,
-                actor_id=region.id.value,
+                actor_id=sid,
                 action=ActionType.disaster,
                 detail_key=f"disaster_{kind}",
-                detail=f"{kind} hit {len(hit)} agents in {region.id.value}",
+                detail=f"{kind} hit {len(hit)} agents in {sid}",
                 deltas={"n": float(len(hit)), "loss": loss},
+                lon=lon,
+                lat=lat,
+                alert=alert,
             )
         )
     return events
@@ -1164,7 +1182,7 @@ def end_of_turn(
     micro_events: list[EventRecord] | None = None,
 ) -> None:
     previous_leaders = {s.leader_id for s in sim.settlements if s.leader_id}
-    snapshot = {a.id: a.settlement_id or "lone" for a in sim.agents}
+    snapshot = {a.id: _set_id(a) for a in sim.agents}
     marker = len(sim.events)
     apply_aging(sim)
     apply_deaths(sim, rng)
@@ -1175,8 +1193,12 @@ def end_of_turn(
     _emit_leadership_changes(sim, previous_leaders, current_leaders)
     specials = sim.events[marker:]
     grouped = summarize_group_events(sim, micro_events or [], specials, snapshot)
-    disasters = apply_disasters(sim, rng)
-    sim.events = sim.events[:marker] + grouped + disasters
+    historic = apply_historic_quakes(sim)
+    epidemics = apply_epidemics(sim, rng)
+    weather = apply_weather_shocks(sim, rng)
+    skip_quake = {e.actor_id for e in historic}
+    disasters = apply_disasters(sim, rng, skip_quake)
+    sim.events = sim.events[:marker] + grouped + historic + epidemics + weather + disasters
     if sim.world.regions:
         for region in sim.world.regions:
             regen = 2.0 + 3.0 * region.education_level

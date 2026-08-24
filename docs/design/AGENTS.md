@@ -12,7 +12,8 @@
 4. [ADR 0003](../decisions/0003-drizzle-orm.md) — 永続化は Drizzle（SQLAlchemy は使わない）
 5. [ADR 0004](../decisions/0004-better-auth.md) — 認証は Better Auth 予定（MVP では実装しない）
 6. [ADR 0006](../decisions/0006-flat-map-primary.md) — 観測の主画面は平面世界地図
-7. （テーマ根拠）[../hackathon/review.md](../hackathon/review.md)
+7. [ADR 0007](../decisions/0007-un-geoscheme-subregions.md) — 比較はマクロ5列、配置は国連サブ地域22
+8. （テーマ根拠）[../hackathon/review.md](../hackathon/review.md)
 
 ## プロダクトの立ち位置（短く）
 
@@ -21,6 +22,7 @@
 * シミュレーションは真理の証明ではなく仮説探索
 * 可視化の既定は **Natural Earth の平面地図**（集団の領域・衝突）。地球儀は補助。衛星写真・建物モデルは広げない（[ADR 0006](../decisions/0006-flat-map-primary.md)）
 * 初期条件は中央モーダル、出来事はチャット型パネル。地図を常時広くする
+* 比較の列は五マクロ固定。サブ地域は列内で1つ選び、エージェントはその枠だけに置く（[ADR 0007](../decisions/0007-un-geoscheme-subregions.md)）
 * 認証は将来 Better Auth + Drizzle。**MVP ではログインを作らない**
 
 ## 作業ルール

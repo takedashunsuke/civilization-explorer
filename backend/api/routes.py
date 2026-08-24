@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from simulation import create_simulation, tick
 from simulation.llm import describe_provider
+from simulation.continents import resolve_subregion
 from simulation.models import (
     ClimateType,
     GeographyType,
@@ -27,6 +28,7 @@ _STORE: dict[str, SimulationState] = {}
 
 class RegionCreateBody(BaseModel):
     id: str
+    subregion: str | None = None
     population: int = Field(default=4, ge=2, le=40)
     institution: str = "democracy"
     tax_rate: float = Field(default=0.1, ge=0, le=1)
@@ -120,6 +122,7 @@ def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
         region_models.append(
             RegionParams(
                 id=rid,
+                subregion_id=resolve_subregion(rid, item.subregion),
                 population=item.population,
                 institution=r_inst,
                 tax_rate=item.tax_rate,

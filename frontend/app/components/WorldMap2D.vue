@@ -7,6 +7,7 @@ import {
   pickTheater,
   simToLatLon,
   snapLonLatToLand,
+  theaterCenter,
   CONTINENT_THEATERS,
   type Theater,
 } from '~/utils/earthMap'
@@ -19,6 +20,7 @@ type MapAgent = {
   alive: boolean
   traits?: string[]
   region_id?: string | null
+  subregion_id?: string | null
 }
 
 type MapSettlement = {
@@ -27,6 +29,7 @@ type MapSettlement = {
   member_ids: string[]
   leader_id?: string | null
   region_id?: string | null
+  subregion_id?: string | null
 }
 
 type MapEvent = {
@@ -34,6 +37,10 @@ type MapEvent = {
   actor_id: string
   action: string
   target_id?: string | null
+  detail_key?: string
+  lon?: number | null
+  lat?: number | null
+  alert?: string | null
 }
 
 type MapSim = {
@@ -43,7 +50,7 @@ type MapSim = {
     landform?: string
     climate?: string
     turn?: number
-    regions?: Array<{ id: string; climate?: string }>
+    regions?: Array<{ id: string; climate?: string; subregion_id?: string | null }>
   }
   agents: MapAgent[]
   settlements?: MapSettlement[]
@@ -86,14 +93,18 @@ function theaterFor(id?: string | null): Theater {
   return pickTheater(id || 'asia')
 }
 
+function agentTheater(agent: { region_id?: string | null; subregion_id?: string | null }): Theater {
+  return theaterFor(agent.subregion_id || agent.region_id)
+}
+
 function projectOnLand(x: number, y: number, theater: Theater, earth: HTMLCanvasElement): [number, number] {
   const raw = simToLatLon(x, y, theater)
   const snapped = snapLonLatToLand(raw.lon, raw.lat, landMask, theater)
   return lonLatToXy(snapped.lon, snapped.lat, earth.width, earth.height)
 }
 
-function projectAgent(agent: { position: { x: number; y: number }; region_id?: string | null }, earth: HTMLCanvasElement): [number, number] {
-  return projectOnLand(agent.position.x, agent.position.y, theaterFor(agent.region_id), earth)
+function projectAgent(agent: { position: { x: number; y: number }; region_id?: string | null; subregion_id?: string | null }, earth: HTMLCanvasElement): [number, number] {
+  return projectOnLand(agent.position.x, agent.position.y, agentTheater(agent), earth)
 }
 
 function viewSize() {
@@ -220,8 +231,16 @@ function draw() {
       ctx.fillStyle = overlay
       ctx.fillRect(x1, y1, x2 - x1, y2 - y1)
     }
-    ctx.strokeStyle = 'rgba(255, 214, 120, 0.75)'
+    ctx.strokeStyle = 'rgba(255, 214, 120, 0.35)'
     ctx.lineWidth = 1.1 / scale
+    ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
+  }
+  for (const region of props.sim?.world.regions ?? []) {
+    const theater = pickTheater(region.subregion_id || region.id)
+    const [x1, y1] = lonLatToXy(theater.west, theater.north, earth.width, earth.height)
+    const [x2, y2] = lonLatToXy(theater.east, theater.south, earth.width, earth.height)
+    ctx.strokeStyle = 'rgba(255, 236, 170, 0.95)'
+    ctx.lineWidth = 1.8 / scale
     ctx.strokeRect(x1, y1, x2 - x1, y2 - y1)
   }
 
@@ -255,10 +274,10 @@ function draw() {
       : undefined
     const center = member
       ? projectAgent(member, earth)
-      : projectOnLand(settlement.position.x, settlement.position.y, theaterFor(settlement.region_id), earth)
+      : projectOnLand(settlement.position.x, settlement.position.y, theaterFor(settlement.subregion_id || settlement.region_id), earth)
     centers.set(settlement.id, center)
     const hull = convexHull(pts)
-    const color = settlementColor(settlement.id)
+    const color = settlementColor(settlement.region_id || settlement.id)
     const target = octx ?? ctx
     target.beginPath()
     if (hull.length >= 3) {
@@ -335,8 +354,34 @@ function draw() {
     const label = `${t(`map.polity.${kind}`)} · ${settlement.member_ids.length}`
     ctx.fillStyle = 'rgba(8, 12, 16, 0.65)'
     ctx.fillText(label, center[0], center[1] - 7 / scale)
-    ctx.fillStyle = settlementColor(settlement.id)
+    ctx.fillStyle = settlementColor(settlement.region_id || settlement.id)
     ctx.fillText(label, center[0], center[1] - 8 / scale)
+  }
+
+  const pulseTurn = (props.sim?.world.turn ?? 1) - 1
+  const pulseAt = Date.now() / 260
+  for (const ev of props.sim?.events ?? []) {
+    if (!ev.alert || ev.turn !== pulseTurn) continue
+    let lon = ev.lon
+    let lat = ev.lat
+    if (lon == null || lat == null) {
+      const mid = theaterCenter(pickTheater(ev.actor_id || 'asia'))
+      lon = mid.lon
+      lat = mid.lat
+    }
+    const [x, y] = lonLatToXy(lon, lat, earth.width, earth.height)
+    const blink = 0.28 + 0.42 * (0.5 + 0.5 * Math.sin(pulseAt))
+    const radius = (42 + 16 * (0.5 + 0.5 * Math.sin(pulseAt * 1.35))) / scale
+    const color = ev.alert === 'red' ? `255, 72, 64` : `255, 214, 64`
+    ctx.beginPath()
+    ctx.arc(x, y, radius, 0, Math.PI * 2)
+    ctx.strokeStyle = `rgba(${color}, ${blink})`
+    ctx.lineWidth = 3.4 / scale
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.arc(x, y, 7 / scale, 0, Math.PI * 2)
+    ctx.fillStyle = `rgba(${color}, ${0.45 + blink * 0.4})`
+    ctx.fill()
   }
 }
 

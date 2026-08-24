@@ -3,9 +3,11 @@ import Button from 'primevue/button'
 import InputNumber from 'primevue/inputnumber'
 import Dropdown from 'primevue/dropdown'
 import Tag from 'primevue/tag'
+import Toast from 'primevue/toast'
+import { useToast } from 'primevue/usetoast'
 import { polityKind, settlementColor } from '~/utils/groupColors'
 import WorldMap2D from '~/components/WorldMap2D.vue'
-import { BACKGROUND_ROWS, CONTINENT_IDS, defaultRegionDraft, type RegionDraft } from '~/utils/continents'
+import { BACKGROUND_ROWS, CONTINENT_IDS, defaultRegionDraft, macroOf, subregionChoices, type ContinentId, type RegionDraft } from '~/utils/continents'
 
 type Agent = {
   id: string
@@ -19,6 +21,7 @@ type Agent = {
     personality?: { cooperation: number; aggression: number; ambition: number }
     age?: number
     region_id?: string | null
+    subregion_id?: string | null
   }
 
 type Metrics = {
@@ -38,6 +41,10 @@ type EventRow = {
   detail_key?: string
   success?: boolean | null
   deltas?: Record<string, number>
+  lon?: number | null
+  lat?: number | null
+  alert?: string | null
+  extra?: Record<string, string>
 }
 
 type Settlement = {
@@ -46,6 +53,7 @@ type Settlement = {
   member_ids: string[]
     leader_id?: string | null
     region_id?: string | null
+    subregion_id?: string | null
   }
 
 type Terrain = {
@@ -70,7 +78,7 @@ type Simulation = {
     climate?: string
     disaster_frequency?: number
     religion?: string
-    regions?: Array<{ id: string; climate?: string; resource_pool?: number }>
+    regions?: Array<{ id: string; climate?: string; resource_pool?: number; subregion_id?: string | null }>
     terrain?: Terrain
     initial_population?: number
     initial_total_wealth?: number
@@ -85,6 +93,7 @@ type Simulation = {
 const AUTO_INTERVAL_MS = 800
 
 const { t, locale, setLocale } = useI18n()
+const toast = useToast()
 
 useHead(() => ({
   title: t('brand'),
@@ -107,6 +116,10 @@ const calendarEra = ref<'bc' | 'ad'>('ad')
 const calendarYear = ref(700)
 const conditionStep = ref(1)
 const regionDrafts = ref<RegionDraft[]>(CONTINENT_IDS.map((id) => defaultRegionDraft(id)))
+
+function subregionOptions(id: ContinentId) {
+  return subregionChoices(id).map((sid) => ({ label: t(`subregions.${sid}`), value: sid }))
+}
 
 const institutionOptions = computed(() => [
   { label: t('institutions.democracy'), value: 'democracy' },
@@ -239,7 +252,11 @@ const metricItems = computed(() => {
 function actorLabel(actorId: string): string {
   if (actorId === 'world') return t('events.world')
   if (actorId === 'lone') return t('events.lone')
-  if ((CONTINENT_IDS as readonly string[]).includes(actorId)) return t(`geographies.${actorId}`)
+  const subKey = `subregions.${actorId}`
+  const sub = t(subKey)
+  if (sub !== subKey) return sub
+  const macro = macroOf(actorId)
+  if (macro) return t(`geographies.${macro}`)
   if (actorId.startsWith('s')) return actorId
   const agent = sim.value?.agents.find((a) => a.id === actorId)
   return agent?.name ?? actorId
@@ -247,17 +264,19 @@ function actorLabel(actorId: string): string {
 
 function eventGroupId(actorId: string): string | null {
   if (!actorId || actorId === 'world' || actorId === 'lone') return null
-  if ((CONTINENT_IDS as readonly string[]).includes(actorId)) return actorId
+  const macro = macroOf(actorId)
+  if (macro) return macro
   if (actorId.startsWith('s')) return actorId
-  return sim.value?.agents.find((a) => a.id === actorId)?.settlement_id ?? null
+  const agent = sim.value?.agents.find((a) => a.id === actorId)
+  return agent?.region_id ?? agent?.settlement_id ?? null
+}
+
+function isGroupId(id: string | null | undefined): boolean {
+  return !id || id === 'world' || id === 'lone' || id.startsWith('s') || Boolean(macroOf(id))
 }
 
 function eventActorColor(actorId: string): string {
   return settlementColor(eventGroupId(actorId))
-}
-
-function isGroupId(id: string | null | undefined): boolean {
-  return !id || id === 'world' || id === 'lone' || id.startsWith('s') || (CONTINENT_IDS as readonly string[]).includes(id)
 }
 
 function actionLabel(action: string): string {
@@ -283,6 +302,7 @@ function inferDetailKey(row: EventRow): string {
 function eventDetail(row: EventRow): string {
   const key = `eventDetails.${inferDetailKey(row)}`
   const personId = isGroupId(row.target_id) ? row.actor_id : (row.target_id || row.actor_id)
+  const name = locale.value === 'ja' ? (row.extra?.name_ja || row.extra?.name_en || '') : (row.extra?.name_en || row.extra?.name_ja || '')
   const translated = t(key, {
     group: actorLabel(row.actor_id),
     other: row.target_id ? actorLabel(row.target_id) : '',
@@ -296,8 +316,23 @@ function eventDetail(row: EventRow): string {
     stolen: row.deltas?.stolen != null ? row.deltas.stolen.toFixed(1) : '',
     age: row.deltas?.age != null ? String(Math.round(row.deltas.age)) : '',
     heir: row.target_id ? actorLabel(row.target_id) : '',
+    name,
+    mag: row.extra?.mag_label || (row.deltas?.magnitude != null ? String(row.deltas.magnitude) : ''),
+    year: row.extra?.year || '',
   })
   return translated === key ? row.detail : translated
+}
+
+function showShockToasts(rows: EventRow[], fromTurn: number) {
+  for (const row of rows) {
+    if (!row.alert || row.turn < fromTurn) continue
+    toast.add({
+      severity: row.alert === 'red' ? 'error' : 'warn',
+      summary: actionLabel(row.action),
+      detail: eventDetail(row),
+      life: 7000,
+    })
+  }
 }
 
 async function onLocaleChange(code: string) {
@@ -329,6 +364,7 @@ async function createSimulation() {
         geography: 'world',
         regions: regionDrafts.value.map((region) => ({
           id: region.id,
+          subregion: region.subregion,
           population: 4,
           institution: region.institution,
           tax_rate: region.taxRate,
@@ -356,11 +392,13 @@ async function tick(n = 1, opts?: { silent?: boolean }) {
   tickInFlight = true
   if (!opts?.silent) busy.value = true
   error.value = ''
+  const fromTurn = sim.value.world.turn
   try {
     sim.value = await api<Simulation>(`/simulations/${sim.value.id}/tick`, {
       method: 'POST',
       body: { n },
     })
+    showShockToasts(sim.value.events ?? [], fromTurn)
   } catch (e: unknown) {
     error.value = e instanceof Error ? e.message : String(e)
     stopAutoPlay()
@@ -392,6 +430,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="layout">
+    <Toast position="top-right" />
     <div class="lang" role="group" :aria-label="t('language')">
       <button
         type="button"
@@ -578,11 +617,24 @@ onBeforeUnmount(() => {
             <div class="bg-table" role="table">
               <div class="bg-row bg-head" role="row">
                 <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
-                <div v-for="id in CONTINENT_IDS" :key="id" class="bg-cell" role="columnheader">{{ t(`geographies.${id}`) }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-h1`" class="bg-cell col-head" role="columnheader">
+                  <span>{{ t(`geographies.${region.id}`) }}</span>
+                  <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
+                </div>
+              </div>
+              <div class="bg-row bg-form" role="row">
+                <div class="bg-stub" role="rowheader">{{ t('wizard.rows.subregion') }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-sub`" class="bg-cell" role="cell">
+                  <Dropdown v-model="region.subregion" :options="subregionOptions(region.id)" option-label="label" option-value="value" class="field-control" />
+                </div>
+              </div>
+              <div class="bg-row" role="row">
+                <div class="bg-stub" role="rowheader">{{ t('wizard.rows.focus') }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-focus`" class="bg-cell bg-focus" role="cell">{{ t(`wizard.blurbs.${region.subregion}`) }}</div>
               </div>
               <div v-for="row in BACKGROUND_ROWS" :key="row" class="bg-row" role="row">
                 <div class="bg-stub" role="rowheader">{{ t(`wizard.rows.${row}`) }}</div>
-                <div v-for="id in CONTINENT_IDS" :key="`${id}-${row}`" class="bg-cell" role="cell">{{ t(`wizard.table.${id}.${row}`) }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-${row}`" class="bg-cell" role="cell">{{ t(`wizard.table.${region.subregion}.${row}`) }}</div>
               </div>
             </div>
           </section>
@@ -591,7 +643,10 @@ onBeforeUnmount(() => {
             <div class="bg-table bg-form" role="table">
               <div class="bg-row bg-head" role="row">
                 <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
-                <div v-for="id in CONTINENT_IDS" :key="id" class="bg-cell" role="columnheader">{{ t(`geographies.${id}`) }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-h2`" class="bg-cell col-head" role="columnheader">
+                  <span>{{ t(`geographies.${region.id}`) }}</span>
+                  <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
+                </div>
               </div>
               <div class="bg-row" role="row">
                 <div class="bg-stub" role="rowheader">{{ t('institution') }}</div>
@@ -618,7 +673,10 @@ onBeforeUnmount(() => {
             <div class="bg-table bg-form" role="table">
               <div class="bg-row bg-head" role="row">
                 <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
-                <div v-for="id in CONTINENT_IDS" :key="id" class="bg-cell" role="columnheader">{{ t(`geographies.${id}`) }}</div>
+                <div v-for="region in regionDrafts" :key="`${region.id}-h3`" class="bg-cell col-head" role="columnheader">
+                  <span>{{ t(`geographies.${region.id}`) }}</span>
+                  <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
+                </div>
               </div>
               <div class="bg-row" role="row">
                 <div class="bg-stub" role="rowheader">{{ t('religion') }}</div>
@@ -1082,6 +1140,25 @@ h2 {
 .bg-head .bg-cell {
   font-weight: 700;
   color: #ffffff;
+}
+
+.col-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.12rem;
+}
+
+.col-sub {
+  font-weight: 500;
+  font-size: 0.72rem;
+  color: #d5e4f2;
+}
+
+.bg-focus {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #e8f1fa;
 }
 
 .bg-form .bg-cell {

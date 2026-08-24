@@ -1,5 +1,6 @@
 import landRings from '~/data/landRings.json'
 import physical from '~/data/physical.json'
+import { SUBREGION_THEATERS } from '~/utils/continents'
 
 const ELEV_W = 2048
 const ELEV_H = 1024
@@ -29,11 +30,14 @@ export const THEATERS: Theater[] = [
   { id: 'america', west: -125, east: -34, south: -56, north: 50 },
   { id: 'oceania', west: 110, east: 180, south: -48, north: 0 },
   { id: 'middle_east', west: 26, east: 66, south: 12, north: 43 },
+  ...SUBREGION_THEATERS,
 ]
 
 const THEATER_BY_ID: Record<string, Theater> = Object.fromEntries(THEATERS.map((item) => [item.id, item]))
 
-export const CONTINENT_THEATERS = THEATERS.filter((item) => item.id !== 'middle_east')
+export const CONTINENT_THEATERS = THEATERS.filter((item) =>
+  ['africa', 'europe', 'asia', 'america', 'oceania'].includes(item.id),
+)
 
 const LAND = landRings as Ring[]
 const LAKES = physical.lakes as Ring[]
