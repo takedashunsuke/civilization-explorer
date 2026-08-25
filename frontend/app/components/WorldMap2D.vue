@@ -207,7 +207,7 @@ function draw() {
   if (!ctx) return
   const { w, h } = viewSize()
   ctx.setTransform(1, 0, 0, 1, 0, 0)
-  ctx.fillStyle = '#071018'
+  ctx.fillStyle = '#13425f'
   ctx.fillRect(0, 0, w, h)
   ctx.setTransform(scale, 0, 0, scale, ox, oy)
   ctx.imageSmoothingEnabled = true
@@ -545,7 +545,7 @@ watch(
   border-radius: 8px;
   border: 1px solid var(--line);
   overflow: hidden;
-  background: #071018;
+  background: #13425f;
   cursor: grab;
   touch-action: none;
 }
