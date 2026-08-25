@@ -414,6 +414,7 @@
   },
   "actions": {
     "create": "作成",
+    "preparing": "準備中",
     "tick": "+10年",
     "tick5": "+50年",
     "autoPlay": "再生",
@@ -433,7 +434,8 @@
     "authority": "権威",
     "authorityHint": "制度の権威度（0付近〜1）。高いほど服従しやすい。",
     "happiness": "幸福",
-    "happinessHint": "生存主体の幸福度の平均（0〜1）。"
+    "happinessHint": "生存主体の幸福度の平均（0〜1）。",
+    "radar": "5地域のレーダー"
   },
   "layout": {
     "showConditions": "初期条件",

@@ -414,6 +414,7 @@
   },
   "actions": {
     "create": "Create",
+    "preparing": "Preparing",
     "tick": "+10 years",
     "tick5": "+50 years",
     "autoPlay": "Play",
@@ -433,7 +434,8 @@
     "authority": "Authority",
     "authorityHint": "Institutional authority (near 0–1). Higher favors obedience.",
     "happiness": "Happiness",
-    "happinessHint": "Mean happiness of living actors (0–1)."
+    "happinessHint": "Mean happiness of living actors (0–1).",
+    "radar": "Five-region radar"
   },
   "layout": {
     "showConditions": "Conditions",

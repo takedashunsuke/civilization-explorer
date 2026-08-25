@@ -6,6 +6,7 @@ import Slider from 'primevue/slider'
 import DataTable from 'primevue/datatable'
 import Column from 'primevue/column'
 import Tag from 'primevue/tag'
+import ProgressBar from 'primevue/progressbar'
 import { polityKind, settlementColor } from '~/utils/groupColors'
 import WorldMap2D from '~/components/WorldMap2D.vue'
 import { BACKGROUND_ROWS, CONTINENT_IDS, defaultRegionDraft, macroOf, subregionChoices, type ContinentId, type RegionDraft } from '~/utils/continents'
@@ -115,6 +116,7 @@ const apiBase = config.public.apiBase as string
 
 const sim = ref<Simulation | null>(null)
 const busy = ref(false)
+const creating = ref(false)
 const error = ref('')
 const autoPlaying = ref(false)
 let autoTimer: ReturnType<typeof setInterval> | null = null
@@ -340,7 +342,7 @@ const turnOnlyLabel = computed(() => {
   return t('turnLabel', { turn: sim.value.world.turn })
 })
 
-const METRIC_COLS = [
+const METRIC_ROWS = [
   { key: 'inequality', field: 'inequality', hint: 'metrics.inequalityHint' },
   { key: 'trust', field: 'mean_trust', hint: 'metrics.trustHint' },
   { key: 'cooperationRate', field: 'cooperation_rate', hint: 'metrics.cooperationRateHint' },
@@ -348,10 +350,20 @@ const METRIC_COLS = [
   { key: 'happiness', field: 'mean_happiness', hint: 'metrics.happinessHint' },
 ] as const
 
-type MetricField = (typeof METRIC_COLS)[number]['field']
+type MetricField = (typeof METRIC_ROWS)[number]['field']
 
 function metricValue(row: Pick<Metrics, MetricField>, field: MetricField): number {
   return row[field]
+}
+
+function clamp01(n: number): number {
+  return Math.max(0, Math.min(1, n))
+}
+
+function metricFill(field: MetricField, value: number): number {
+  if (field === 'mean_trust') return clamp01((value + 1) / 2)
+  if (field === 'inequality') return clamp01(value / 2)
+  return clamp01(value)
 }
 
 const regionMetricRows = computed(() => {
@@ -387,6 +399,19 @@ function regionMetricLabel(id: string): string {
   const label = t(key)
   return label === key ? id : label
 }
+
+function regionMetricColor(id: string): string {
+  return settlementColor(id === 'world' ? null : id)
+}
+
+const radarLabels = computed(() => METRIC_ROWS.map((col) => t(`metrics.${col.key}`)))
+const radarDatasets = computed(() =>
+  regionMetricRows.value.map((row) => ({
+    id: row.id,
+    label: regionMetricLabel(row.id),
+    values: METRIC_ROWS.map((col) => metricFill(col.field, metricValue(row, col.field))),
+  })),
+)
 
 function actorLabel(actorId: string): string {
   if (actorId === 'world') return t('events.world')
@@ -529,6 +554,7 @@ function stopAutoPlay() {
 async function createSimulation() {
   stopAutoPlay()
   busy.value = true
+  creating.value = true
   error.value = ''
   try {
     sim.value = await api<Simulation>('/simulations', {
@@ -562,6 +588,7 @@ async function createSimulation() {
     error.value = e instanceof Error ? e.message : String(e)
   } finally {
     busy.value = false
+    creating.value = false
   }
 }
 
@@ -760,30 +787,40 @@ onBeforeUnmount(() => {
               <li v-for="row in regionMetricRows" :key="row.id">
                 <span class="metrics-bar-region">{{ regionMetricLabel(row.id) }}</span>
                 <span v-if="row.subregion" class="metrics-bar-sub">{{ t(`subregions.${row.subregion}`) }}</span>
-                <span class="metrics-bar-stat">
-                  {{ t('metrics.happiness') }}
-                  <em>{{ row.mean_happiness.toFixed(2) }}</em>
+                <span class="metrics-bar-stat">{{ t('metrics.happiness') }}</span>
+                <span class="metric-meter" :style="{ '--fill': `${metricFill('mean_happiness', row.mean_happiness) * 100}%`, '--tone': regionMetricColor(row.id) }">
+                  <span class="metric-meter-fill" />
                 </span>
+                <em class="metrics-bar-num">{{ row.mean_happiness.toFixed(2) }}</em>
               </li>
             </ul>
             <span class="metrics-bar-chevron" aria-hidden="true">{{ metricsOpen ? '▾' : '▴' }}</span>
           </button>
           <div class="metrics-sheet">
-            <div class="metrics-grid" role="table">
-              <div class="metrics-grid-row metrics-grid-head" role="row">
-                <div class="metrics-grid-stub" role="columnheader">{{ t('wizard.axis') }}</div>
-                <div v-for="col in METRIC_COLS" :key="col.key" class="metrics-grid-cell" role="columnheader">
-                  <span>{{ t(`metrics.${col.key}`) }}</span>
-                  <p class="hint">{{ t(col.hint) }}</p>
+            <div class="metrics-detail">
+              <RegionMetricsRadar v-if="metricsOpen" :labels="radarLabels" :datasets="radarDatasets" />
+              <div class="metrics-grid" role="table">
+                <div class="metrics-grid-row metrics-grid-head" role="row">
+                  <div class="metrics-grid-stub" role="columnheader">{{ t('wizard.axis') }}</div>
+                  <div v-for="col in regionMetricRows" :key="`h-${col.id}`" class="metrics-grid-cell" role="columnheader">
+                    <span>{{ regionMetricLabel(col.id) }}</span>
+                    <span v-if="col.subregion" class="col-sub">{{ t(`subregions.${col.subregion}`) }}</span>
+                  </div>
                 </div>
-              </div>
-              <div v-for="row in regionMetricRows" :key="`detail-${row.id}`" class="metrics-grid-row" role="row">
-                <div class="metrics-grid-stub" role="rowheader">
-                  <span>{{ regionMetricLabel(row.id) }}</span>
-                  <span v-if="row.subregion" class="col-sub">{{ t(`subregions.${row.subregion}`) }}</span>
-                </div>
-                <div v-for="col in METRIC_COLS" :key="`${row.id}-${col.key}`" class="metrics-grid-cell" role="cell">
-                  <span class="metric-value">{{ metricValue(row, col.field).toFixed(3) }}</span>
+                <div v-for="metric in METRIC_ROWS" :key="metric.key" class="metrics-grid-row" role="row">
+                  <div class="metrics-grid-stub" role="rowheader">
+                    <span>{{ t(`metrics.${metric.key}`) }}</span>
+                    <p class="hint">{{ t(metric.hint) }}</p>
+                  </div>
+                  <div v-for="col in regionMetricRows" :key="`${col.id}-${metric.key}`" class="metrics-grid-cell" role="cell">
+                    <span
+                      class="metric-meter"
+                      :style="{ '--fill': `${metricFill(metric.field, metricValue(col, metric.field)) * 100}%`, '--tone': regionMetricColor(col.id) }"
+                    >
+                      <span class="metric-meter-fill" />
+                    </span>
+                    <span class="metric-value">{{ metricValue(col, metric.field).toFixed(3) }}</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -792,7 +829,7 @@ onBeforeUnmount(() => {
       </main>
     </div>
 
-    <div v-if="conditionsOpen" class="modal-backdrop" @click="conditionsOpen = false" />
+    <div v-if="conditionsOpen" class="modal-backdrop" @click="!creating && (conditionsOpen = false)" />
     <aside
       v-if="conditionsOpen"
       class="conditions-modal panel"
@@ -802,7 +839,7 @@ onBeforeUnmount(() => {
     >
       <div class="panel-heading events-heading">
         <h2>{{ t('initialConditions') }}</h2>
-        <button type="button" class="events-close" :aria-label="t('layout.closeConditions')" @click="conditionsOpen = false">×</button>
+        <button type="button" class="events-close" :aria-label="t('layout.closeConditions')" :disabled="creating" @click="conditionsOpen = false">×</button>
       </div>
       <div class="conditions-form">
         <div class="conditions-fields">
@@ -996,12 +1033,21 @@ onBeforeUnmount(() => {
           <p v-if="error" class="error">{{ error }}</p>
         </div>
         <div class="conditions-footer step-footer">
-          <Button v-if="conditionStep > 1" :label="t('wizard.back')" class="action-btn" severity="secondary" @click="conditionStep -= 1" />
-          <Button v-if="conditionStep < 3" :label="t('wizard.next')" class="action-btn" @click="conditionStep += 1" />
-          <Button v-else :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy && !autoPlaying" @click="createSimulation" />
+          <Button v-if="conditionStep > 1" :label="t('wizard.back')" class="action-btn" severity="secondary" :disabled="creating" @click="conditionStep -= 1" />
+          <Button v-if="conditionStep < 3" :label="t('wizard.next')" class="action-btn" :disabled="creating" @click="conditionStep += 1" />
+          <Button v-else :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy && !autoPlaying" :disabled="creating" @click="createSimulation" />
         </div>
       </div>
     </aside>
+
+    <div v-if="creating" class="creating-overlay" role="status" aria-live="polite" aria-busy="true">
+      <div class="creating-card">
+        <p class="creating-label">{{ t('actions.preparing') }}</p>
+        <div class="creating-bar">
+          <ProgressBar mode="indeterminate" />
+        </div>
+      </div>
+    </div>
 
     <aside v-if="eventsOpen" class="events-modal panel" role="dialog" :aria-label="t('events.title')">
       <div class="panel-heading events-heading">
@@ -1295,6 +1341,42 @@ h2 {
   inset: 0;
   z-index: 35;
   background: rgba(4, 8, 14, 0.55);
+}
+
+.creating-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(4, 8, 14, 0.4);
+}
+
+.creating-card {
+  width: min(28rem, calc(100vw - 2rem));
+  padding: 1.1rem 1.25rem 1.2rem;
+  border-radius: 0.6rem;
+  background: #1c252f;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+}
+
+.creating-label {
+  margin: 0 0 0.75rem;
+  text-align: center;
+  font-size: 0.95rem;
+  color: #e8eef4;
+}
+
+.creating-bar :deep(.p-progressbar) {
+  height: 6px;
+  border-radius: 6px;
+  background: #2b3845;
+  border: 0;
+}
+
+.creating-bar :deep(.p-progressbar-value) {
+  background: #3b82f6;
 }
 
 .conditions-modal {
@@ -1728,6 +1810,11 @@ h2 {
   opacity: 0.85;
 }
 
+.events-close:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
 .event-chat {
   margin: 0;
   padding: 0;
@@ -1942,25 +2029,32 @@ label {
 }
 
 .metrics.open .metrics-sheet {
-  max-height: 22rem;
+  max-height: 34rem;
   opacity: 1;
   transform: translateY(0);
 }
 
-.metrics-grid {
+.metrics-detail {
   display: grid;
-  gap: 0.3rem;
+  grid-template-columns: minmax(12rem, 0.9fr) minmax(0, 1.4fr);
+  gap: 0.55rem;
   padding: 0.5rem 0.55rem 0.55rem;
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
   border-radius: 10px;
   background: color-mix(in srgb, var(--panel) 96%, transparent);
 }
 
+.metrics-grid {
+  display: grid;
+  gap: 0.28rem;
+  min-width: 0;
+}
+
 .metrics-grid-row {
   display: grid;
-  grid-template-columns: minmax(5.5rem, 0.9fr) repeat(5, minmax(0, 1fr));
+  grid-template-columns: minmax(6.2rem, 0.95fr) repeat(5, minmax(0, 1fr));
   gap: 0.3rem;
-  align-items: start;
+  align-items: center;
 }
 
 .metrics-grid-stub {
@@ -1973,7 +2067,10 @@ label {
 
 .metrics-grid-cell {
   min-width: 0;
-  padding: 0.2rem 0.25rem;
+  padding: 0.12rem 0.15rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.12rem;
 }
 
 .metrics-grid-head .metrics-grid-cell {
@@ -1981,16 +2078,43 @@ label {
   font-size: 0.74rem;
 }
 
+.metric-meter {
+  display: block;
+  height: 0.42rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 70%, transparent);
+  overflow: hidden;
+}
+
+.metric-meter-fill {
+  display: block;
+  width: var(--fill, 0%);
+  height: 100%;
+  border-radius: inherit;
+  background: var(--tone, var(--accent));
+}
+
 .metric-value {
   font-variant-numeric: tabular-nums;
   color: var(--accent);
-  font-size: 0.82rem;
+  font-size: 0.76rem;
 }
 
 .metrics .hint {
   font-size: 0.62rem;
   line-height: 1.3;
   margin: 0.15rem 0 0;
+}
+
+.metrics-bar-list .metric-meter {
+  height: 0.38rem;
+  margin-top: 0.12rem;
+}
+
+@media (max-width: 980px) {
+  .metrics-detail {
+    grid-template-columns: 1fr;
+  }
 }
 
 .map-stats {
