@@ -104,7 +104,7 @@ export function defaultRegionDraft(id: ContinentId): RegionDraft {
     inequality: 0.5,
     traitRate: 0.1,
     welfareRate: 0,
-    population: 100,
+    population: 1000,
   }
 }
 

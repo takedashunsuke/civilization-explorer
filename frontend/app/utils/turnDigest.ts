@@ -12,6 +12,7 @@ export type DigestEvent = {
 }
 
 export type DigestAgent = {
+  id?: string
   alive: boolean
   region_id?: string | null
   settlement_id?: string | null
@@ -39,6 +40,35 @@ export type DigestSim = {
   agents: DigestAgent[]
   settlements?: DigestSettlement[]
   events: DigestEvent[]
+  region_readings?: Array<{
+    region_id: string
+    subregion_id?: string | null
+    tension: number
+    prosperity: number
+    discontent: number
+    cohesion: number
+    rising_archetype: string
+    trajectory: string
+    summary: string
+    source?: string
+  }>
+  world_summary?: string
+  last_metrics?: {
+    world_summary?: string
+    reading_source?: string
+    regions?: Array<{
+      region_id: string
+      subregion_id?: string | null
+      tension?: number
+      prosperity?: number
+      discontent?: number
+      cohesion?: number
+      rising_archetype?: string
+      trajectory?: string
+      summary?: string
+      reading_source?: string
+    }>
+  } | null
 }
 
 export type RegionObservation = {
@@ -48,12 +78,14 @@ export type RegionObservation = {
   bands: number
   cities: number
   nations: number
-  conflicts: number
-  cooperations: number
-  births: number
-  deaths: number
-  disasters: number
-  regimeShifts: number
+  tension: number
+  prosperity: number
+  discontent: number
+  cohesion: number
+  risingArchetype: string
+  trajectory: string
+  summary: string
+  readingSource: string
 }
 
 export type NotableEventRef = {
@@ -65,6 +97,8 @@ export type NotableEventRef = {
 
 export type TurnDigestData = {
   turn: number
+  worldSummary: string
+  readingSource: string
   totals: {
     population: number
     groups: number
@@ -197,7 +231,6 @@ export function buildTurnDigest(sim: DigestSim | null): TurnDigestData | null {
   const turn = sim.world.turn
   const agents = sim.agents.filter((a) => a.alive)
   const settlements = sim.settlements ?? []
-  const agentsById = new Map(sim.agents.map((a) => [a.id, a]))
   const turnActions = countTurnActions(sim.events, turn)
   const cumulative = countCumulative(sim.events)
 
@@ -218,27 +251,52 @@ export function buildTurnDigest(sim: DigestSim | null): TurnDigestData | null {
     sim.world.regions?.map((r) => r.id) ??
     [...new Set(agents.map((a) => a.region_id).filter(Boolean) as string[])]
 
+  const readingsById = new Map(
+    (sim.region_readings ?? []).map((row) => [row.region_id, row]),
+  )
+  for (const row of sim.last_metrics?.regions ?? []) {
+    if (!readingsById.has(row.region_id) && row.summary != null) {
+      readingsById.set(row.region_id, {
+        region_id: row.region_id,
+        subregion_id: row.subregion_id,
+        tension: row.tension ?? 0,
+        prosperity: row.prosperity ?? 0,
+        discontent: row.discontent ?? 0,
+        cohesion: row.cohesion ?? 0,
+        rising_archetype: row.rising_archetype ?? 'none',
+        trajectory: row.trajectory ?? 'stagnation',
+        summary: row.summary ?? '',
+        source: row.reading_source,
+      })
+    }
+  }
+
   const regionObservations: RegionObservation[] = regionIds.map((regionId) => {
     const regionMeta = sim.world.regions?.find((r) => r.id === regionId)
     const population = agents.filter((a) => a.region_id === regionId).length
     const polities = countPolities(settlements, regionId)
-    const turnEvents = sim.events.filter((e) => e.turn === turn && eventRegionId(e, agentsById) === regionId)
+    const reading = readingsById.get(regionId)
     return {
       regionId,
-      subregionId: regionMeta?.subregion_id ?? null,
+      subregionId: regionMeta?.subregion_id ?? reading?.subregion_id ?? null,
       population,
       ...polities,
-      conflicts: turnEvents.filter((e) => e.action === 'conflict').length,
-      cooperations: turnEvents.filter((e) => e.action === 'cooperate').length,
-      births: turnEvents.filter((e) => e.action === 'birth').length,
-      deaths: turnEvents.filter((e) => e.action === 'death').length,
-      disasters: turnEvents.filter((e) => e.action === 'disaster').length,
-      regimeShifts: turnEvents.filter((e) => e.action === 'regime' || inferDetailKey(e) === 'regime_shift').length,
+      tension: reading?.tension ?? 0,
+      prosperity: reading?.prosperity ?? 0,
+      discontent: reading?.discontent ?? 0,
+      cohesion: reading?.cohesion ?? 0,
+      risingArchetype: reading?.rising_archetype ?? 'none',
+      trajectory: reading?.trajectory ?? 'stagnation',
+      summary: reading?.summary ?? '',
+      readingSource: reading?.source ?? sim.last_metrics?.reading_source ?? 'heuristic',
     }
   })
 
   return {
     turn,
+    worldSummary: sim.world_summary || sim.last_metrics?.world_summary || '',
+    readingSource: sim.last_metrics?.reading_source
+      || (sim.region_readings?.some((r) => r.source === 'llm') ? 'llm' : 'heuristic'),
     totals: {
       population: agents.length,
       groups,

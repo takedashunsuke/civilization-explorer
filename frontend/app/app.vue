@@ -33,12 +33,27 @@ type Metrics = {
   cooperation_rate: number
   authority: number
   mean_happiness: number
+  world_summary?: string
+  reading_source?: string
   regions?: RegionMetrics[]
 }
 
-type RegionMetrics = Metrics & {
+type RegionMetrics = {
   region_id: string
   subregion_id?: string | null
+  inequality: number
+  mean_trust: number
+  cooperation_rate: number
+  authority: number
+  mean_happiness: number
+  tension?: number
+  prosperity?: number
+  discontent?: number
+  cohesion?: number
+  rising_archetype?: string
+  trajectory?: string
+  summary?: string
+  reading_source?: string
 }
 
 type EventRow = {
@@ -104,6 +119,19 @@ type Simulation = {
   settlements?: Settlement[]
   events: EventRow[]
   last_metrics: Metrics | null
+  region_readings?: Array<{
+    region_id: string
+    subregion_id?: string | null
+    tension: number
+    prosperity: number
+    discontent: number
+    cohesion: number
+    rising_archetype: string
+    trajectory: string
+    summary: string
+    source?: string
+  }>
+  world_summary?: string
 }
 
 const AUTO_INTERVAL_MS = 800
@@ -126,14 +154,21 @@ type LlmHealth = {
   ollama_model?: string
   openai_model?: string
   note?: string
+  wired?: boolean
+  mode?: string
+  max_agents_per_turn?: number
+  group_sample_per_region?: number
+  timeout_sec?: number
 }
 
 const llmHealth = ref<LlmHealth | null>(null)
 const apiReachable = ref(false)
 
 const llmDecisionWired = computed(() => {
-  const note = llmHealth.value?.note ?? ''
-  // Until Phase 2 wiring lands, health always reports heuristic stub.
+  const h = llmHealth.value
+  if (!h) return false
+  if (typeof h.wired === 'boolean') return h.wired
+  const note = h.note ?? ''
   return !note.toLowerCase().includes('heuristic') && !note.toLowerCase().includes('phase 2')
 })
 
@@ -175,7 +210,7 @@ let autoTimer: ReturnType<typeof setInterval> | null = null
 let tickInFlight = false
 
 const calendarEra = ref<'bc' | 'ad'>('ad')
-const calendarYear = ref(0)
+const calendarYear = ref(1000)
 const conditionStep = ref(1)
 const regionDrafts = ref<RegionDraft[]>(CONTINENT_IDS.map((id) => defaultRegionDraft(id)))
 
@@ -214,8 +249,8 @@ const LEVEL_STEPS = [0.2, 0.35, 0.5, 0.65, 0.8]
 const TAX_STEPS = [0.05, 0.1, 0.15, 0.2, 0.25]
 const NOTABLE_STEPS = [0.04, 0.085, 0.13, 0.175, 0.22]
 const WELFARE_STEPS = [0, 0.07, 0.14, 0.21, 0.28]
-const COLUMN_POP_MIN = 100
-const COLUMN_POP_MAX = 1000
+const COLUMN_POP_MIN = 1000
+const COLUMN_POP_MAX = 10000
 
 const mapSeed = computed(() => sim.value?.world.seed ?? 0)
 
@@ -224,7 +259,7 @@ const calendarEraOptions = computed(() => [
   { label: t('calendarEra.ad'), value: 'ad' as const },
 ])
 
-const MAX_CALENDAR_YEAR = 3000
+const MAX_CALENDAR_YEAR = 2500
 const BC_YEAR_MAX = 50000
 
 const calendarYearMin = computed(() => (calendarEra.value === 'ad' ? 0 : 1))
@@ -339,14 +374,24 @@ const liveYearLabel = computed(() => formatYearLabel(currentAstroYear.value))
 const liveJapanEra = computed(() => japanEraName(currentAstroYear.value))
 const liveWorldEra = computed(() => worldEraName(currentAstroYear.value))
 
-const recentEvents = computed(() => (sim.value?.events ?? []).slice(-40).reverse())
+const recentEvents = computed(() => {
+  const rows = [...(sim.value?.events ?? [])]
+  rows.sort((a, b) => {
+    if (a.turn !== b.turn) return b.turn - a.turn
+    const aLlm = a.extra?.decide === 'llm' ? 1 : 0
+    const bLlm = b.extra?.decide === 'llm' ? 1 : 0
+    if (aLlm !== bLlm) return bLlm - aLlm
+    return 0
+  })
+  return rows.slice(0, 48)
+})
 
 const aliveCount = computed(() => (sim.value?.agents ?? []).filter((a) => a.alive).length)
 const totalAgents = computed(() => sim.value?.agents.length ?? 0)
 const initialPopulation = computed(
-  () => sim.value?.world.initial_population ?? 100,
+  () => sim.value?.world.initial_population ?? 1000,
 )
-const populationCap = computed(() => sim.value?.world.population_cap ?? 1000)
+const populationCap = computed(() => sim.value?.world.population_cap ?? 10000)
 const populationDelta = computed(() => aliveCount.value - initialPopulation.value)
 const settlementCount = computed(() => sim.value?.settlements?.length ?? 0)
 const polityCounts = computed(() => {
@@ -421,6 +466,23 @@ const digestOneLiner = computed(() => {
   return t(key, { turn, ...totals })
 })
 
+const digestWorldLine = computed(() => {
+  const digest = turnDigest.value
+  if (!digest) return ''
+  const raw = digest.worldSummary?.trim() || ''
+  if (raw && isUsableWorldSummary(raw)) {
+    return raw
+  }
+  const ranked = [...digest.regionObservations].sort(
+    (a, b) => b.discontent + b.tension - (a.discontent + a.tension),
+  )
+  const top = ranked.slice(0, 2).filter((row) => row.population > 0 || row.summary)
+  if (!top.length) return ''
+  return top
+    .map((row) => `${digestRegionLabel(row.regionId)}: ${digestCausalSummary(row)}`)
+    .join(' · ')
+})
+
 function digestRegionLabel(id: string): string {
   const key = `geographies.${id}`
   const label = t(key)
@@ -429,6 +491,99 @@ function digestRegionLabel(id: string): string {
 
 function digestRegionColor(id: string): string {
   return settlementColor(id)
+}
+
+function pct(value: number): string {
+  return `${Math.round((Number(value) || 0) * 100)}%`
+}
+
+function digestArchetypeLabel(key: string): string {
+  const path = `digest.archetypes.${key}`
+  const translated = t(path)
+  return translated === path ? key : translated
+}
+
+function digestTrajectoryLabel(key: string): string {
+  const path = `digest.trajectories.${key}`
+  const translated = t(path)
+  return translated === path ? key : translated
+}
+
+function isRawMetricDump(summary: string): boolean {
+  return /tension\s*=|prosperity\s*=|→\s*\w+\/\w+|tax=|shocks=/.test(summary)
+}
+
+function hasJapanese(text: string): boolean {
+  return /[\u3040-\u30ff\u3400-\u9fff]/.test(text)
+}
+
+function isUsableWorldSummary(raw: string): boolean {
+  if (isRawMetricDump(raw)) return false
+  if (/^(LLM read|Heuristic|Group LLM steered|集団LLM|ヒューリスティック)/i.test(raw)) return false
+  if (locale.value === 'ja') return hasJapanese(raw)
+  return true
+}
+
+function isUsableNarrativeSummary(summary: string): boolean {
+  if (!summary || summary.startsWith('{') || isRawMetricDump(summary)) return false
+  if (/^(high discontent|stable mood|scarce resources|resource slack)/i.test(summary)) return false
+  if (/^[a-z]+:\s*(stagnation|war|industry|reform|exodus|faith)\b/i.test(summary)) return false
+  if (/trajectory\s+\w+/i.test(summary)) return false
+  if (/→\s*\w+\s+rising/i.test(summary)) return false
+  if (locale.value === 'ja') return hasJapanese(summary)
+  return true
+}
+
+function digestPrimarySignal(row: {
+  tension: number
+  prosperity: number
+  discontent: number
+  cohesion: number
+}): string {
+  const ranked: Array<[string, number]> = [
+    ['highDiscontent', row.discontent],
+    ['highTension', row.tension],
+    ['highProsperity', row.prosperity],
+    ['lowCohesion', 1 - row.cohesion],
+  ]
+  ranked.sort((a, b) => b[1] - a[1])
+  const [key, score] = ranked[0]
+  if (score < 0.45) {
+    if (row.prosperity >= 0.55) return t('digest.signal.highProsperity')
+    if (row.cohesion >= 0.55) return t('digest.signal.highCohesion')
+    return t('digest.signal.lowTension')
+  }
+  return t(`digest.signal.${key}`)
+}
+
+function digestCausalSummary(row: {
+  tension: number
+  prosperity: number
+  discontent: number
+  cohesion: number
+  risingArchetype: string
+  trajectory: string
+  summary: string
+}): string {
+  if (isUsableNarrativeSummary(row.summary)) {
+    return row.summary
+  }
+  return [
+    digestPrimarySignal(row),
+    digestTrajectoryLabel(row.trajectory),
+    digestArchetypeLabel(row.risingArchetype),
+  ].join(' → ')
+}
+
+function meterTone(kind: 'tension' | 'prosperity' | 'discontent' | 'cohesion', value: number): string {
+  if (kind === 'tension' || kind === 'discontent') {
+    if (value >= 0.65) return 'hot'
+    if (value >= 0.4) return 'warm'
+    return 'cool'
+  }
+  if (value >= 0.65) return 'good'
+  if (value >= 0.4) return 'warm'
+  return 'dim'
 }
 
 function actorLabel(actorId: string): string {
@@ -539,6 +694,9 @@ function notableEventText(ref: { key: string; actorId: string; targetId?: string
 }
 
 function eventDetail(row: EventRow): string {
+  if (row.action === 'observe') {
+    return row.extra?.reason || row.detail || t('eventDetails.world_reading')
+  }
   const key = `eventDetails.${inferDetailKey(row)}`
   const personId = isGroupId(row.target_id) ? row.actor_id : (row.target_id || row.actor_id)
   const name = locale.value === 'ja' ? (row.extra?.name_ja || row.extra?.name_en || '') : (row.extra?.name_en || row.extra?.name_ja || '')
@@ -571,6 +729,15 @@ async function onLocaleChange(code: string) {
 
 async function api<T>(path: string, options?: Parameters<typeof $fetch<T>>[1]): Promise<T> {
   return await $fetch<T>(`${apiBase}${path}`, options)
+}
+
+function formatApiError(e: unknown): string {
+  const err = e as { statusCode?: number; status?: number; message?: string; data?: { detail?: string } }
+  const status = err.statusCode ?? err.status
+  if (status === 404) return t('errors.simLost')
+  if (err.data?.detail) return String(err.data.detail)
+  if (e instanceof Error && e.message) return e.message
+  return String(e)
 }
 
 function stopAutoPlay() {
@@ -615,7 +782,7 @@ async function createSimulation() {
     conditionsOpen.value = false
     await startAutoPlay()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : String(e)
+    error.value = formatApiError(e)
   } finally {
     busy.value = false
     creating.value = false
@@ -631,8 +798,9 @@ async function tick(n = 1, opts?: { silent?: boolean }) {
   }
   n = Math.min(n, remaining)
   tickInFlight = true
-  if (!opts?.silent) busy.value = true
-  error.value = ''
+  // Always show progress — group LLM can take many seconds per turn.
+  busy.value = true
+  if (!opts?.silent) error.value = ''
   try {
     sim.value = await api<Simulation>(`/simulations/${sim.value.id}/tick`, {
       method: 'POST',
@@ -640,11 +808,17 @@ async function tick(n = 1, opts?: { silent?: boolean }) {
     })
     if (turnsUntilYearCap() <= 0) stopAutoPlay()
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : String(e)
+    const err = e as { statusCode?: number; status?: number }
+    const status = err.statusCode ?? err.status
+    error.value = formatApiError(e)
     stopAutoPlay()
+    if (status === 404) {
+      sim.value = null
+      conditionsOpen.value = true
+    }
   } finally {
     tickInFlight = false
-    if (!opts?.silent) busy.value = false
+    busy.value = false
   }
 }
 
@@ -705,6 +879,7 @@ onBeforeUnmount(() => {
             <span class="header-era-sep" aria-hidden="true">·</span>
             <span>{{ llmProviderLabel }}</span>
           </p>
+          <p v-if="error" class="header-error" role="alert">{{ error }}</p>
         </div>
         <p
           class="header-headline"
@@ -763,7 +938,15 @@ onBeforeUnmount(() => {
             @click="toggleAutoPlay"
           />
         </div>
-        <Tag v-if="sim" :value="turnStatusLabel" severity="info" />
+        <div class="header-turn-row">
+          <Tag v-if="sim" :value="turnStatusLabel" severity="info" />
+          <span
+            v-if="busy && sim && !creating"
+            class="tick-status"
+            role="status"
+            aria-live="polite"
+          >{{ t('actions.ticking') }}</span>
+        </div>
         </div>
       </div>
       <div v-if="sim" class="header-era" aria-live="polite">
@@ -881,51 +1064,59 @@ onBeforeUnmount(() => {
               </div>
               <section class="digest-section digest-section-notable">
                 <h3>{{ t('digest.notableTitle') }}</h3>
+                <p v-if="digestWorldLine" class="digest-notable-line">{{ digestWorldLine }}</p>
                 <p v-if="turnDigest.notableEvents.length" class="digest-notable-line">
                   {{ turnDigest.notableEvents.slice(0, 3).map((item) => notableEventText(item)).join(' · ') }}
                 </p>
-                <p v-else class="hint">{{ t('digest.notableEmpty') }}</p>
+                <p v-else-if="!digestWorldLine" class="hint">{{ t('digest.notableEmpty') }}</p>
               </section>
               <section class="digest-section digest-section-obs">
-                <h3>{{ t('digest.obsTitle') }}</h3>
-                <div class="digest-obs-table" role="table">
-                  <div class="digest-obs-row digest-obs-head" role="row">
-                    <div class="digest-obs-stub" role="columnheader" />
-                    <div
-                      v-for="row in turnDigest.regionObservations"
-                      :key="`h-${row.regionId}`"
-                      class="digest-obs-cell"
-                      role="columnheader"
-                    >
-                      <span :style="{ color: digestRegionColor(row.regionId) }">{{ digestRegionLabel(row.regionId) }}</span>
+                <h3>
+                  {{ t('digest.obsTitle') }}
+                  <span class="digest-obs-source">{{ turnDigest.readingSource === 'llm' ? t('digest.obsLlm') : t('digest.obsHeuristic') }}</span>
+                </h3>
+                <div class="digest-region-grid">
+                  <article
+                    v-for="row in turnDigest.regionObservations"
+                    :key="row.regionId"
+                    class="digest-region-card"
+                  >
+                    <header class="digest-region-head">
+                      <strong :style="{ color: digestRegionColor(row.regionId) }">{{ digestRegionLabel(row.regionId) }}</strong>
+                      <span class="digest-region-pop">{{ t('digest.meterPop', { n: row.population }) }}</span>
+                    </header>
+                    <div class="digest-flow" :aria-label="t('digest.causalTitle')">
+                      <span class="digest-flow-chip signal">{{ digestPrimarySignal(row) }}</span>
+                      <span class="digest-flow-arrow" aria-hidden="true">→</span>
+                      <span class="digest-flow-chip trajectory" :data-traj="row.trajectory">{{ digestTrajectoryLabel(row.trajectory) }}</span>
+                      <span class="digest-flow-arrow" aria-hidden="true">→</span>
+                      <span class="digest-flow-chip archetype">{{ digestArchetypeLabel(row.risingArchetype) }}</span>
                     </div>
-                  </div>
-                  <div class="digest-obs-row" role="row">
-                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colPopulation') }}</div>
-                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-pop`" class="digest-obs-cell" role="cell">{{ row.population }}</div>
-                  </div>
-                  <div class="digest-obs-row" role="row">
-                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colPolities') }}</div>
-                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-pol`" class="digest-obs-cell" role="cell">
-                      {{ t('digest.polityCounts', { bands: row.bands, cities: row.cities, nations: row.nations }) }}
-                    </div>
-                  </div>
-                  <div class="digest-obs-row" role="row">
-                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colConflicts') }}</div>
-                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-conf`" class="digest-obs-cell" role="cell">{{ row.conflicts }}</div>
-                  </div>
-                  <div class="digest-obs-row" role="row">
-                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colCoops') }}</div>
-                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-coop`" class="digest-obs-cell" role="cell">{{ row.cooperations }}</div>
-                  </div>
-                  <div class="digest-obs-row" role="row">
-                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colBirths') }}</div>
-                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-birth`" class="digest-obs-cell" role="cell">{{ row.births }}</div>
-                  </div>
-                  <div class="digest-obs-row" role="row">
-                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colDeaths') }}</div>
-                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-death`" class="digest-obs-cell" role="cell">{{ row.deaths }}</div>
-                  </div>
+                    <ul class="digest-meters">
+                      <li>
+                        <span>{{ t('digest.colTension') }}</span>
+                        <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('tension', row.tension)" :style="{ width: pct(row.tension) }" /></div>
+                        <em>{{ pct(row.tension) }}</em>
+                      </li>
+                      <li>
+                        <span>{{ t('digest.colProsperity') }}</span>
+                        <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('prosperity', row.prosperity)" :style="{ width: pct(row.prosperity) }" /></div>
+                        <em>{{ pct(row.prosperity) }}</em>
+                      </li>
+                      <li>
+                        <span>{{ t('digest.colDiscontent') }}</span>
+                        <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('discontent', row.discontent)" :style="{ width: pct(row.discontent) }" /></div>
+                        <em>{{ pct(row.discontent) }}</em>
+                      </li>
+                      <li>
+                        <span>{{ t('digest.colCohesion') }}</span>
+                        <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('cohesion', row.cohesion)" :style="{ width: pct(row.cohesion) }" /></div>
+                        <em>{{ pct(row.cohesion) }}</em>
+                      </li>
+                    </ul>
+                    <p class="digest-region-summary">{{ digestCausalSummary(row) }}</p>
+                    <p class="digest-region-polity">{{ t('digest.polityCounts', { bands: row.bands, cities: row.cities, nations: row.nations }) }}</p>
+                  </article>
                 </div>
               </section>
             </div>
@@ -1127,7 +1318,7 @@ onBeforeUnmount(() => {
                       v-model="region.population"
                       :min="COLUMN_POP_MIN"
                       :max="COLUMN_POP_MAX"
-                      :step="10"
+                      :step="100"
                     />
                     <span class="pop-slider-value">{{ t('wizard.columnPopCount', { n: region.population }) }}</span>
                   </div>
@@ -1164,12 +1355,14 @@ onBeforeUnmount(() => {
       </div>
       <p v-if="!recentEvents.length" class="hint">{{ t('events.empty') }}</p>
       <ol v-else class="event-chat">
-        <li v-for="(row, idx) in recentEvents" :key="`${row.turn}-${row.actor_id}-${row.action}-${idx}`" class="event-bubble">
+        <li v-for="(row, idx) in recentEvents" :key="`${row.turn}-${row.actor_id}-${row.action}-${idx}`" class="event-bubble" :class="{ 'event-llm': row.extra?.decide === 'llm' }">
           <div class="event-bubble-meta">
             <span class="event-actor" :style="{ color: eventActorColor(row.actor_id) }">{{ actorLabel(row.actor_id) }}</span>
             <span class="event-action" :style="{ color: eventActorColor(row.actor_id) }">{{ actionLabel(row.action) }}</span>
+            <span v-if="row.extra?.decide === 'llm'" class="event-llm-badge">{{ t('events.decideLlm') }}</span>
           </div>
           <p class="event-text">{{ eventDetail(row) }}</p>
+          <p v-if="row.extra?.reason" class="event-reason">{{ t('events.reason', { text: row.extra.reason }) }}</p>
         </li>
       </ol>
     </aside>
@@ -1247,6 +1440,14 @@ onBeforeUnmount(() => {
   text-overflow: ellipsis;
 }
 
+.header-error {
+  margin: 0.35rem 0 0;
+  max-width: 28rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: #c45c4a;
+}
+
 .header-era {
   display: flex;
   flex-direction: column;
@@ -1302,6 +1503,27 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 0.3rem;
+  flex: 0 0 auto;
+}
+
+.tick-status {
+  display: inline-flex;
+  align-items: center;
+  height: var(--header-bar-h);
+  padding: 0 0.55rem;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--text, #1c2430) 78%, #3a6ea5);
+  background: color-mix(in srgb, #3a6ea5 12%, transparent);
+  white-space: nowrap;
+}
+
+.header-turn-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   flex: 0 0 auto;
 }
 
@@ -1948,7 +2170,7 @@ h2 {
 }
 
 .digest-edge-btn.open {
-  left: min(32rem, 72%);
+  left: min(34rem, 78%);
 }
 
 .digest-edge-btn:hover {
@@ -1968,7 +2190,7 @@ h2 {
   top: 0;
   bottom: 0;
   z-index: 14;
-  width: min(32rem, 72%);
+  width: min(34rem, 78%);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -1977,6 +2199,7 @@ h2 {
   background: #1c252f;
   box-shadow: 8px 0 28px rgba(0, 0, 0, 0.35);
   overflow: hidden;
+  min-height: 0;
 }
 
 .digest-heading {
@@ -1996,13 +2219,21 @@ h2 {
 }
 
 .digest-body {
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  gap: 0.45rem;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  padding-right: 0.15rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.digest-section {
+  flex: 0 0 auto;
 }
 
 .digest-section h3 {
@@ -2053,47 +2284,179 @@ h2 {
   font-size: 0.7rem;
   line-height: 1.35;
   color: var(--text);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 .digest-section-obs {
   flex: 0 0 auto;
+  min-height: 0;
 }
 
-.digest-obs-table {
+.digest-obs-source {
+  margin-left: 0.4rem;
+  font-size: 0.62rem;
+  font-weight: 650;
+  color: #9ec9ff;
+}
+
+.digest-region-grid {
   display: grid;
-  gap: 0.12rem;
-  min-width: 0;
+  grid-template-columns: 1fr;
+  gap: 0.55rem;
 }
 
-.digest-obs-row {
-  display: grid;
-  grid-template-columns: minmax(3.4rem, 0.7fr) repeat(5, minmax(0, 1fr));
-  gap: 0.18rem;
-  align-items: center;
+@media (min-width: 720px) {
+  .digest-region-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-.digest-obs-stub {
-  font-weight: 600;
-  font-size: 0.64rem;
+.digest-region-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.55rem 0.6rem 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  border-radius: 10px;
+  background:
+    linear-gradient(160deg, color-mix(in srgb, #1a2733 55%, transparent), transparent 55%),
+    color-mix(in srgb, var(--panel) 88%, #0b1218);
+}
+
+.digest-region-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.digest-region-head strong {
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.digest-region-pop {
+  font-size: 0.62rem;
   color: var(--muted);
 }
 
-.digest-obs-cell {
-  min-width: 0;
-  padding: 0.08rem 0.1rem;
-  font-variant-numeric: tabular-nums;
-  font-size: 0.68rem;
-  text-align: center;
+.digest-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.22rem;
 }
 
-.digest-obs-head .digest-obs-cell {
-  font-weight: 700;
-  font-size: 0.66rem;
-  text-align: center;
+.digest-flow-chip {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 0.18rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.62rem;
+  font-weight: 650;
+  line-height: 1.2;
+}
+
+.digest-flow-chip.signal {
+  color: #d9ecff;
+  background: color-mix(in srgb, #2f5f86 55%, transparent);
+}
+
+.digest-flow-chip.trajectory {
+  color: #fff4d6;
+  background: color-mix(in srgb, #8a6a28 50%, transparent);
+}
+
+.digest-flow-chip.trajectory[data-traj='war'] {
+  color: #ffe0db;
+  background: color-mix(in srgb, #a3453a 55%, transparent);
+}
+
+.digest-flow-chip.trajectory[data-traj='industry'] {
+  color: #dff8e8;
+  background: color-mix(in srgb, #2f7a4e 55%, transparent);
+}
+
+.digest-flow-chip.trajectory[data-traj='reform'] {
+  color: #e7e0ff;
+  background: color-mix(in srgb, #5a4ea0 55%, transparent);
+}
+
+.digest-flow-chip.archetype {
+  color: #ffe9c8;
+  background: color-mix(in srgb, #9a6230 55%, transparent);
+}
+
+.digest-flow-arrow {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.digest-meters {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.22rem;
+}
+
+.digest-meters li {
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 1fr) 2rem;
+  gap: 0.28rem;
+  align-items: center;
+  font-size: 0.6rem;
+  color: var(--muted);
+}
+
+.digest-meters em {
+  font-style: normal;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.digest-meter-track {
+  height: 0.38rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, #0d141c 70%, var(--line));
+  overflow: hidden;
+}
+
+.digest-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #6ea8d8;
+}
+
+.digest-meter-fill.hot {
+  background: linear-gradient(90deg, #d15a4a, #ff8b6e);
+}
+
+.digest-meter-fill.warm {
+  background: linear-gradient(90deg, #c49a3c, #efc15a);
+}
+
+.digest-meter-fill.cool,
+.digest-meter-fill.dim {
+  background: linear-gradient(90deg, #3d5f78, #7aa7c7);
+}
+
+.digest-meter-fill.good {
+  background: linear-gradient(90deg, #2f8f5b, #6dcaa0);
+}
+
+.digest-region-summary {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--text) 88%, #b7d7ff);
+}
+
+.digest-region-polity {
+  margin: 0;
+  font-size: 0.58rem;
+  color: var(--muted);
 }
 
 .events-close {
@@ -2132,17 +2495,42 @@ h2 {
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
 }
 
+.event-bubble.event-llm {
+  border-color: color-mix(in srgb, #6db6ff 55%, var(--line));
+  background: color-mix(in srgb, #163048 35%, var(--panel));
+}
+
 .event-bubble-meta {
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
   font-size: 0.75rem;
+}
+
+.event-llm-badge {
+  margin-left: auto;
+  padding: 0.05rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  color: #cfe7ff;
+  background: color-mix(in srgb, #2a6cad 70%, transparent);
 }
 
 .event-bubble .event-text {
   margin: 0.25rem 0 0;
   font-size: 0.78rem;
   line-height: 1.4;
+}
+
+.event-bubble .event-reason {
+  margin: 0.2rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--text) 72%, #9ec9ff);
+  font-style: italic;
 }
 
 label {

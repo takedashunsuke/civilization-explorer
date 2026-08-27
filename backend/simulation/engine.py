@@ -5,6 +5,8 @@ import random
 from collections import defaultdict
 
 from simulation.continents import CONTINENT_PRESETS, SUBREGION_CENTERS, resolve_preset, resolve_subregion
+from simulation.llm import observe_and_steer_regions
+from config import get_settings
 from simulation.shocks import apply_epidemics, apply_historic_quakes, apply_weather_shocks
 from simulation.models import (
     ActionType,
@@ -20,6 +22,8 @@ from simulation.models import (
     LandformType,
     MetricsSnapshot,
     RegionMetricsSnapshot,
+    RegionPolicy,
+    RegionReading,
     Personality,
     Position,
     RegionParams,
@@ -39,8 +43,8 @@ from simulation.terrain import biome_at, generate_terrain, random_land_position,
 
 SETTLEMENT_DISTANCE = 22.0
 SETTLEMENT_MIN_SIZE = 2
-POPULATION_MIN = 100
-POPULATION_MAX = 1000
+POPULATION_MIN = 1000
+POPULATION_MAX = 10000
 ENERGY_WAIT_THRESHOLD = 0.15
 CROSS_CONTINENT_CHANCE = 0.015
 COHORT_MIGRATE_CHANCE = 0.20
@@ -209,7 +213,15 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
     agents: list[AgentState] = []
     idx = 0
     for spec, region in zip(region_params, regions):
-        home = random_land_position(region.terrain, rng, region.landform, region.climate)
+        # Several camps across the region so individuals read as a scattered band,
+        # not one tight blob. Nearby camps still merge via SETTLEMENT_DISTANCE.
+        n_camps = max(4, min(20, spec.population // 60))
+        homes = [
+            random_land_position(region.terrain, rng, region.landform, region.climate)
+            for _ in range(n_camps)
+        ]
+        per_camp = max(1, spec.population // n_camps)
+        local_jitter = min(7.0, 2.8 + per_camp * 0.012)
         for _ in range(spec.population):
             idx += 1
             coop = clamp(spec.initial_values.cooperation + rng.uniform(-0.2, 0.2))
@@ -222,11 +234,14 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
             wealth = rng.uniform(max(2.0, 14.0 - spread / 2), 14.0 + spread / 2)
             if "genius" in traits:
                 wealth += 4
-            jitter = min(8.0, 3.2 + spec.population * 0.004)
+            home = homes[rng.randrange(len(homes))]
+            # Mild radial bias so camps look organic rather than a hard square.
+            angle = rng.uniform(0, 2 * math.pi)
+            radius = local_jitter * (rng.random() ** 0.55)
             pos = snap_to_land(
                 region.terrain,
-                home.x + rng.uniform(-jitter, jitter),
-                home.y + rng.uniform(-jitter, jitter),
+                home.x + math.cos(angle) * radius,
+                home.y + math.sin(angle) * radius,
             )
             agents.append(
                 AgentState(
@@ -311,6 +326,43 @@ def nearest_other(sim: SimulationState, agent: AgentState) -> AgentState | None:
     return min(others, key=lambda o: distance(agent.position, o.position))
 
 
+def nearby_with_trust(
+    sim: SimulationState, agent: AgentState, limit: int = 5
+) -> list[tuple[AgentState, float, float]]:
+    others = [
+        a
+        for a in sim.agents
+        if a.alive and a.id != agent.id and _region_key(a) == _region_key(agent)
+    ]
+    ranked: list[tuple[AgentState, float, float]] = []
+    for other in others:
+        dist = distance(agent.position, other.position)
+        trust = get_relationship(sim, agent.id, other.id).trust
+        ranked.append((other, trust, dist))
+    ranked.sort(key=lambda row: row[2])
+    return ranked[:limit]
+
+
+def _attach_migrate_coords(agent: AgentState, choice: ChosenAction, rng: random.Random) -> ChosenAction:
+    if choice.action != ActionType.migrate:
+        return choice
+    if choice.reason.startswith("migrate:") or choice.reason.startswith("migrate_cross:"):
+        return choice
+    dx, dy = rng.uniform(-12, 12), rng.uniform(-12, 12)
+    choice.reason = f"migrate:{agent.position.x + dx:.1f},{agent.position.y + dy:.1f}"
+    return choice
+
+
+def _choice_extra(choice: ChosenAction) -> dict[str, str]:
+    extra: dict[str, str] = {}
+    if choice.source == "llm":
+        extra["decide"] = "llm"
+        text = (choice.rationale or choice.reason or "").strip()
+        if text and not text.startswith("migrate"):
+            extra["reason"] = text[:180]
+    return extra
+
+
 def heuristic_decide(sim: SimulationState, agent: AgentState, rng: random.Random) -> ChosenAction:
     if agent.energy < ENERGY_WAIT_THRESHOLD:
         return ChosenAction(agent_id=agent.id, action=ActionType.wait, reason="low energy")
@@ -372,20 +424,28 @@ def heuristic_decide(sim: SimulationState, agent: AgentState, rng: random.Random
 def _cohere_region_migration(
     sim: SimulationState, choices: list[ChosenAction], rng: random.Random
 ) -> list[ChosenAction]:
-    """集落（なければ亜地域）ごとに同じ変位で移す。大陸をまたぐ移動は例外。"""
+    """集落（なければ亜地域）ごとに同じ変位で移す。大陸をまたぐ移動は例外。
+
+    既に行動が付いたエージェントだけを対象にする（集団サンプル方針でも全人口へ拡散しない）。
+    LLM / 集団方針が選んだ行動は上書きしない。
+    """
     by_id = {c.agent_id: c for c in choices}
+    llm_locked = {c.agent_id for c in choices if c.source == "llm"}
     by_cohort: dict[str, list[AgentState]] = defaultdict(list)
-    for agent in sim.agents:
-        if agent.alive:
+    agents_by_id = {a.id: a for a in sim.agents if a.alive}
+    for agent_id in by_id:
+        agent = agents_by_id.get(agent_id)
+        if agent is not None:
             by_cohort[_cohort_key(agent)].append(agent)
     other_regions = sim.world.regions
     for members in by_cohort.values():
         if not members:
             continue
-        migrating = any(
-            by_id.get(m.id) is not None and by_id[m.id].action == ActionType.migrate for m in members
-        )
-        mean_e = sum(m.energy for m in members) / len(members)
+        cohort_members = [m for m in members if m.id not in llm_locked]
+        if not cohort_members:
+            continue
+        migrating = any(by_id[m.id].action == ActionType.migrate for m in cohort_members)
+        mean_e = sum(m.energy for m in cohort_members) / len(cohort_members)
         if not migrating and mean_e > 0.42 and rng.random() < COHORT_MIGRATE_CHANCE:
             migrating = True
         if not migrating:
@@ -395,14 +455,14 @@ def _cohere_region_migration(
             candidates = [
                 r
                 for r in other_regions
-                if r.id.value != members[0].region_id
+                if r.id.value != cohort_members[0].region_id
             ]
             if candidates:
                 dest = rng.choice(candidates)
         if dest is not None:
             landing = random_land_position(dest.terrain, rng, dest.landform, dest.climate)
             sid = dest.subregion_id or dest.id.value
-            for member in members:
+            for member in cohort_members:
                 jx, jy = rng.uniform(-4, 4), rng.uniform(-4, 4)
                 by_id[member.id] = ChosenAction(
                     agent_id=member.id,
@@ -414,7 +474,7 @@ def _cohere_region_migration(
                 )
             continue
         dx, dy = rng.uniform(-7, 7), rng.uniform(-7, 7)
-        for member in members:
+        for member in cohort_members:
             by_id[member.id] = ChosenAction(
                 agent_id=member.id,
                 action=ActionType.migrate,
@@ -423,10 +483,102 @@ def _cohere_region_migration(
     return [by_id[a.id] for a in sim.agents if a.alive and a.id in by_id]
 
 
+def _pick_group_actors(
+    sim: SimulationState,
+    members: list[AgentState],
+    sample_size: int,
+    rng: random.Random,
+) -> list[AgentState]:
+    if not members or sample_size <= 0:
+        return []
+    leaders = {
+        s.leader_id
+        for s in sim.settlements
+        if s.leader_id and any(m.id == s.leader_id for m in members)
+    }
+    scored: list[tuple[int, str, AgentState]] = []
+    for agent in members:
+        score = 0
+        if agent.id in leaders:
+            score += 100
+        if "charisma" in agent.traits:
+            score += 40
+        if "genius" in agent.traits:
+            score += 30
+        scored.append((score, agent.id, agent))
+    scored.sort(key=lambda row: (-row[0], row[1]))
+    picked: list[AgentState] = []
+    seen: set[str] = set()
+    for _, _, agent in scored:
+        if agent.id in seen:
+            continue
+        seen.add(agent.id)
+        picked.append(agent)
+        if len(picked) >= sample_size:
+            return picked
+    return picked
+
+
+def _policy_target(sim: SimulationState, agent: AgentState, action: ActionType, rng: random.Random) -> str | None:
+    if action not in {ActionType.cooperate, ActionType.conflict}:
+        return None
+    # Prefer another region's leader, else nearest local peer.
+    other_leaders = [
+        a
+        for a in sim.agents
+        if a.alive and a.region_id != agent.region_id and any(s.leader_id == a.id for s in sim.settlements)
+    ]
+    if other_leaders and (action == ActionType.conflict or rng.random() < 0.55):
+        return rng.choice(other_leaders).id
+    peer = nearest_other(sim, agent)
+    return peer.id if peer else None
+
+
 def decide_actions(sim: SimulationState, rng: random.Random) -> list[ChosenAction]:
-    # Phase 2 で LLM に差し替え。現状は常にヒューリスティック。
-    choices = [heuristic_decide(sim, agent, rng) for agent in sim.agents if agent.alive]
-    return _cohere_region_migration(sim, choices, rng)
+    """Enact region/institution stances on a small sample — not per-person LLM."""
+    settings = get_settings()
+    sample_n = max(4, int(settings.llm_group_sample_per_region))
+    policies = {p.region_id: p for p in sim.region_policies}
+    choices: list[ChosenAction] = []
+
+    if sim.world.regions:
+        region_iter = list(sim.world.regions)
+    else:
+        region_iter = []
+
+    for region in region_iter:
+        rid = region.id.value
+        policy = policies.get(rid)
+        if policy is None:
+            policy = RegionPolicy(region_id=rid, subregion_id=region.subregion_id, action=ActionType.wait)
+        members = [a for a in sim.agents if a.alive and a.region_id == rid]
+        actors = _pick_group_actors(sim, members, sample_n, rng)
+        enact_n = max(1, int(round(len(actors) * clamp(policy.intensity, 0.15, 1.0)))) if actors else 0
+        for idx, agent in enumerate(actors):
+            if idx >= enact_n or policy.action == ActionType.wait:
+                choices.append(
+                    ChosenAction(
+                        agent_id=agent.id,
+                        action=ActionType.wait,
+                        reason="group hold",
+                        source=policy.source,
+                        rationale=policy.reason,
+                    )
+                )
+                continue
+            target_id = _policy_target(sim, agent, policy.action, rng)
+            choice = ChosenAction(
+                agent_id=agent.id,
+                action=policy.action,
+                target_id=target_id,
+                reason=policy.reason or f"group:{policy.action.value}",
+                source=policy.source,
+                rationale=policy.reason,
+            )
+            choices.append(_attach_migrate_coords(agent, choice, rng))
+
+    # Group stance already picked who moves; do not expand/override via cohort heuristics.
+    return choices
 
 
 def resolve_actions(
@@ -483,6 +635,7 @@ def resolve_actions(
                     detail_key=detail_key,
                     detail=reason,
                     deltas={"energy": actor.energy - before},
+                    extra=_choice_extra(choice),
                 )
             )
             continue
@@ -498,6 +651,7 @@ def resolve_actions(
                         action=ActionType.wait,
                         detail_key="cooperate_missing_target",
                         detail="cooperate fallback: missing target",
+                        extra=_choice_extra(choice),
                     )
                 )
                 continue
@@ -545,6 +699,7 @@ def resolve_actions(
                     success=success,
                     detail_key=detail_key,
                     detail=detail,
+                    extra=_choice_extra(choice),
                 )
             )
             _remember(actor, detail)
@@ -561,6 +716,7 @@ def resolve_actions(
                         action=ActionType.wait,
                         detail_key="conflict_missing_target",
                         detail="conflict fallback: missing target",
+                        extra=_choice_extra(choice),
                     )
                 )
                 continue
@@ -592,6 +748,7 @@ def resolve_actions(
                     detail_key=detail_key,
                     detail=detail,
                     deltas={"stolen": stolen},
+                    extra=_choice_extra(choice),
                 )
             )
             _remember(actor, detail)
@@ -644,6 +801,7 @@ def resolve_actions(
                     detail_key="migrate",
                     detail=detail,
                     deltas={"x": actor.position.x, "y": actor.position.y},
+                    extra=_choice_extra(choice),
                 )
             )
             _remember(actor, detail)
@@ -669,6 +827,7 @@ def resolve_actions(
                     detail_key="obey",
                     detail=detail,
                     deltas={"tax": pay},
+                    extra=_choice_extra(choice),
                 )
             )
             _remember(actor, detail)
@@ -697,6 +856,7 @@ def resolve_actions(
                     action=ActionType.resist,
                     detail_key="resist",
                     detail=detail,
+                    extra=_choice_extra(choice),
                 )
             )
             _remember(actor, detail)
@@ -778,8 +938,8 @@ def _spawn_child(sim: SimulationState, parent: AgentState, rng: random.Random) -
         name=child_id,
         position=snap_to_land(
             region_terrain(sim, parent),
-            parent.position.x + rng.uniform(-4, 4),
-            parent.position.y + rng.uniform(-4, 4),
+            parent.position.x + rng.uniform(-6, 6),
+            parent.position.y + rng.uniform(-6, 6),
         ),
         wealth=wealth,
         energy=clamp(0.65 + rng.uniform(-0.1, 0.1)),
@@ -1126,6 +1286,146 @@ def compute_metrics(
         mean_happiness=mean_happiness,
         regions=region_rows,
     )
+
+
+def apply_region_readings_to_metrics(
+    metrics: MetricsSnapshot,
+    readings: list[RegionReading],
+    world_summary: str,
+) -> MetricsSnapshot:
+    """Replace display metrics with semantic observer scores (LLM when wired)."""
+    by_id = {r.region_id: r for r in readings}
+    source = "llm" if any(r.source == "llm" for r in readings) else "heuristic"
+    updated_regions: list[RegionMetricsSnapshot] = []
+    for row in metrics.regions:
+        reading = by_id.get(row.region_id)
+        if reading is None:
+            updated_regions.append(row)
+            continue
+        updated_regions.append(
+            RegionMetricsSnapshot(
+                region_id=row.region_id,
+                subregion_id=row.subregion_id or reading.subregion_id,
+                # Map semantic observer axes onto the existing metric slots.
+                inequality=round(reading.discontent, 4),
+                mean_trust=round(reading.cohesion, 4),
+                cooperation_rate=round(reading.prosperity, 4),
+                authority=round(clamp(1.0 - reading.tension * 0.7), 4),
+                mean_happiness=round(clamp(1.0 - reading.discontent), 4),
+                tension=reading.tension,
+                prosperity=reading.prosperity,
+                discontent=reading.discontent,
+                cohesion=reading.cohesion,
+                rising_archetype=reading.rising_archetype,
+                trajectory=reading.trajectory,
+                summary=reading.summary,
+                reading_source=reading.source,
+            )
+        )
+    if updated_regions:
+        inequality = round(sum(r.inequality for r in updated_regions) / len(updated_regions), 4)
+        mean_trust = round(sum(r.mean_trust for r in updated_regions) / len(updated_regions), 4)
+        coop_rate = round(sum(r.cooperation_rate for r in updated_regions) / len(updated_regions), 4)
+        authority = round(sum(r.authority for r in updated_regions) / len(updated_regions), 4)
+        mean_happiness = round(
+            sum(r.mean_happiness for r in updated_regions) / len(updated_regions), 4
+        )
+    else:
+        inequality = metrics.inequality
+        mean_trust = metrics.mean_trust
+        coop_rate = metrics.cooperation_rate
+        authority = metrics.authority
+        mean_happiness = metrics.mean_happiness
+    return MetricsSnapshot(
+        inequality=inequality,
+        mean_trust=mean_trust,
+        cooperation_rate=coop_rate,
+        authority=authority,
+        mean_happiness=mean_happiness,
+        regions=updated_regions or metrics.regions,
+        world_summary=world_summary,
+        reading_source=source,
+    )
+
+
+def emit_region_observation_events(
+    sim: SimulationState, readings: list[RegionReading], world_summary: str
+) -> list[EventRecord]:
+    turn = sim.world.turn
+    events: list[EventRecord] = []
+    if world_summary:
+        events.append(
+            EventRecord(
+                turn=turn,
+                actor_id="world",
+                action=ActionType.observe,
+                detail_key="world_reading",
+                detail=world_summary,
+                extra={"decide": "llm" if any(r.source == "llm" for r in readings) else "heuristic", "reason": world_summary},
+            )
+        )
+    for reading in readings:
+        traj_key = f"trajectory_{reading.trajectory}"
+        events.append(
+            EventRecord(
+                turn=turn,
+                actor_id=reading.subregion_id or reading.region_id,
+                action=ActionType.observe,
+                detail_key=traj_key,
+                detail=reading.summary,
+                deltas={
+                    "tension": reading.tension,
+                    "prosperity": reading.prosperity,
+                    "discontent": reading.discontent,
+                    "cohesion": reading.cohesion,
+                },
+                extra={
+                    "decide": reading.source,
+                    "reason": reading.summary,
+                    "archetype": reading.rising_archetype,
+                    "trajectory": reading.trajectory,
+                    "region": reading.region_id,
+                },
+            )
+        )
+    return events
+
+
+def emit_region_policy_events(sim: SimulationState, policies: list[RegionPolicy]) -> list[EventRecord]:
+    """Institution / polity stance for the *next* turn (visible in the event feed)."""
+    turn = sim.world.turn
+    events: list[EventRecord] = []
+    for policy in policies:
+        events.append(
+            EventRecord(
+                turn=turn,
+                actor_id=policy.subregion_id or policy.region_id,
+                action=ActionType.observe,
+                detail_key=f"region_stance_{policy.action.value}",
+                detail=policy.reason or f"group stance → {policy.action.value}",
+                deltas={"intensity": policy.intensity},
+                extra={
+                    "decide": policy.source,
+                    "reason": policy.reason,
+                    "region": policy.region_id,
+                    "group_action": policy.action.value,
+                    "intensity": f"{policy.intensity:.2f}",
+                    "mode": "group",
+                },
+            )
+        )
+    return events
+
+
+def ensure_region_policies(sim: SimulationState) -> None:
+    """First tick: seed stance with heuristics only (LLM runs once at end_of_turn)."""
+    if sim.region_policies:
+        return
+    from simulation.llm import build_region_factsheet, heuristic_region_policy, heuristic_region_readings
+
+    facts = build_region_factsheet(sim, None)
+    readings = heuristic_region_readings(sim, facts)
+    sim.region_policies = [heuristic_region_policy(f, r) for f, r in zip(facts, readings)]
 
 
 def _set_id(agent: AgentState | None) -> str:
@@ -1482,6 +1782,11 @@ def end_of_turn(
     current_leaders = {s.leader_id for s in sim.settlements if s.leader_id}
     _emit_leadership_changes(sim, previous_leaders, current_leaders)
     specials = sim.events[marker:]
+    llm_decisions = [
+        event
+        for event in (micro_events or [])
+        if event.extra.get("decide") == "llm" and event.action != ActionType.wait
+    ]
     grouped = summarize_group_events(sim, micro_events or [], specials, snapshot)
     historic = apply_historic_quakes(sim)
     epidemics = apply_epidemics(sim, rng)
@@ -1489,7 +1794,6 @@ def end_of_turn(
     skip_quake = {e.actor_id for e in historic}
     disasters = apply_disasters(sim, rng, skip_quake)
     regimes = apply_regime_drift(sim, rng)
-    sim.events = sim.events[:marker] + grouped + historic + epidemics + weather + disasters + regimes
     if sim.world.regions:
         for region in sim.world.regions:
             regen = 2.0 + 3.0 * region.education_level
@@ -1523,7 +1827,29 @@ def end_of_turn(
         sim.world.institution_runtime.authority = clamp(sim.world.institution_runtime.authority)
     apply_welfare(sim)
     metrics = compute_metrics(sim, cooperate_successes, action_count, micro_events or [])
+    observe_input = (micro_events or []) + historic + epidemics + weather + disasters + regimes + specials
+    # One LLM pass per region: semantic reading + next-turn group/institution stance.
+    readings, policies, world_summary = observe_and_steer_regions(sim, observe_input)
+    metrics = apply_region_readings_to_metrics(metrics, readings, world_summary)
+    sim.region_readings = readings
+    sim.region_policies = policies
+    sim.world_summary = world_summary
     sim.last_metrics = metrics
+    observe_events = emit_region_observation_events(sim, readings, world_summary)
+    policy_events = emit_region_policy_events(sim, policies)
+    # Keep group LLM enactments + semantic region readings / next stance visible.
+    sim.events = (
+        sim.events[:marker]
+        + llm_decisions
+        + observe_events
+        + policy_events
+        + grouped
+        + historic
+        + epidemics
+        + weather
+        + disasters
+        + regimes
+    )
     turn = sim.world.turn
     alive = sum(1 for a in sim.agents if a.alive)
     turn_events = [e for e in sim.events if e.turn == turn]
@@ -1537,10 +1863,12 @@ def end_of_turn(
             summary=(
                 f"turn={turn} pop={alive} "
                 f"clash={conflicts} coop={coops} birth={births} death={deaths}"
+                + (f" | {world_summary}" if world_summary else "")
             ),
             metrics=metrics,
         )
     )
+    sim.status = "running"
     sim.world.turn += 1
 
 
@@ -1557,6 +1885,7 @@ def tick(sim: SimulationState, n: int = 1) -> SimulationState:
         return sim
     rng = random.Random(sim.world.seed + sim.world.turn * 1009)
     for _ in range(steps):
+        ensure_region_policies(sim)
         choices = decide_actions(sim, rng)
         coop_ok, action_count, micro_events = resolve_actions(sim, choices, rng)
         end_of_turn(sim, coop_ok, action_count, rng, micro_events)

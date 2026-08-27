@@ -46,7 +46,7 @@ class ReligionType(str, Enum):
 
 
 YEARS_PER_TURN = 10
-MAX_CALENDAR_YEAR = 3000
+MAX_CALENDAR_YEAR = 2500
 
 
 def resolve_theater_and_landform(
@@ -85,6 +85,7 @@ class ActionType(str, Enum):
     trait = "trait"
     disaster = "disaster"
     regime = "regime"
+    observe = "observe"
 
 
 class Position(BaseModel):
@@ -108,7 +109,7 @@ class InitialValues(BaseModel):
 class RegionParams(BaseModel):
     id: GeographyType
     subregion_id: str | None = None
-    population: int = Field(default=100, ge=100, le=1000)
+    population: int = Field(default=1000, ge=1000, le=10000)
     institution: InstitutionType = InstitutionType.democracy
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     education_level: float = Field(default=0.5, ge=0, le=1)
@@ -121,13 +122,13 @@ class RegionParams(BaseModel):
 
 class WorldParams(BaseModel):
     seed: int = 42
-    population: int = Field(default=100, ge=100, le=1000)
+    population: int = Field(default=1000, ge=1000, le=10000)
     resource_pool: float = 100.0
     education_level: float = Field(default=0.5, ge=0, le=1)
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     institution: InstitutionType = InstitutionType.democracy
     # Astronomical year: AD 1 = 1, BC 1 = 0, BC 44 = -43
-    start_year: int = Field(default=700, ge=-50000, le=3000)
+    start_year: int = Field(default=1000, ge=-50000, le=2500)
     geography: GeographyType = GeographyType.world
     landform: LandformType = LandformType.continent
     climate: ClimateType = ClimateType.temperate
@@ -209,7 +210,7 @@ class WorldState(BaseModel):
     education_level: float
     tax_rate: float
     institution: InstitutionType
-    start_year: int = 700
+    start_year: int = 1000
     geography: GeographyType = GeographyType.world
     landform: LandformType = LandformType.continent
     climate: ClimateType = ClimateType.temperate
@@ -245,6 +246,15 @@ class RegionMetricsSnapshot(BaseModel):
     cooperation_rate: float
     authority: float
     mean_happiness: float
+    # Semantic overlay (LLM when wired; heuristic fallback otherwise)
+    tension: float = 0.0
+    prosperity: float = 0.0
+    discontent: float = 0.0
+    cohesion: float = 0.0
+    rising_archetype: str = "none"
+    trajectory: str = "stagnation"
+    summary: str = ""
+    reading_source: str = "heuristic"
 
 
 class MetricsSnapshot(BaseModel):
@@ -254,6 +264,32 @@ class MetricsSnapshot(BaseModel):
     authority: float
     mean_happiness: float
     regions: list[RegionMetricsSnapshot] = Field(default_factory=list)
+    world_summary: str = ""
+    reading_source: str = "heuristic"
+
+
+class RegionReading(BaseModel):
+    region_id: str
+    subregion_id: str | None = None
+    tension: float = Field(default=0.0, ge=0, le=1)
+    prosperity: float = Field(default=0.0, ge=0, le=1)
+    discontent: float = Field(default=0.0, ge=0, le=1)
+    cohesion: float = Field(default=0.0, ge=0, le=1)
+    rising_archetype: str = "none"
+    trajectory: str = "stagnation"
+    summary: str = ""
+    source: Literal["llm", "heuristic"] = "heuristic"
+
+
+class RegionPolicy(BaseModel):
+    """Institution / polity stance for the turn (not per-person decisions)."""
+
+    region_id: str
+    subregion_id: str | None = None
+    action: ActionType = ActionType.wait
+    intensity: float = Field(default=0.3, ge=0, le=1)
+    reason: str = ""
+    source: Literal["llm", "heuristic"] = "heuristic"
 
 
 class HistoryRecord(BaseModel):
@@ -267,6 +303,8 @@ class ChosenAction(BaseModel):
     action: ActionType
     target_id: str | None = None
     reason: str = ""
+    source: Literal["llm", "heuristic"] = "heuristic"
+    rationale: str = ""
 
 
 class SimulationState(BaseModel):
@@ -279,6 +317,9 @@ class SimulationState(BaseModel):
     events: list[EventRecord] = Field(default_factory=list)
     history: list[HistoryRecord] = Field(default_factory=list)
     last_metrics: MetricsSnapshot | None = None
+    region_readings: list[RegionReading] = Field(default_factory=list)
+    region_policies: list[RegionPolicy] = Field(default_factory=list)
+    world_summary: str = ""
 
 
 WorldParams = WorldParams

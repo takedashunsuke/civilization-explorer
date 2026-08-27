@@ -2,8 +2,8 @@
   "brand": "Civilization Explorer",
   "consoleTitle": "Observation Console",
   "llmStatus": {
-    "decisionHeuristic": "Decisions: heuristic",
-    "decisionLlm": "Decisions: LLM",
+    "decisionHeuristic": "Group stance: heuristic",
+    "decisionLlm": "Group stance: LLM",
     "provider": "Config {provider}",
     "providerOllama": "Config Ollama ({model})",
     "providerOpenai": "Config OpenAI ({model})",
@@ -24,7 +24,7 @@
   "turnLabel": "Turn {turn}",
   "initialConditions": "Initial conditions",
   "calendarYear": "Start year",
-  "calendarYearHint": "Set a Gregorian year as BC or AD. Each turn advances ten years. Simulation stops at AD 3000.",
+  "calendarYearHint": "Set a Gregorian year as BC or AD. Each turn advances ten years. Simulation stops at AD 2500.",
   "calendarEra": {
     "bc": "BC",
     "ad": "AD"
@@ -45,7 +45,7 @@
     "notables": "Notable"
   },
   "population": "Population",
-  "populationHint": "Initial actors (100–1000). Births happen per subregion, up to 1000 per column.",
+  "populationHint": "Initial actors (1000–10000). Births happen per subregion, up to 10000 per column.",
   "seed": "Seed",
   "seedHint": "RNG seed. Same value reproduces terrain, positions, traits, and ties.",
   "taxRate": "Tax rate",
@@ -158,7 +158,7 @@
     "notableHint": "How easily charisma or genius appears. Higher values bias the run toward outliers.",
     "trade": "Openness (trade)",
     "columnPop": "Starting people",
-    "columnPopHint": "How many people this continent column starts with (100–1000). That is the group's starting size on the map.",
+    "columnPopHint": "How many people this continent column starts with (1000–10000). That is the group's starting size on the map.",
     "columnPopCount": "{n} people",
     "welfareHint": "How strongly this column shares wealth when it is uneven. Closer to none, inequality stays.",
     "welfare": {
@@ -424,10 +424,14 @@
   "actions": {
     "create": "Create",
     "preparing": "Preparing",
+    "ticking": "Computing turn…",
     "tick": "+10 years",
     "tick5": "+50 years",
     "autoPlay": "Play",
     "autoStop": "Stop"
+  },
+  "errors": {
+    "simLost": "Simulation not found. After a server reload, create a new simulation."
   },
   "digest": {
     "title": "Situation",
@@ -445,15 +449,54 @@
     "cumulativeTitle": "Since start",
     "cumulativeSummary": "Clashes {conflicts}, coops {cooperations}, births {births}, deaths {deaths}, disasters {disasters}, regime shifts {regimeShifts}",
     "obsTitle": "Regional observations",
+    "obsLlm": "LLM",
+    "obsHeuristic": "Heuristic",
     "colPopulation": "Pop.",
     "colPolities": "Band/City/Nation",
+    "colTension": "Tension",
+    "colProsperity": "Prosperity",
+    "colDiscontent": "Discontent",
+    "colCohesion": "Cohesion",
+    "colArchetype": "Rising figure",
+    "colTrajectory": "Trajectory",
+    "colSummary": "Cause→effect",
     "colConflicts": "Clashes",
     "colCoops": "Coops",
     "colBirths": "Births",
     "colDeaths": "Deaths",
     "polityCounts": "{bands}/{cities}/{nations}",
     "chipDisasters": "Disasters",
-    "chipRegime": "Regime"
+    "chipRegime": "Regime",
+    "meterPop": "Pop. {n}",
+    "causalTitle": "Regional flow",
+    "causalEmpty": "No readable causal chain yet",
+    "signal": {
+      "highTension": "High tension",
+      "lowTension": "Low tension",
+      "highProsperity": "Resource slack",
+      "lowProsperity": "Scarce resources",
+      "highDiscontent": "Rising discontent",
+      "lowDiscontent": "Contained discontent",
+      "highCohesion": "Strong cohesion",
+      "lowCohesion": "Weak cohesion"
+    },
+    "archetypes": {
+      "reformer": "Reformer",
+      "warlord": "Warlord",
+      "merchant": "Merchant",
+      "priest": "Priest",
+      "bureaucrat": "Bureaucrat",
+      "explorer": "Explorer",
+      "none": "—"
+    },
+    "trajectories": {
+      "war": "Toward war",
+      "industry": "Toward industry",
+      "reform": "Toward reform",
+      "stagnation": "Stagnation",
+      "exodus": "Exodus",
+      "faith": "Toward faith"
+    }
   },
   "layout": {
     "showConditions": "Conditions",
@@ -510,7 +553,9 @@
     "action": "Move",
     "detail": "Detail",
     "world": "World",
-    "lone": "Unaffiliated"
+    "lone": "Unaffiliated",
+    "decideLlm": "LLM",
+    "reason": "Reason: {text}"
   },
   "actionTypes": {
     "wait": "Quiet",
@@ -524,7 +569,8 @@
     "lead": "Succession",
     "trait": "Notable",
     "disaster": "Disaster",
-    "regime": "Regime"
+    "regime": "Regime",
+    "observe": "Reading"
   },
   "eventDetails": {
     "wait": "Rested to recover energy.",
@@ -576,7 +622,14 @@
     "weather_storm": "Abnormal storms struck coasts and islands in {group}.",
     "weather_heat": "An abnormal heat wave hit {group}.",
     "historic_quake": "In {year}, a recorded great earthquake near {group} ({name}, M{mag}). From Wikipedia.",
-    "regime_shift": "{group} shifted from {from} to {to}."
+    "regime_shift": "{group} shifted from {from} to {to}.",
+    "world_reading": "World reading",
+    "region_stance_wait": "{group}'s institutions hold a wait-and-see stance.",
+    "region_stance_cooperate": "{group}'s institutions push cooperation.",
+    "region_stance_conflict": "{group}'s institutions push conflict/pressure.",
+    "region_stance_migrate": "{group}'s institutions push movement/exodus.",
+    "region_stance_obey": "{group}'s institutions push obedience and stability.",
+    "region_stance_resist": "{group}'s institutions push resistance."
   },
   "yearLabel": {
     "bc": "BC {year}",

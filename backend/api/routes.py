@@ -29,7 +29,7 @@ _STORE: dict[str, SimulationState] = {}
 class RegionCreateBody(BaseModel):
     id: str
     subregion: str | None = None
-    population: int = Field(default=100, ge=100, le=1000)
+    population: int = Field(default=1000, ge=1000, le=10000)
     institution: str = "democracy"
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     education_level: float = Field(default=0.5, ge=0, le=1)
@@ -42,12 +42,12 @@ class RegionCreateBody(BaseModel):
 
 class CreateSimulationRequest(BaseModel):
     seed: int | None = None
-    population: int = Field(default=100, ge=100, le=1000)
+    population: int = Field(default=1000, ge=1000, le=10000)
     resource_pool: float = 100.0
     education_level: float = Field(default=0.5, ge=0, le=1)
     tax_rate: float = Field(default=0.1, ge=0, le=1)
     institution: str = "democracy"
-    start_year: int = Field(default=700, ge=-50000, le=3000)
+    start_year: int = Field(default=1000, ge=-50000, le=2500)
     geography: str = "world"
     landform: str = "continent"
     climate: str = "temperate"

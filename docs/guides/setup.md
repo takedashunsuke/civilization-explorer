@@ -4,7 +4,7 @@
 
 * Node.js 22.19+（Nuxt 4 の engines 要件）
 * Python 3.12+（macOS では `python` ではなく `python3` のことが多い）
-* （任意）Ollama — LLM Phase 2 以降。現状の意思決定はヒューリスティック。手順は下記「Ollama」
+* （任意）Ollama — `LLM_PROVIDER=ollama` で意思決定に接続。失敗時はヒューリスティック。手順は下記「Ollama」
 * （任意）Docker / Supabase CLI — 永続化 Phase 4 以降。MVP の結果キャッシュはブラウザの localStorage（1日）で足りる
 ## Backend
 
@@ -91,11 +91,16 @@ API だけ確認する場合: `http://127.0.0.1:11434/api/tags`
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_MODEL=llama3.2:1b
+LLM_MAX_AGENTS_PER_TURN=4
+LLM_TIMEOUT_SEC=8
+LLM_CONCURRENCY=1
 ```
 
-`LLM_PROVIDER=stub` のままだとヒューリスティックのまま。切替後に Backend を再起動し、`http://127.0.0.1:8000/health` の `llm` を見る。
+`LLM_PROVIDER=stub` のままだとヒューリスティックのまま。切替後に Backend を再起動し、`http://127.0.0.1:8000/health` の `llm.wired` が `true` であることを確認する。
 
-意思決定の実呼び出しは Phase 2。Ollama が落ちていても Tick はスタブで進む想定。
+要約・理由の表示言語は `LLM_NARRATIVE_LANG=ja`（既定）または `en`。
+
+各ターン、リーダー／特異 traits を優先して最大 `LLM_MAX_AGENTS_PER_TURN` 人だけ LLM が行動を選ぶ。残りと失敗時はヒューリスティック。出来事パネルに LLM 理由が表示される。
 
 ### トラブル
 

@@ -2,8 +2,8 @@
   "brand": "Civilization Explorer",
   "consoleTitle": "観測コンソール",
   "llmStatus": {
-    "decisionHeuristic": "意思決定: ヒューリスティック",
-    "decisionLlm": "意思決定: LLM",
+    "decisionHeuristic": "集団方針: ヒューリスティック",
+    "decisionLlm": "集団方針: LLM",
     "provider": "設定 {provider}",
     "providerOllama": "設定 Ollama（{model}）",
     "providerOpenai": "設定 OpenAI（{model}）",
@@ -24,7 +24,7 @@
   "turnLabel": "ターン {turn}",
   "initialConditions": "初期条件",
   "calendarYear": "開始年",
-  "calendarYearHint": "西暦を BC / AD で指定。1ターン＝10年進みます。シミュレーションは西暦3000年までです。",
+  "calendarYearHint": "西暦を BC / AD で指定。1ターン＝10年進みます。シミュレーションは西暦2500年までです。",
   "calendarEra": {
     "bc": "BC（紀元前）",
     "ad": "AD（紀元後）"
@@ -45,7 +45,7 @@
     "notables": "特異"
   },
   "population": "人口",
-  "populationHint": "初期の主体数（100〜1000）。出生は亜地域ごとに起き、各列の上限は1000です。",
+  "populationHint": "初期の主体数（1000〜10000）。出生は亜地域ごとに起き、各列の上限は10000です。",
   "seed": "シード",
   "seedHint": "乱数の種。同じ値なら地形・初期配置・性格・関係が再現されます。",
   "taxRate": "税率",
@@ -133,7 +133,7 @@
     "central_america": "中央アメリカ",
     "caribbean": "カリブ",
     "south_america": "南アメリカ",
-    "australasia": "オーストララシア",
+    "australasia": "オーストラシア",
     "melanesia": "メラネシア",
     "micronesia": "ミクロネシア",
     "polynesia": "ポリネシア"
@@ -158,7 +158,7 @@
     "notableHint": "カリスマや天才など、他と違う人物が生まれやすいかです。高いほど偏りが出ます。",
     "trade": "対外開放（交易）",
     "columnPop": "初期の人数",
-    "columnPopHint": "この大陸の列に、シミュレーション開始時に置く人数です。100〜1000人の間で選べます。地図上の集団の出発サイズになります。",
+    "columnPopHint": "この大陸の列に、シミュレーション開始時に置く人数です。1000〜10000人の間で選べます。地図上の集団の出発サイズになります。",
     "columnPopCount": "{n}人",
     "welfareHint": "富が偏ったとき、列の中で分け合う強さです。なしに近いほど格差が残りやすいです。",
     "welfare": {
@@ -424,10 +424,14 @@
   "actions": {
     "create": "作成",
     "preparing": "準備中",
+    "ticking": "ターン計算中…",
     "tick": "+10年",
     "tick5": "+50年",
     "autoPlay": "再生",
     "autoStop": "停止"
+  },
+  "errors": {
+    "simLost": "シミュレーションが見つかりません。サーバー再起動後は「作成」からやり直してください。"
   },
   "digest": {
     "title": "状況",
@@ -445,15 +449,54 @@
     "cumulativeTitle": "開始からの累計",
     "cumulativeSummary": "争い{conflicts}・協力{cooperations}・出生{births}・死亡{deaths}・災害{disasters}・体制転換{regimeShifts}",
     "obsTitle": "地域別の観測",
+    "obsLlm": "LLM",
+    "obsHeuristic": "推定",
     "colPopulation": "人口",
     "colPolities": "集団/都市/国家",
+    "colTension": "緊張",
+    "colProsperity": "繁栄",
+    "colDiscontent": "不満",
+    "colCohesion": "結束",
+    "colArchetype": "台頭人物",
+    "colTrajectory": "軌道",
+    "colSummary": "因果",
     "colConflicts": "争い",
     "colCoops": "協力",
     "colBirths": "出生",
     "colDeaths": "死亡",
     "polityCounts": "{bands}/{cities}/{nations}",
     "chipDisasters": "災害",
-    "chipRegime": "体制"
+    "chipRegime": "体制",
+    "meterPop": "人口 {n}",
+    "causalTitle": "この地域の流れ",
+    "causalEmpty": "まだ読み取れる因果がない",
+    "signal": {
+      "highTension": "緊張が高い",
+      "lowTension": "緊張は低い",
+      "highProsperity": "豊かさが余る",
+      "lowProsperity": "資源が足りない",
+      "highDiscontent": "不満が溜まっている",
+      "lowDiscontent": "不満は抑えめ",
+      "highCohesion": "結束が強い",
+      "lowCohesion": "結束が弱い"
+    },
+    "archetypes": {
+      "reformer": "改革者",
+      "warlord": "軍事指導者",
+      "merchant": "商人",
+      "priest": "宗教家",
+      "bureaucrat": "官僚",
+      "explorer": "探検家",
+      "none": "—"
+    },
+    "trajectories": {
+      "war": "戦争へ",
+      "industry": "産業へ",
+      "reform": "改革へ",
+      "stagnation": "停滞",
+      "exodus": "流出",
+      "faith": "信仰へ"
+    }
   },
   "layout": {
     "showConditions": "初期条件",
@@ -510,7 +553,9 @@
     "action": "動き",
     "detail": "詳細",
     "world": "世界",
-    "lone": "未所属"
+    "lone": "未所属",
+    "decideLlm": "LLM",
+    "reason": "理由: {text}"
   },
   "actionTypes": {
     "wait": "静穏",
@@ -524,7 +569,8 @@
     "lead": "交代",
     "trait": "特異",
     "disaster": "災害",
-    "regime": "体制"
+    "regime": "体制",
+    "observe": "観測"
   },
   "eventDetails": {
     "wait": "力を回復するために休んだ。",
@@ -576,7 +622,14 @@
     "weather_storm": "{group} で異常な嵐が海岸と島を叩いた。",
     "weather_heat": "{group} で異常な熱波が出た。",
     "historic_quake": "{year}年、{group} 付近で史実の大地震（{name}、M{mag}）。Wikipedia の記録に基づく。",
-    "regime_shift": "{group} の体制が {from} から {to} へ移った。"
+    "regime_shift": "{group} の体制が {from} から {to} へ移った。",
+    "world_reading": "世界の読み取り",
+    "region_stance_wait": "{group} の制度は様子見の方針。",
+    "region_stance_cooperate": "{group} の制度は協力を推し進める方針。",
+    "region_stance_conflict": "{group} の制度は対立・圧力の方針。",
+    "region_stance_migrate": "{group} の制度は移動・拡散の方針。",
+    "region_stance_obey": "{group} の制度は服従と安定の方針。",
+    "region_stance_resist": "{group} の制度は抵抗の方針。"
   },
   "yearLabel": {
     "bc": "BC {year}",
