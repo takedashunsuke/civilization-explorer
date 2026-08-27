@@ -1524,13 +1524,19 @@ def end_of_turn(
     apply_welfare(sim)
     metrics = compute_metrics(sim, cooperate_successes, action_count, micro_events or [])
     sim.last_metrics = metrics
+    turn = sim.world.turn
+    alive = sum(1 for a in sim.agents if a.alive)
+    turn_events = [e for e in sim.events if e.turn == turn]
+    conflicts = sum(1 for e in turn_events if e.action == ActionType.conflict)
+    coops = sum(1 for e in turn_events if e.action == ActionType.cooperate)
+    births = sum(1 for e in turn_events if e.action == ActionType.birth)
+    deaths = sum(1 for e in turn_events if e.action == ActionType.death)
     sim.history.append(
         HistoryRecord(
-            turn=sim.world.turn,
+            turn=turn,
             summary=(
-                f"t={sim.world.turn} agents={sum(1 for a in sim.agents if a.alive)} "
-                f"ineq={metrics.inequality:.2f} trust={metrics.mean_trust:.2f} "
-                f"coop={metrics.cooperation_rate:.2f}"
+                f"turn={turn} pop={alive} "
+                f"clash={conflicts} coop={coops} birth={births} death={deaths}"
             ),
             metrics=metrics,
         )

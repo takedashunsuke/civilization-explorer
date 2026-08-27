@@ -9,6 +9,7 @@ import Tag from 'primevue/tag'
 import ProgressBar from 'primevue/progressbar'
 import { polityKind, settlementColor } from '~/utils/groupColors'
 import WorldMap2D from '~/components/WorldMap2D.vue'
+import { buildTurnDigest } from '~/utils/turnDigest'
 import { BACKGROUND_ROWS, CONTINENT_IDS, defaultRegionDraft, macroOf, subregionChoices, type ContinentId, type RegionDraft } from '~/utils/continents'
 
 type Agent = {
@@ -87,7 +88,13 @@ type Simulation = {
     disaster_frequency?: number
     religion?: string
     years_per_turn?: number
-    regions?: Array<{ id: string; climate?: string; resource_pool?: number; subregion_id?: string | null }>
+    regions?: Array<{
+      id: string
+      subregion_id?: string | null
+      institution?: string
+      tax_rate?: number
+      education_level?: number
+    }>
     terrain?: Terrain
     initial_population?: number
     initial_total_wealth?: number
@@ -109,10 +116,55 @@ useHead(() => ({
 
 const conditionsOpen = ref(true)
 const eventsOpen = ref(false)
-const metricsOpen = ref(false)
+const digestOpen = ref(false)
 
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
+
+type LlmHealth = {
+  provider: string
+  ollama_model?: string
+  openai_model?: string
+  note?: string
+}
+
+const llmHealth = ref<LlmHealth | null>(null)
+const apiReachable = ref(false)
+
+const llmDecisionWired = computed(() => {
+  const note = llmHealth.value?.note ?? ''
+  // Until Phase 2 wiring lands, health always reports heuristic stub.
+  return !note.toLowerCase().includes('heuristic') && !note.toLowerCase().includes('phase 2')
+})
+
+const llmProviderLabel = computed(() => {
+  const h = llmHealth.value
+  if (!apiReachable.value) return t('llmStatus.unreachable')
+  if (!h) return t('llmStatus.unreachable')
+  if (h.provider === 'ollama') return t('llmStatus.providerOllama', { model: h.ollama_model || '—' })
+  if (h.provider === 'openai') return t('llmStatus.providerOpenai', { model: h.openai_model || '—' })
+  if (h.provider === 'stub') return t('llmStatus.providerStub')
+  return t('llmStatus.provider', { provider: h.provider })
+})
+
+const llmDecisionLabel = computed(() =>
+  llmDecisionWired.value ? t('llmStatus.decisionLlm') : t('llmStatus.decisionHeuristic'),
+)
+
+async function refreshHealth() {
+  try {
+    const res = await $fetch<{ ok: boolean; llm?: LlmHealth }>(`${apiBase}/health`)
+    apiReachable.value = Boolean(res?.ok)
+    llmHealth.value = res.llm ?? null
+  } catch {
+    apiReachable.value = false
+    llmHealth.value = null
+  }
+}
+
+onMounted(() => {
+  void refreshHealth()
+})
 
 const sim = ref<Simulation | null>(null)
 const busy = ref(false)
@@ -342,76 +394,42 @@ const turnOnlyLabel = computed(() => {
   return t('turnLabel', { turn: sim.value.world.turn })
 })
 
-const METRIC_ROWS = [
-  { key: 'inequality', field: 'inequality', hint: 'metrics.inequalityHint' },
-  { key: 'trust', field: 'mean_trust', hint: 'metrics.trustHint' },
-  { key: 'cooperationRate', field: 'cooperation_rate', hint: 'metrics.cooperationRateHint' },
-  { key: 'authority', field: 'authority', hint: 'metrics.authorityHint' },
-  { key: 'happiness', field: 'mean_happiness', hint: 'metrics.happinessHint' },
-] as const
+const turnDigest = computed(() => buildTurnDigest(sim.value))
 
-type MetricField = (typeof METRIC_ROWS)[number]['field']
-
-function metricValue(row: Pick<Metrics, MetricField>, field: MetricField): number {
-  return row[field]
-}
-
-function clamp01(n: number): number {
-  return Math.max(0, Math.min(1, n))
-}
-
-function metricFill(field: MetricField, value: number): number {
-  if (field === 'mean_trust') return clamp01((value + 1) / 2)
-  if (field === 'inequality') return clamp01(value / 2)
-  return clamp01(value)
-}
-
-const regionMetricRows = computed(() => {
-  const m = sim.value?.last_metrics
-  if (!m) return []
-  if (m.regions?.length) {
-    return m.regions.map((row) => ({
-      id: row.region_id,
-      subregion: row.subregion_id ?? null,
-      inequality: row.inequality,
-      mean_trust: row.mean_trust,
-      cooperation_rate: row.cooperation_rate,
-      authority: row.authority,
-      mean_happiness: row.mean_happiness,
-    }))
-  }
-  return [
-    {
-      id: 'world',
-      subregion: null,
-      inequality: m.inequality,
-      mean_trust: m.mean_trust,
-      cooperation_rate: m.cooperation_rate,
-      authority: m.authority,
-      mean_happiness: m.mean_happiness,
-    },
-  ]
+const experimentSetup = computed(() => {
+  const regions = sim.value?.world.regions ?? []
+  if (!regions.length) return ''
+  return regions
+    .map((region) =>
+      t('digest.regionSetup', {
+        region: t(`geographies.${region.id}`),
+        sub: region.subregion_id ? t(`subregions.${region.subregion_id}`) : '—',
+        institution: t(`institutions.${region.institution}`),
+        tax: Math.round((region.tax_rate ?? 0) * 100),
+      }),
+    )
+    .join(t('digest.setupSep'))
 })
 
-function regionMetricLabel(id: string): string {
-  if (id === 'world') return t('metrics.world')
+const digestOneLiner = computed(() => {
+  const digest = turnDigest.value
+  if (!digest) return ''
+  const { turn, totals } = digest
+  const hasActivity =
+    totals.conflicts + totals.cooperations + totals.births + totals.deaths + totals.disasters + totals.regimeShifts > 0
+  const key = hasActivity ? 'digest.oneLiner' : 'digest.oneLinerQuiet'
+  return t(key, { turn, ...totals })
+})
+
+function digestRegionLabel(id: string): string {
   const key = `geographies.${id}`
   const label = t(key)
   return label === key ? id : label
 }
 
-function regionMetricColor(id: string): string {
-  return settlementColor(id === 'world' ? null : id)
+function digestRegionColor(id: string): string {
+  return settlementColor(id)
 }
-
-const radarLabels = computed(() => METRIC_ROWS.map((col) => t(`metrics.${col.key}`)))
-const radarDatasets = computed(() =>
-  regionMetricRows.value.map((row) => ({
-    id: row.id,
-    label: regionMetricLabel(row.id),
-    values: METRIC_ROWS.map((col) => metricFill(col.field, metricValue(row, col.field))),
-  })),
-)
 
 function actorLabel(actorId: string): string {
   if (actorId === 'world') return t('events.world')
@@ -507,6 +525,18 @@ const headerHeadline = computed(() => {
     alert: picked.some((row) => row.alert === 'red') ? 'red' : 'yellow',
   }
 })
+
+function notableEventText(ref: { key: string; actorId: string; targetId?: string | null; extra?: Record<string, string> }): string {
+  return headlineText({
+    turn: sim.value?.world.turn ?? 0,
+    actor_id: ref.actorId,
+    action: ref.key.startsWith('group_') ? 'conflict' : ref.key === 'regime_shift' ? 'regime' : 'disaster',
+    target_id: ref.targetId,
+    detail_key: ref.key,
+    detail: '',
+    extra: ref.extra,
+  })
+}
 
 function eventDetail(row: EventRow): string {
   const key = `eventDetails.${inferDetailKey(row)}`
@@ -670,6 +700,11 @@ onBeforeUnmount(() => {
         <div class="header-left">
           <p class="eyebrow">{{ t('brand') }}</p>
           <h1>{{ t('consoleTitle') }}</h1>
+          <p class="llm-status" :title="llmHealth?.note || undefined">
+            <span>{{ llmDecisionLabel }}</span>
+            <span class="header-era-sep" aria-hidden="true">·</span>
+            <span>{{ llmProviderLabel }}</span>
+          </p>
         </div>
         <p
           class="header-headline"
@@ -692,6 +727,14 @@ onBeforeUnmount(() => {
             class="header-btn"
             :severity="eventsOpen ? 'info' : 'secondary'"
             @click="eventsOpen = !eventsOpen"
+          />
+          <Button
+            :label="t('digest.title')"
+            icon="pi pi-book"
+            class="header-btn"
+            :disabled="!sim"
+            :severity="digestOpen ? 'info' : 'secondary'"
+            @click="digestOpen = !digestOpen"
           />
           <Button
             :label="t('actions.tick')"
@@ -773,58 +816,120 @@ onBeforeUnmount(() => {
         <p class="hint map-legend">{{ t('map.legend') }} {{ t('map.zoomHintFlat') }}</p>
         <div class="map-stage">
           <WorldMap2D :sim="sim" geography="world" :seed="mapSeed" />
-        </div>
-        <div v-if="regionMetricRows.length" class="metrics" :class="{ open: metricsOpen }">
           <button
+            v-if="sim && turnDigest"
             type="button"
-            class="metrics-bar"
-            :aria-expanded="metricsOpen"
-            :aria-label="metricsOpen ? t('metrics.hideDetail') : t('metrics.showDetail')"
-            @click="metricsOpen = !metricsOpen"
+            class="digest-edge-btn"
+            :class="{ open: digestOpen }"
+            :aria-expanded="digestOpen"
+            :aria-label="digestOpen ? t('layout.closeDigest') : t('digest.showDetail')"
+            @click="digestOpen = !digestOpen"
           >
-            <span class="metrics-bar-title">{{ t('metrics.title') }}</span>
-            <ul class="metrics-bar-list">
-              <li v-for="row in regionMetricRows" :key="row.id">
-                <span class="metrics-bar-region">{{ regionMetricLabel(row.id) }}</span>
-                <span v-if="row.subregion" class="metrics-bar-sub">{{ t(`subregions.${row.subregion}`) }}</span>
-                <span class="metrics-bar-stat">{{ t('metrics.happiness') }}</span>
-                <span class="metric-meter" :style="{ '--fill': `${metricFill('mean_happiness', row.mean_happiness) * 100}%`, '--tone': regionMetricColor(row.id) }">
-                  <span class="metric-meter-fill" />
-                </span>
-                <em class="metrics-bar-num">{{ row.mean_happiness.toFixed(2) }}</em>
-              </li>
-            </ul>
-            <span class="metrics-bar-chevron" aria-hidden="true">{{ metricsOpen ? '▾' : '▴' }}</span>
+            <span>{{ t('digest.title') }}</span>
+            <span class="digest-edge-chevron" aria-hidden="true">{{ digestOpen ? '‹' : '›' }}</span>
           </button>
-          <div class="metrics-sheet">
-            <div class="metrics-detail">
-              <RegionMetricsRadar v-if="metricsOpen" :labels="radarLabels" :datasets="radarDatasets" />
-              <div class="metrics-grid" role="table">
-                <div class="metrics-grid-row metrics-grid-head" role="row">
-                  <div class="metrics-grid-stub" role="columnheader">{{ t('wizard.axis') }}</div>
-                  <div v-for="col in regionMetricRows" :key="`h-${col.id}`" class="metrics-grid-cell" role="columnheader">
-                    <span>{{ regionMetricLabel(col.id) }}</span>
-                    <span v-if="col.subregion" class="col-sub">{{ t(`subregions.${col.subregion}`) }}</span>
-                  </div>
-                </div>
-                <div v-for="metric in METRIC_ROWS" :key="metric.key" class="metrics-grid-row" role="row">
-                  <div class="metrics-grid-stub" role="rowheader">
-                    <span>{{ t(`metrics.${metric.key}`) }}</span>
-                    <p class="hint">{{ t(metric.hint) }}</p>
-                  </div>
-                  <div v-for="col in regionMetricRows" :key="`${col.id}-${metric.key}`" class="metrics-grid-cell" role="cell">
-                    <span
-                      class="metric-meter"
-                      :style="{ '--fill': `${metricFill(metric.field, metricValue(col, metric.field)) * 100}%`, '--tone': regionMetricColor(col.id) }"
-                    >
-                      <span class="metric-meter-fill" />
-                    </span>
-                    <span class="metric-value">{{ metricValue(col, metric.field).toFixed(3) }}</span>
-                  </div>
-                </div>
+          <div
+            v-if="digestOpen"
+            class="digest-backdrop"
+            @click="digestOpen = false"
+          />
+          <aside
+            v-if="digestOpen && turnDigest"
+            class="digest-modal panel"
+            role="dialog"
+            :aria-label="t('digest.title')"
+            @click.stop
+          >
+            <div class="panel-heading events-heading digest-heading">
+              <h2>{{ t('digest.title') }}</h2>
+              <div class="events-heading-actions">
+                <Tag v-if="sim" :value="turnOnlyLabel" severity="secondary" />
+                <button type="button" class="events-close" :aria-label="t('layout.closeDigest')" @click="digestOpen = false">×</button>
               </div>
             </div>
-          </div>
+            <p class="digest-one-liner">{{ digestOneLiner }}</p>
+            <div class="digest-body">
+              <section v-if="experimentSetup" class="digest-section digest-section-setup">
+                <h3>{{ t('digest.setupTitle') }}</h3>
+                <p class="digest-setup" :title="experimentSetup">{{ experimentSetup }}</p>
+              </section>
+              <div class="digest-summary-grid">
+                <section class="digest-section">
+                  <h3>{{ t('digest.turnTitle') }}</h3>
+                  <ul class="digest-chips">
+                    <li>{{ t('headerStats.groups') }}{{ turnDigest.totals.groups }}</li>
+                    <li>{{ t('headerStats.cities') }}{{ turnDigest.totals.cities }}</li>
+                    <li>{{ t('headerStats.nations') }}{{ turnDigest.totals.nations }}</li>
+                    <li>{{ t('headerStats.lone') }}{{ turnDigest.totals.lone }}</li>
+                    <li>{{ t('headerStats.clashes') }}{{ turnDigest.totals.conflicts }}</li>
+                    <li>{{ t('headerStats.coops') }}{{ turnDigest.totals.cooperations }}</li>
+                    <li>{{ t('digest.colBirths') }} {{ turnDigest.totals.births }}</li>
+                    <li>{{ t('digest.colDeaths') }} {{ turnDigest.totals.deaths }}</li>
+                  </ul>
+                </section>
+                <section class="digest-section">
+                  <h3>{{ t('digest.cumulativeTitle') }}</h3>
+                  <ul class="digest-chips">
+                    <li>{{ t('headerStats.clashes') }}{{ turnDigest.cumulative.conflicts }}</li>
+                    <li>{{ t('headerStats.coops') }}{{ turnDigest.cumulative.cooperations }}</li>
+                    <li>{{ t('digest.colBirths') }} {{ turnDigest.cumulative.births }}</li>
+                    <li>{{ t('digest.colDeaths') }} {{ turnDigest.cumulative.deaths }}</li>
+                    <li>{{ t('digest.chipDisasters') }} {{ turnDigest.cumulative.disasters }}</li>
+                    <li>{{ t('digest.chipRegime') }} {{ turnDigest.cumulative.regimeShifts }}</li>
+                  </ul>
+                </section>
+              </div>
+              <section class="digest-section digest-section-notable">
+                <h3>{{ t('digest.notableTitle') }}</h3>
+                <p v-if="turnDigest.notableEvents.length" class="digest-notable-line">
+                  {{ turnDigest.notableEvents.slice(0, 3).map((item) => notableEventText(item)).join(' · ') }}
+                </p>
+                <p v-else class="hint">{{ t('digest.notableEmpty') }}</p>
+              </section>
+              <section class="digest-section digest-section-obs">
+                <h3>{{ t('digest.obsTitle') }}</h3>
+                <div class="digest-obs-table" role="table">
+                  <div class="digest-obs-row digest-obs-head" role="row">
+                    <div class="digest-obs-stub" role="columnheader" />
+                    <div
+                      v-for="row in turnDigest.regionObservations"
+                      :key="`h-${row.regionId}`"
+                      class="digest-obs-cell"
+                      role="columnheader"
+                    >
+                      <span :style="{ color: digestRegionColor(row.regionId) }">{{ digestRegionLabel(row.regionId) }}</span>
+                    </div>
+                  </div>
+                  <div class="digest-obs-row" role="row">
+                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colPopulation') }}</div>
+                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-pop`" class="digest-obs-cell" role="cell">{{ row.population }}</div>
+                  </div>
+                  <div class="digest-obs-row" role="row">
+                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colPolities') }}</div>
+                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-pol`" class="digest-obs-cell" role="cell">
+                      {{ t('digest.polityCounts', { bands: row.bands, cities: row.cities, nations: row.nations }) }}
+                    </div>
+                  </div>
+                  <div class="digest-obs-row" role="row">
+                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colConflicts') }}</div>
+                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-conf`" class="digest-obs-cell" role="cell">{{ row.conflicts }}</div>
+                  </div>
+                  <div class="digest-obs-row" role="row">
+                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colCoops') }}</div>
+                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-coop`" class="digest-obs-cell" role="cell">{{ row.cooperations }}</div>
+                  </div>
+                  <div class="digest-obs-row" role="row">
+                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colBirths') }}</div>
+                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-birth`" class="digest-obs-cell" role="cell">{{ row.births }}</div>
+                  </div>
+                  <div class="digest-obs-row" role="row">
+                    <div class="digest-obs-stub" role="rowheader">{{ t('digest.colDeaths') }}</div>
+                    <div v-for="row in turnDigest.regionObservations" :key="`${row.regionId}-death`" class="digest-obs-cell" role="cell">{{ row.deaths }}</div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </aside>
         </div>
       </main>
     </div>
@@ -1130,6 +1235,16 @@ onBeforeUnmount(() => {
 
 .header-left {
   min-width: 0;
+}
+
+.llm-status {
+  margin: 0.15rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .header-era {
@@ -1798,6 +1913,189 @@ h2 {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
+.digest-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 12;
+  background: rgba(4, 8, 14, 0.28);
+  cursor: pointer;
+}
+
+.digest-edge-btn {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  z-index: 16;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0.7rem 0.28rem;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  border-left: 0;
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%);
+  color: var(--text);
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.28);
+  cursor: pointer;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.digest-edge-btn.open {
+  left: min(32rem, 72%);
+}
+
+.digest-edge-btn:hover {
+  background: color-mix(in srgb, var(--panel) 84%, var(--accent) 16%);
+}
+
+.digest-edge-chevron {
+  writing-mode: horizontal-tb;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--accent);
+}
+
+.digest-modal {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 14;
+  width: min(32rem, 72%);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 0.55rem 0.65rem 0.6rem;
+  border-radius: 8px 0 0 8px;
+  background: #1c252f;
+  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+
+.digest-heading {
+  margin-bottom: 0.35rem;
+  flex: 0 0 auto;
+}
+
+.digest-one-liner {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 0 0 auto;
+}
+
+.digest-body {
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 0.45rem;
+}
+
+.digest-section h3 {
+  margin: 0 0 0.15rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.digest-section-setup .digest-setup {
+  margin: 0;
+  font-size: 0.68rem;
+  line-height: 1.35;
+  color: var(--muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.digest-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.4rem;
+}
+
+.digest-chips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.22rem;
+}
+
+.digest-chips li {
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: color-mix(in srgb, var(--panel) 70%, #0b1218);
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.digest-notable-line {
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.35;
+  color: var(--text);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.digest-section-obs {
+  flex: 0 0 auto;
+}
+
+.digest-obs-table {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.digest-obs-row {
+  display: grid;
+  grid-template-columns: minmax(3.4rem, 0.7fr) repeat(5, minmax(0, 1fr));
+  gap: 0.18rem;
+  align-items: center;
+}
+
+.digest-obs-stub {
+  font-weight: 600;
+  font-size: 0.64rem;
+  color: var(--muted);
+}
+
+.digest-obs-cell {
+  min-width: 0;
+  padding: 0.08rem 0.1rem;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.68rem;
+  text-align: center;
+}
+
+.digest-obs-head .digest-obs-cell {
+  font-weight: 700;
+  font-size: 0.66rem;
+  text-align: center;
+}
+
 .events-close {
   margin: 0;
   border: 0;
@@ -1935,188 +2233,6 @@ label {
   white-space: nowrap;
 }
 
-.metrics {
-  position: absolute;
-  left: 0.55rem;
-  right: 0.55rem;
-  bottom: 0.45rem;
-  z-index: 8;
-  display: flex;
-  flex-direction: column-reverse;
-  min-height: 0;
-  pointer-events: none;
-}
-
-.metrics-bar {
-  pointer-events: auto;
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  width: 100%;
-  margin: 0;
-  padding: 0.4rem 0.55rem;
-  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--panel) 92%, transparent);
-  color: var(--text);
-  cursor: pointer;
-  text-align: left;
-}
-
-.metrics-bar-title {
-  flex: 0 0 auto;
-  font-weight: 700;
-  font-size: 0.78rem;
-}
-
-.metrics-bar-list {
-  flex: 1 1 auto;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 0.35rem;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  min-width: 0;
-}
-
-.metrics-bar-list li {
-  display: flex;
-  flex-direction: column;
-  gap: 0.05rem;
-  min-width: 0;
-  padding: 0.1rem 0.25rem;
-  border-left: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-}
-
-.metrics-bar-region {
-  font-weight: 600;
-  font-size: 0.74rem;
-}
-
-.metrics-bar-sub {
-  font-size: 0.62rem;
-  color: var(--muted);
-}
-
-.metrics-bar-stat {
-  font-size: 0.68rem;
-  color: var(--muted);
-}
-
-.metrics-bar-stat em {
-  margin-left: 0.2rem;
-  font-style: normal;
-  font-variant-numeric: tabular-nums;
-  color: var(--accent);
-  font-weight: 700;
-}
-
-.metrics-bar-chevron {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.metrics-sheet {
-  pointer-events: auto;
-  overflow: hidden;
-  max-height: 0;
-  opacity: 0;
-  transform: translateY(0.6rem);
-  transition: max-height 0.28s ease, opacity 0.22s ease, transform 0.28s ease;
-  margin-bottom: 0.4rem;
-}
-
-.metrics.open .metrics-sheet {
-  max-height: 34rem;
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.metrics-detail {
-  display: grid;
-  grid-template-columns: minmax(12rem, 0.9fr) minmax(0, 1.4fr);
-  gap: 0.55rem;
-  padding: 0.5rem 0.55rem 0.55rem;
-  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  border-radius: 10px;
-  background: color-mix(in srgb, var(--panel) 96%, transparent);
-}
-
-.metrics-grid {
-  display: grid;
-  gap: 0.28rem;
-  min-width: 0;
-}
-
-.metrics-grid-row {
-  display: grid;
-  grid-template-columns: minmax(6.2rem, 0.95fr) repeat(5, minmax(0, 1fr));
-  gap: 0.3rem;
-  align-items: center;
-}
-
-.metrics-grid-stub {
-  display: flex;
-  flex-direction: column;
-  gap: 0.08rem;
-  font-weight: 600;
-  font-size: 0.74rem;
-}
-
-.metrics-grid-cell {
-  min-width: 0;
-  padding: 0.12rem 0.15rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.12rem;
-}
-
-.metrics-grid-head .metrics-grid-cell {
-  font-weight: 600;
-  font-size: 0.74rem;
-}
-
-.metric-meter {
-  display: block;
-  height: 0.42rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--line) 70%, transparent);
-  overflow: hidden;
-}
-
-.metric-meter-fill {
-  display: block;
-  width: var(--fill, 0%);
-  height: 100%;
-  border-radius: inherit;
-  background: var(--tone, var(--accent));
-}
-
-.metric-value {
-  font-variant-numeric: tabular-nums;
-  color: var(--accent);
-  font-size: 0.76rem;
-}
-
-.metrics .hint {
-  font-size: 0.62rem;
-  line-height: 1.3;
-  margin: 0.15rem 0 0;
-}
-
-.metrics-bar-list .metric-meter {
-  height: 0.38rem;
-  margin-top: 0.12rem;
-}
-
-@media (max-width: 980px) {
-  .metrics-detail {
-    grid-template-columns: 1fr;
-  }
-}
-
 .map-stats {
   margin: 0;
   color: var(--text);
@@ -2133,7 +2249,8 @@ label {
   position: relative;
   flex: 1 1 auto;
   min-height: 280px;
-  padding-bottom: 4.2rem;
+  padding-bottom: 0;
+  overflow: hidden;
 }
 
 .map-stage :deep(.map-wrap) {

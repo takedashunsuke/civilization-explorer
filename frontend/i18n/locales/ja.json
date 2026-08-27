@@ -1,6 +1,15 @@
 {
   "brand": "Civilization Explorer",
-  "consoleTitle": "観測コンソール（スタブ）",
+  "consoleTitle": "観測コンソール",
+  "llmStatus": {
+    "decisionHeuristic": "意思決定: ヒューリスティック",
+    "decisionLlm": "意思決定: LLM",
+    "provider": "設定 {provider}",
+    "providerOllama": "設定 Ollama（{model}）",
+    "providerOpenai": "設定 OpenAI（{model}）",
+    "providerStub": "設定 stub",
+    "unreachable": "API未接続"
+  },
   "language": "言語",
   "locale": {
     "ja": "日本語",
@@ -420,28 +429,38 @@
     "autoPlay": "再生",
     "autoStop": "停止"
   },
-  "metrics": {
-    "title": "メトリクス",
-    "world": "世界",
-    "showDetail": "地域メトリクスの詳細を表示",
-    "hideDetail": "地域メトリクスの詳細を閉じる",
-    "inequality": "格差",
-    "inequalityHint": "富のばらつき（標準偏差÷平均）。高いほど貧富の差が大きい。",
-    "trust": "信頼",
-    "trustHint": "主体間の信頼の平均（-1〜1）。高いほど協力しやすい。",
-    "cooperationRate": "協力率",
-    "cooperationRateHint": "直前ターンで協力が成功した割合（0〜1）。",
-    "authority": "権威",
-    "authorityHint": "制度の権威度（0付近〜1）。高いほど服従しやすい。",
-    "happiness": "幸福",
-    "happinessHint": "生存主体の幸福度の平均（0〜1）。",
-    "radar": "5地域のレーダー"
+  "digest": {
+    "title": "状況",
+    "showDetail": "詳細を開く",
+    "hideDetail": "閉じる",
+    "oneLiner": "第{turn}ターン：人口{population}人。争い{conflicts}・協力{cooperations}・出生{births}・死亡{deaths}。",
+    "oneLinerQuiet": "第{turn}ターン：人口{population}人。目立った出来事はない。",
+    "setupTitle": "実験の設定",
+    "setupSep": " ／ ",
+    "regionSetup": "{region}（{sub}・{institution}・税{tax}%）",
+    "turnTitle": "今ターンの動き",
+    "turnSummary": "集団{groups}・都市{cities}・国家{nations}・未所属{lone}。今ターンは争い{conflicts}件、協力{cooperations}件、出生{births}・死亡{deaths}。",
+    "notableTitle": "注目の出来事",
+    "notableEmpty": "大きな変化はまだ起きていない。",
+    "cumulativeTitle": "開始からの累計",
+    "cumulativeSummary": "争い{conflicts}・協力{cooperations}・出生{births}・死亡{deaths}・災害{disasters}・体制転換{regimeShifts}",
+    "obsTitle": "地域別の観測",
+    "colPopulation": "人口",
+    "colPolities": "集団/都市/国家",
+    "colConflicts": "争い",
+    "colCoops": "協力",
+    "colBirths": "出生",
+    "colDeaths": "死亡",
+    "polityCounts": "{bands}/{cities}/{nations}",
+    "chipDisasters": "災害",
+    "chipRegime": "体制"
   },
   "layout": {
     "showConditions": "初期条件",
     "hideConditions": "条件を閉じる",
     "closeConditions": "初期条件を閉じる",
-    "closeEvents": "出来事を閉じる"
+    "closeEvents": "出来事を閉じる",
+    "closeDigest": "状況を閉じる"
   },
   "headlines": {
     "epidemic": "{group}で疫病",

@@ -1,6 +1,15 @@
 {
   "brand": "Civilization Explorer",
-  "consoleTitle": "Observation Console (stub)",
+  "consoleTitle": "Observation Console",
+  "llmStatus": {
+    "decisionHeuristic": "Decisions: heuristic",
+    "decisionLlm": "Decisions: LLM",
+    "provider": "Config {provider}",
+    "providerOllama": "Config Ollama ({model})",
+    "providerOpenai": "Config OpenAI ({model})",
+    "providerStub": "Config stub",
+    "unreachable": "API offline"
+  },
   "language": "Language",
   "locale": {
     "ja": "日本語",
@@ -420,28 +429,38 @@
     "autoPlay": "Play",
     "autoStop": "Stop"
   },
-  "metrics": {
-    "title": "Metrics",
-    "world": "World",
-    "showDetail": "Show regional metrics",
-    "hideDetail": "Hide regional metrics",
-    "inequality": "Inequality",
-    "inequalityHint": "Wealth spread (stddev ÷ mean). Higher = wider gap.",
-    "trust": "Trust",
-    "trustHint": "Mean pairwise trust (−1 to 1). Higher favors cooperation.",
-    "cooperationRate": "Cooperation rate",
-    "cooperationRateHint": "Share of successful cooperate actions last turn (0–1).",
-    "authority": "Authority",
-    "authorityHint": "Institutional authority (near 0–1). Higher favors obedience.",
-    "happiness": "Happiness",
-    "happinessHint": "Mean happiness of living actors (0–1).",
-    "radar": "Five-region radar"
+  "digest": {
+    "title": "Situation",
+    "showDetail": "Open details",
+    "hideDetail": "Close",
+    "oneLiner": "Turn {turn}: pop. {population}. Clashes {conflicts}, coops {cooperations}, births {births}, deaths {deaths}.",
+    "oneLinerQuiet": "Turn {turn}: pop. {population}. No major events yet.",
+    "setupTitle": "Experiment setup",
+    "setupSep": " · ",
+    "regionSetup": "{region} ({sub}, {institution}, tax {tax}%)",
+    "turnTitle": "This turn",
+    "turnSummary": "Bands {groups}, cities {cities}, nations {nations}, unaffiliated {lone}. This turn: {conflicts} clashes, {cooperations} coops, {births} births, {deaths} deaths.",
+    "notableTitle": "Notable events",
+    "notableEmpty": "No major changes yet.",
+    "cumulativeTitle": "Since start",
+    "cumulativeSummary": "Clashes {conflicts}, coops {cooperations}, births {births}, deaths {deaths}, disasters {disasters}, regime shifts {regimeShifts}",
+    "obsTitle": "Regional observations",
+    "colPopulation": "Pop.",
+    "colPolities": "Band/City/Nation",
+    "colConflicts": "Clashes",
+    "colCoops": "Coops",
+    "colBirths": "Births",
+    "colDeaths": "Deaths",
+    "polityCounts": "{bands}/{cities}/{nations}",
+    "chipDisasters": "Disasters",
+    "chipRegime": "Regime"
   },
   "layout": {
     "showConditions": "Conditions",
     "hideConditions": "Hide conditions",
     "closeConditions": "Close conditions",
-    "closeEvents": "Close events"
+    "closeEvents": "Close events",
+    "closeDigest": "Close situation"
   },
   "headlines": {
     "epidemic": "Plague in {group}",

@@ -552,7 +552,7 @@ defineExpose({ fitToAgents, resetView, showWholeEarth })
 .map-zoom {
   position: absolute;
   right: 0.5rem;
-  bottom: 0.5rem;
+  top: 0.5rem;
   display: flex;
   align-items: center;
   gap: 0.35rem;
