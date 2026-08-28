@@ -433,8 +433,83 @@
   "errors": {
     "simLost": "Simulation not found. After a server reload, create a new simulation."
   },
+  "templates": {
+    "label": "Scenario",
+    "hint": "Pick a template first, then fine-tune in each step if needed.",
+    "diverse_world": {
+      "name": "Five diverse columns",
+      "blurb": "Each macro column starts with a different regime, tax, and faith.",
+      "opening": "AD {year}. Five regions begin at once under different laws and cultures."
+    },
+    "demo_pitch": {
+      "name": "Demo: institutions select people",
+      "blurb": "Europe = high tax autocracy vs Americas = low tax democracy, equal population.",
+      "opening": "AD {year}. Heavy-tax autocracy in Europe, light-tax democracy in the Americas — who survives?"
+    },
+    "tax_contrast": {
+      "name": "Tax contrast",
+      "blurb": "Europe 25% autocracy vs Americas 5% democracy; others in between.",
+      "opening": "AD {year}. A world built to compare tax alone."
+    },
+    "institution_lab": {
+      "name": "Institution lab",
+      "blurb": "Anarchy, democracy, and autocracy fixed per column.",
+      "opening": "AD {year}. Five regimes side by side."
+    },
+    "uniform_baseline": {
+      "name": "Uniform baseline",
+      "blurb": "All columns aligned: democracy, mid tax, 1000 people.",
+      "opening": "AD {year}. A neutral baseline — change one knob and rerun."
+    }
+  },
+  "story": {
+    "regionOpening": "· {region} ({sub}) — {institution}, tax {tax}%, {religion}",
+    "regionPortrait": "In {region}, {polity}. Under {institution} at {tax}% tax, {mood}. Hints of {trajectory}; {archetype} figures stand out ({population} people).",
+    "secondaryRegion": "Meanwhile {region} drifts toward {trajectory} as {archetype} types rise.",
+    "quietTurn": "Little open conflict, but {population} people keep living across the map.",
+    "cumulativeRegime": "Regime has shifted {n} time(s) so far — the rules themselves are moving.",
+    "outcomeArc": "After {turn} turns: {population} people, {conflicts} clashes, {cooperations} co-ops, {disasters} disasters, {regime} regime shifts — {cities} cities, {nations} nations formed.",
+    "headline": {
+      "upheaval": "Disaster and regime shocks moved the world",
+      "conflict": "Conflict spreads ({n} clashes)",
+      "cooperation": "Cooperation builds ties ({n} co-ops)",
+      "demography": "Demography in motion ({births} births, {deaths} deaths)",
+      "polity": "Polities taking shape ({cities} cities, {nations} nations)",
+      "quiet": "Turn {turn} — a quieter beat"
+    },
+    "polity": {
+      "scatter": "scattered camps",
+      "band": "{n} band(s)",
+      "city": "{n} city-scale group(s)",
+      "nation": "{n} nation-scale bloc(s)"
+    },
+    "mood": {
+      "angry": "discontent is surfacing",
+      "tense": "tension is rising",
+      "prosperous": "prosperity is spreading",
+      "calm": "life is mostly calm"
+    },
+    "archetype": {
+      "none": "no clear leader type yet"
+    },
+    "notable": {
+      "regime_shift": "{group} shifted from {from} to {to}.",
+      "group_conflict_out": "Clash between {group} and {other}.",
+      "group_conflict_in": "Unrest inside {group}.",
+      "epidemic": "Epidemic in {group}.",
+      "disaster_earthquake": "Earthquake hit {group}.",
+      "disaster_typhoon": "Typhoon hit {group}.",
+      "disaster_flood": "Flooding in {group}.",
+      "historic_quake": "Historic quake recorded in {group}."
+    }
+  },
   "digest": {
     "title": "Situation",
+    "storyTitle": "Story this turn",
+    "openingTitle": "How the world began",
+    "outcomeTitle": "Arc so far",
+    "numbersTitle": "By the numbers",
+    "societyTitle": "Societies by region",
     "showDetail": "Open details",
     "hideDetail": "Close",
     "oneLiner": "Turn {turn}: pop. {population}. Clashes {conflicts}, coops {cooperations}, births {births}, deaths {deaths}.",

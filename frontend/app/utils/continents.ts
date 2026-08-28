@@ -89,6 +89,85 @@ export type RegionDraft = {
   population: number
 }
 
+/** 列ごとの差別化された初期社会（テンプレート `diverse_world` と同じ） */
+const REGION_CHARACTER: Record<ContinentId, Partial<RegionDraft>> = {
+  africa: {
+    subregion: 'western_africa',
+    institution: 'anarchy',
+    taxRate: 0.05,
+    education: 0.35,
+    religion: 'folk',
+    tradeOpenness: 0.35,
+    cooperation: 0.45,
+    authorityAcceptance: 0.4,
+    ambition: 0.55,
+    inequality: 0.55,
+    traitRate: 0.13,
+    welfareRate: 0.07,
+    population: 2000,
+  },
+  europe: {
+    subregion: 'western_europe',
+    institution: 'democracy',
+    taxRate: 0.2,
+    education: 0.65,
+    religion: 'secular',
+    tradeOpenness: 0.65,
+    cooperation: 0.55,
+    authorityAcceptance: 0.6,
+    ambition: 0.45,
+    inequality: 0.35,
+    traitRate: 0.1,
+    welfareRate: 0.21,
+    population: 3000,
+  },
+  asia: {
+    subregion: 'eastern_asia',
+    institution: 'autocracy',
+    taxRate: 0.15,
+    education: 0.55,
+    religion: 'polytheism',
+    tradeOpenness: 0.5,
+    cooperation: 0.5,
+    authorityAcceptance: 0.65,
+    ambition: 0.5,
+    inequality: 0.45,
+    traitRate: 0.12,
+    welfareRate: 0.14,
+    population: 4000,
+  },
+  america: {
+    subregion: 'northern_america',
+    institution: 'democracy',
+    taxRate: 0.1,
+    education: 0.6,
+    religion: 'monotheism',
+    tradeOpenness: 0.55,
+    cooperation: 0.5,
+    authorityAcceptance: 0.5,
+    ambition: 0.6,
+    inequality: 0.5,
+    traitRate: 0.175,
+    welfareRate: 0,
+    population: 2500,
+  },
+  oceania: {
+    subregion: 'australasia',
+    institution: 'democracy',
+    taxRate: 0.1,
+    education: 0.5,
+    religion: 'folk',
+    tradeOpenness: 0.45,
+    cooperation: 0.55,
+    authorityAcceptance: 0.45,
+    ambition: 0.5,
+    inequality: 0.4,
+    traitRate: 0.085,
+    welfareRate: 0.14,
+    population: 1500,
+  },
+}
+
 export function defaultRegionDraft(id: ContinentId): RegionDraft {
   return {
     id,
@@ -105,6 +184,7 @@ export function defaultRegionDraft(id: ContinentId): RegionDraft {
     traitRate: 0.1,
     welfareRate: 0,
     population: 1000,
+    ...REGION_CHARACTER[id],
   }
 }
 

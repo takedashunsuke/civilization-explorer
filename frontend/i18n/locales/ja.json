@@ -433,8 +433,83 @@
   "errors": {
     "simLost": "シミュレーションが見つかりません。サーバー再起動後は「作成」からやり直してください。"
   },
+  "templates": {
+    "label": "シナリオ",
+    "hint": "まずテンプレートを選び、必要なら各 STEP で細かく調整できます。",
+    "diverse_world": {
+      "name": "多様な五列",
+      "blurb": "アフリカは無政府・低税、欧州は民主・高福祉、東アジアは独裁、など列ごとに社会が異なる世界。",
+      "opening": "西暦{year}年。五つの地域が、それぞれ異なる制度・税・信仰で同時に始まる。"
+    },
+    "demo_pitch": {
+      "name": "デモ：制度が人物を選ぶ",
+      "blurb": "欧州＝高税・独裁 vs 米州＝低税・民主。同じ人口で、従う人と抵抗する人の偏りを比べる。",
+      "opening": "西暦{year}年。欧州は重税の独裁、米州は軽税の民主——制度が次の生き残り方を選ぶ実験。"
+    },
+    "tax_contrast": {
+      "name": "税率の対照",
+      "blurb": "欧州だけ税率25%・独裁、米州だけ5%・民主。他列は中間。",
+      "opening": "西暦{year}年。税率だけを大きく変え、社会の反応を並べて見る。"
+    },
+    "institution_lab": {
+      "name": "体制の実験室",
+      "blurb": "無政府・民主・独裁を列ごとに固定。体制そのものの差を強調。",
+      "opening": "西暦{year}年。五列それぞれに異なる体制を与え、創発の差を観測する。"
+    },
+    "uniform_baseline": {
+      "name": "均一な基準",
+      "blurb": "全列を同じ民主・中税率・1000人に揃えた対照用の基準線。",
+      "opening": "西暦{year}年。条件を揃えた基準世界——ここから1項目だけ変えて比較する。"
+    }
+  },
+  "story": {
+    "regionOpening": "・{region}（{sub}）— {institution}、税{tax}%、{religion}",
+    "regionPortrait": "{region}では{polity}。{institution}・税{tax}%の下、{mood}。{trajectory}の気配で、{archetype}タイプが目立ち始めている（人口{population}）。",
+    "secondaryRegion": "一方{region}は{trajectory}へ向かい、{archetype}が台頭しつつある。",
+    "quietTurn": "大きな衝突は少ないが、{population}人が各地で生活を続けている。",
+    "cumulativeRegime": "これまでに体制転換が{n}回起き、法の在り方そのものが揺れている。",
+    "outcomeArc": "{turn}ターン経過。人口{population}人。争い{conflicts}・協力{cooperations}・災害{disasters}・体制転換{regime}——都市{cities}・国家{nations}へと社会が形作られてきた。",
+    "headline": {
+      "upheaval": "災害と体制の揺れが世界を動かしたターン",
+      "conflict": "争いが広がるターン（{n}件）",
+      "cooperation": "協力が結束を生んだターン（{n}件）",
+      "demography": "人口の出入りが目立つターン（出生{births}・死亡{deaths}）",
+      "polity": "都市{cities}・国家{nations}が形になりつつあるターン",
+      "quiet": "第{turn}ターン——静かな変化の合間"
+    },
+    "polity": {
+      "scatter": "散発的な小さな集落",
+      "band": "集団が{n}つ",
+      "city": "都市規模のまとまりが{n}",
+      "nation": "国家規模の塊が{n}"
+    },
+    "mood": {
+      "angry": "不満が表面化",
+      "tense": "緊張が高まる",
+      "prosperous": "豊かさが広がる",
+      "calm": "おおむね穏やか"
+    },
+    "archetype": {
+      "none": "目立った指導者タイプはまだいない"
+    },
+    "notable": {
+      "regime_shift": "{group}で体制が{from}から{to}へ変わった。",
+      "group_conflict_out": "{group}と{other}の間で争いが起きた。",
+      "group_conflict_in": "{group}で内乱が起きた。",
+      "epidemic": "{group}で疫病が広がった。",
+      "disaster_earthquake": "{group}で大地震が襲った。",
+      "disaster_typhoon": "{group}で台風が襲った。",
+      "disaster_flood": "{group}で水害が起きた。",
+      "historic_quake": "{group}で歴史的な大地震が記録された。"
+    }
+  },
   "digest": {
     "title": "状況",
+    "storyTitle": "このターンの物語",
+    "openingTitle": "世界のはじまり",
+    "outcomeTitle": "ここまでの流れ",
+    "numbersTitle": "数字で見る",
+    "societyTitle": "各地域の社会",
     "showDetail": "詳細を開く",
     "hideDetail": "閉じる",
     "oneLiner": "第{turn}ターン：人口{population}人。争い{conflicts}・協力{cooperations}・出生{births}・死亡{deaths}。",

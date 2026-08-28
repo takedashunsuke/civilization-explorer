@@ -581,17 +581,37 @@ def heuristic_region_readings(sim: SimulationState, facts: list[dict[str, Any]])
         else:
             archetype, traj = "none", "stagnation"
         if _narrative_lang() == "en":
+            inst = fact.get("institution", "democracy")
+            inst_label = {"democracy": "democracy", "autocracy": "autocracy", "anarchy": "anarchy"}.get(
+                inst, inst
+            )
+            tax_pct = int(float(fact.get("tax_rate", 0)) * 100)
+            shock_txt = f" after {disaster_n} shock(s)" if disaster_n else ""
+            conflict_txt = f"{conflict_n} clash(es)" if conflict_n else "little open conflict"
             summary = (
-                f"{'high discontent' if discontent >= 0.55 else 'stable mood'}; "
-                f"{'scarce resources' if prosperity < 0.4 else 'resource slack'} "
-                f"→ {archetype} rising, trajectory {traj}"
+                f"Under {inst_label} at {tax_pct}% tax{shock_txt}, "
+                f"{conflict_txt} — a {arch} figure rises toward {traj}."
             )
         else:
-            mood = "不満が高い" if discontent >= 0.55 else "気分は安定"
-            res = "資源が乏しい" if prosperity < 0.4 else "資源に余裕"
+            inst = fact.get("institution", "democracy")
+            inst_ja = {"democracy": "民主制", "autocracy": "独裁", "anarchy": "無政府"}.get(inst, inst)
+            tax_pct = int(float(fact.get("tax_rate", 0)) * 100)
+            shock_txt = f"{disaster_n}件の衝撃のあと、" if disaster_n else ""
+            conflict_txt = f"争い{conflict_n}件" if conflict_n else "大きな争いは少ない"
             arch = _ARCHETYPE_JA.get(archetype, archetype)
             traj_ja = _TRAJECTORY_JA.get(traj, traj)
-            summary = f"{mood}；{res} → {arch}が台頭、軌道は{traj_ja}"
+            if resist_n >= 2:
+                mood = "抵抗が広がり"
+            elif discontent >= 0.55:
+                mood = "不満が表面化し"
+            elif prosperity >= 0.55:
+                mood = "豊かさが広がり"
+            else:
+                mood = "おおむね穏やかな中"
+            summary = (
+                f"{inst_ja}・税{tax_pct}%の下、{shock_txt}{mood}{conflict_txt}。"
+                f"{arch}が台頭し、社会は{traj_ja}へ向かう。"
+            )
         out.append(
             RegionReading(
                 region_id=fact["region_id"],
@@ -853,11 +873,25 @@ def observe_and_steer_regions(
     provider = (settings.llm_provider or "stub").strip().lower()
     if provider not in {"ollama", "openai"}:
         policies = [heuristic_region_policy(f, h) for f, h in zip(facts, fallback)]
-        stub = (
-            "Heuristic group stance (LLM stub)."
-            if _narrative_lang() == "en"
-            else "ヒューリスティックの集団方針（LLMスタブ）。"
-        )
+        if _narrative_lang() == "en":
+            parts = []
+            for reading in fallback:
+                if reading.summary:
+                    parts.append(f"{reading.region_id}: {reading.summary}")
+            stub = "; ".join(parts[:3]) if parts else "Heuristic group stance (LLM stub)."
+        else:
+            parts = []
+            for reading in fallback:
+                if reading.summary:
+                    geo = {
+                        "africa": "アフリカ",
+                        "europe": "欧州",
+                        "asia": "アジア",
+                        "america": "米州",
+                        "oceania": "オセアニア",
+                    }.get(reading.region_id, reading.region_id)
+                    parts.append(f"{geo}は{reading.summary}")
+            stub = " ".join(parts[:2]) if parts else "各地域はヒューリスティックで読み取られた。"
         return fallback, policies, stub
 
     readings: list[RegionReading] = []

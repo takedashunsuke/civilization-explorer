@@ -10,7 +10,14 @@ import ProgressBar from 'primevue/progressbar'
 import { polityKind, settlementColor } from '~/utils/groupColors'
 import WorldMap2D from '~/components/WorldMap2D.vue'
 import { buildTurnDigest } from '~/utils/turnDigest'
-import { BACKGROUND_ROWS, CONTINENT_IDS, defaultRegionDraft, macroOf, subregionChoices, type ContinentId, type RegionDraft } from '~/utils/continents'
+import {
+  SCENARIO_TEMPLATE_IDS,
+  buildScenarioTemplate,
+  defaultScenarioTemplateId,
+  type ScenarioTemplateId,
+} from '~/utils/scenarioTemplates'
+import { buildOpeningStory, buildOutcomeArc, buildTurnStory } from '~/utils/storyNarrative'
+import { BACKGROUND_ROWS, macroOf, subregionChoices, type ContinentId, type RegionDraft } from '~/utils/continents'
 
 type Agent = {
   id: string
@@ -109,6 +116,7 @@ type Simulation = {
       institution?: string
       tax_rate?: number
       education_level?: number
+      religion?: string
     }>
     terrain?: Terrain
     initial_population?: number
@@ -198,6 +206,7 @@ async function refreshHealth() {
 }
 
 onMounted(() => {
+  applyScenarioTemplate(selectedTemplateId.value)
   void refreshHealth()
 })
 
@@ -212,7 +221,43 @@ let tickInFlight = false
 const calendarEra = ref<'bc' | 'ad'>('ad')
 const calendarYear = ref(1000)
 const conditionStep = ref(1)
-const regionDrafts = ref<RegionDraft[]>(CONTINENT_IDS.map((id) => defaultRegionDraft(id)))
+const selectedTemplateId = ref<ScenarioTemplateId>(defaultScenarioTemplateId())
+const activeTemplateId = ref<ScenarioTemplateId>(defaultScenarioTemplateId())
+const digestNumbersOpen = ref(false)
+const regionDrafts = ref<RegionDraft[]>(buildScenarioTemplate(defaultScenarioTemplateId()).regions)
+
+const templateOptions = computed(() =>
+  SCENARIO_TEMPLATE_IDS.map((id) => ({
+    label: t(`templates.${id}.name`),
+    value: id,
+  })),
+)
+
+const templateBlurb = computed(() => t(`templates.${selectedTemplateId.value}.blurb`))
+
+function applyScenarioTemplate(id: ScenarioTemplateId) {
+  selectedTemplateId.value = id
+  const tpl = buildScenarioTemplate(id)
+  regionDrafts.value = tpl.regions.map((region) => ({ ...region }))
+  calendarEra.value = tpl.era
+  calendarYear.value = tpl.startYear
+}
+
+function storyRegionsFromDrafts(): Array<{
+  id: string
+  subregion_id?: string | null
+  institution?: string
+  tax_rate?: number
+  religion?: string
+}> {
+  return regionDrafts.value.map((region) => ({
+    id: region.id,
+    subregion_id: region.subregion,
+    institution: region.institution,
+    tax_rate: region.taxRate,
+    religion: region.religion,
+  }))
+}
 
 function subregionOptions(id: ContinentId) {
   return subregionChoices(id).map((sid) => ({ label: t(`subregions.${sid}`), value: sid }))
@@ -440,6 +485,40 @@ const turnOnlyLabel = computed(() => {
 })
 
 const turnDigest = computed(() => buildTurnDigest(sim.value))
+
+const openingStory = computed(() => {
+  const regions = sim.value?.world.regions?.length
+    ? sim.value.world.regions.map((region) => ({
+        id: region.id,
+        subregion_id: region.subregion_id,
+        institution: region.institution,
+        tax_rate: region.tax_rate,
+        religion: region.religion,
+      }))
+    : storyRegionsFromDrafts()
+  const year = sim.value?.world.start_year ?? draftAstroYear.value
+  return buildOpeningStory(regions, activeTemplateId.value, year, t)
+})
+
+const turnStory = computed(() => {
+  const digest = turnDigest.value
+  if (!digest) return null
+  const regions =
+    sim.value?.world.regions?.map((region) => ({
+      id: region.id,
+      subregion_id: region.subregion_id,
+      institution: region.institution,
+      tax_rate: region.tax_rate,
+      religion: region.religion,
+    })) ?? storyRegionsFromDrafts()
+  return buildTurnStory(digest, regions, t)
+})
+
+const outcomeArc = computed(() => {
+  const digest = turnDigest.value
+  if (!digest) return ''
+  return buildOutcomeArc(digest, t)
+})
 
 const experimentSetup = computed(() => {
   const regions = sim.value?.world.regions ?? []
@@ -779,7 +858,9 @@ async function createSimulation() {
         })),
       },
     })
+    activeTemplateId.value = selectedTemplateId.value
     conditionsOpen.value = false
+    digestOpen.value = true
     await startAutoPlay()
   } catch (e: unknown) {
     error.value = formatApiError(e)
@@ -1030,13 +1111,30 @@ onBeforeUnmount(() => {
                 <button type="button" class="events-close" :aria-label="t('layout.closeDigest')" @click="digestOpen = false">×</button>
               </div>
             </div>
-            <p class="digest-one-liner">{{ digestOneLiner }}</p>
+            <p class="digest-one-liner">{{ turnStory?.headline || digestOneLiner }}</p>
             <div class="digest-body">
-              <section v-if="experimentSetup" class="digest-section digest-section-setup">
+              <section v-if="turnStory?.paragraphs.length" class="digest-section digest-section-story">
+                <h3>{{ t('digest.storyTitle') }}</h3>
+                <p v-for="(para, idx) in turnStory.paragraphs" :key="idx" class="digest-story-p">{{ para }}</p>
+              </section>
+              <section v-if="openingStory" class="digest-section digest-section-opening">
+                <h3>{{ t('digest.openingTitle') }}</h3>
+                <p class="digest-opening-text">{{ openingStory }}</p>
+              </section>
+              <section v-if="outcomeArc && turnDigest.turn > 1" class="digest-section digest-section-outcome">
+                <h3>{{ t('digest.outcomeTitle') }}</h3>
+                <p class="digest-outcome-text">{{ outcomeArc }}</p>
+              </section>
+              <section v-if="experimentSetup" class="digest-section digest-section-setup digest-section-compact">
                 <h3>{{ t('digest.setupTitle') }}</h3>
                 <p class="digest-setup" :title="experimentSetup">{{ experimentSetup }}</p>
               </section>
-              <div class="digest-summary-grid">
+              <section class="digest-section digest-section-numbers">
+                <button type="button" class="digest-collapse-btn" @click="digestNumbersOpen = !digestNumbersOpen">
+                  {{ t('digest.numbersTitle') }}
+                  <span aria-hidden="true">{{ digestNumbersOpen ? '−' : '+' }}</span>
+                </button>
+                <div v-if="digestNumbersOpen" class="digest-summary-grid">
                 <section class="digest-section">
                   <h3>{{ t('digest.turnTitle') }}</h3>
                   <ul class="digest-chips">
@@ -1061,18 +1159,19 @@ onBeforeUnmount(() => {
                     <li>{{ t('digest.chipRegime') }} {{ turnDigest.cumulative.regimeShifts }}</li>
                   </ul>
                 </section>
-              </div>
+                </div>
+              </section>
               <section class="digest-section digest-section-notable">
                 <h3>{{ t('digest.notableTitle') }}</h3>
                 <p v-if="digestWorldLine" class="digest-notable-line">{{ digestWorldLine }}</p>
                 <p v-if="turnDigest.notableEvents.length" class="digest-notable-line">
                   {{ turnDigest.notableEvents.slice(0, 3).map((item) => notableEventText(item)).join(' · ') }}
                 </p>
-                <p v-else-if="!digestWorldLine" class="hint">{{ t('digest.notableEmpty') }}</p>
+                <p v-else-if="!digestWorldLine && !turnStory?.paragraphs.length" class="hint">{{ t('digest.notableEmpty') }}</p>
               </section>
               <section class="digest-section digest-section-obs">
                 <h3>
-                  {{ t('digest.obsTitle') }}
+                  {{ t('digest.societyTitle') }}
                   <span class="digest-obs-source">{{ turnDigest.readingSource === 'llm' ? t('digest.obsLlm') : t('digest.obsHeuristic') }}</span>
                 </h3>
                 <div class="digest-region-grid">
@@ -1085,6 +1184,9 @@ onBeforeUnmount(() => {
                       <strong :style="{ color: digestRegionColor(row.regionId) }">{{ digestRegionLabel(row.regionId) }}</strong>
                       <span class="digest-region-pop">{{ t('digest.meterPop', { n: row.population }) }}</span>
                     </header>
+                    <p v-if="turnStory?.regionPortraits[row.regionId]" class="digest-region-story">
+                      {{ turnStory.regionPortraits[row.regionId] }}
+                    </p>
                     <div class="digest-flow" :aria-label="t('digest.causalTitle')">
                       <span class="digest-flow-chip signal">{{ digestPrimarySignal(row) }}</span>
                       <span class="digest-flow-arrow" aria-hidden="true">→</span>
@@ -1092,6 +1194,8 @@ onBeforeUnmount(() => {
                       <span class="digest-flow-arrow" aria-hidden="true">→</span>
                       <span class="digest-flow-chip archetype">{{ digestArchetypeLabel(row.risingArchetype) }}</span>
                     </div>
+                    <details class="digest-meters-details">
+                      <summary>{{ t('digest.numbersTitle') }}</summary>
                     <ul class="digest-meters">
                       <li>
                         <span>{{ t('digest.colTension') }}</span>
@@ -1114,7 +1218,8 @@ onBeforeUnmount(() => {
                         <em>{{ pct(row.cohesion) }}</em>
                       </li>
                     </ul>
-                    <p class="digest-region-summary">{{ digestCausalSummary(row) }}</p>
+                    </details>
+                    <p v-if="digestCausalSummary(row)" class="digest-region-summary">{{ digestCausalSummary(row) }}</p>
                     <p class="digest-region-polity">{{ t('digest.polityCounts', { bands: row.bands, cities: row.cities, nations: row.nations }) }}</p>
                   </article>
                 </div>
@@ -1139,6 +1244,21 @@ onBeforeUnmount(() => {
       </div>
       <div class="conditions-form">
         <div class="conditions-fields">
+          <section class="template-picker">
+            <label class="template-label" for="scenario-template">{{ t('templates.label') }}</label>
+            <Dropdown
+              input-id="scenario-template"
+              :model-value="selectedTemplateId"
+              :options="templateOptions"
+              option-label="label"
+              option-value="value"
+              class="template-select field-control"
+              :disabled="creating"
+              @update:model-value="applyScenarioTemplate($event as ScenarioTemplateId)"
+            />
+            <p class="template-blurb">{{ templateBlurb }}</p>
+            <p class="hint template-hint">{{ t('templates.hint') }}</p>
+          </section>
           <nav class="step-nav" aria-label="steps">
             <button type="button" class="step-tab" :class="{ active: conditionStep === 1 }" @click="conditionStep = 1">{{ t('wizard.step1') }}</button>
             <button type="button" class="step-tab" :class="{ active: conditionStep === 2 }" @click="conditionStep = 2">{{ t('wizard.step2') }}</button>
@@ -1753,6 +1873,37 @@ h2 {
   padding-right: 0.2rem;
 }
 
+.template-picker {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, #3d5a80);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 55%, #0f1720);
+}
+
+.template-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.template-select {
+  width: 100%;
+}
+
+.template-blurb {
+  margin: 0.45rem 0 0.2rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.template-hint {
+  margin: 0;
+  font-size: 0.66rem;
+}
+
 .conditions-footer {
   flex: 0 0 auto;
   padding-top: 0.45rem;
@@ -2209,13 +2360,61 @@ h2 {
 
 .digest-one-liner {
   margin: 0 0 0.4rem;
-  font-size: 0.72rem;
-  line-height: 1.35;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  font-weight: 650;
+  color: var(--text);
   flex: 0 0 auto;
+}
+
+.digest-story-p,
+.digest-opening-text,
+.digest-outcome-text {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.digest-opening-text {
+  white-space: pre-line;
+}
+
+.digest-region-story {
+  margin: 0 0 0.35rem;
+  font-size: 0.71rem;
+  line-height: 1.45;
+  color: color-mix(in srgb, var(--text) 92%, #9ec9ff);
+}
+
+.digest-collapse-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin: 0;
+  padding: 0.2rem 0;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.digest-meters-details {
+  margin: 0.25rem 0;
+}
+
+.digest-meters-details summary {
+  cursor: pointer;
+  font-size: 0.64rem;
+  color: var(--muted);
+  margin-bottom: 0.2rem;
+}
+
+.digest-section-compact .digest-setup {
+  -webkit-line-clamp: 3;
 }
 
 .digest-body {
