@@ -7,6 +7,14 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from simulation import create_simulation, tick
+from simulation.experiment import (
+    EXPERIMENT_SEED,
+    describe_experiment,
+    experiment_summary,
+    fresh_roster_copy,
+    world_params_for_variant,
+    WORLD_VARIANT_IDS,
+)
 from simulation.llm import describe_provider
 from simulation.continents import resolve_subregion
 from simulation.models import (
@@ -55,6 +63,9 @@ class CreateSimulationRequest(BaseModel):
     religion: str = "folk"
     initial_values: dict[str, float] | None = None
     regions: list[RegionCreateBody] | None = None
+    controlled_experiment: bool = False
+    experiment_variant: str | None = None
+    experiment_seed: int | None = None
 
 
 class TickRequest(BaseModel):
@@ -70,8 +81,30 @@ def health() -> dict[str, Any]:
     return {"ok": True, "llm": describe_provider()}
 
 
+@router.get("/experiments/design")
+def experiment_design() -> dict[str, Any]:
+    return describe_experiment()
+
+
 @router.post("/simulations")
 def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
+    if body.controlled_experiment:
+        variant = (body.experiment_variant or "peace").strip().lower()
+        if variant not in WORLD_VARIANT_IDS:
+            raise HTTPException(status_code=400, detail=f"invalid experiment_variant: {variant}")
+        seed = body.experiment_seed if body.experiment_seed is not None else EXPERIMENT_SEED
+        params = world_params_for_variant(variant, seed, body.start_year)
+        roster = fresh_roster_copy(seed)
+        sim_id = str(uuid.uuid4())
+        sim = create_simulation(sim_id, params, agent_roster=roster)
+        sim.controlled_experiment = True
+        sim.experiment_variant = variant
+        sim.experiment_seed = seed
+        _STORE[sim_id] = sim
+        payload = _to_public(sim)
+        payload["experiment_summary"] = experiment_summary(sim)
+        return payload
+
     try:
         institution = InstitutionType(body.institution)
     except ValueError as exc:
@@ -210,7 +243,10 @@ def tick_sim(sim_id: str, body: TickRequest | None = None) -> dict[str, Any]:
         sim.status = "running"
     n = body.n if body else 1
     tick(sim, n=n)
-    return _to_public(sim)
+    payload = _to_public(sim)
+    if sim.controlled_experiment:
+        payload["experiment_summary"] = experiment_summary(sim)
+    return payload
 
 
 @router.get("/simulations/{sim_id}/events")
@@ -225,6 +261,16 @@ def get_events(sim_id: str, limit: int = 100) -> dict[str, Any]:
         "events": [e.model_dump() for e in events],
         "history": [h.model_dump() for h in sim.history[-limit:]],
     }
+
+
+@router.get("/simulations/{sim_id}/experiment-summary")
+def get_experiment_summary(sim_id: str) -> dict[str, Any]:
+    sim = _STORE.get(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="simulation not found")
+    if not sim.controlled_experiment:
+        raise HTTPException(status_code=400, detail="not a controlled experiment simulation")
+    return experiment_summary(sim)
 
 
 @router.get("/simulations/{sim_id}/replay")

@@ -118,6 +118,8 @@ class RegionParams(BaseModel):
     initial_values: InitialValues = Field(default_factory=InitialValues)
     trait_rate: float = Field(default=0.1, ge=0, le=1)
     welfare_rate: float = Field(default=0.0, ge=0, le=1)
+    resource_pool: float | None = None
+    disaster_frequency: float | None = Field(default=None, ge=0, le=1)
 
 
 class WorldParams(BaseModel):
@@ -310,6 +312,9 @@ class ChosenAction(BaseModel):
 class SimulationState(BaseModel):
     id: str
     status: Literal["created", "running", "paused"] = "created"
+    controlled_experiment: bool = False
+    experiment_variant: str | None = None
+    experiment_seed: int | None = None
     world: WorldState
     agents: list[AgentState]
     relationships: list[RelationshipState]

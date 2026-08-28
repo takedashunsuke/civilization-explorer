@@ -6,6 +6,7 @@ import {
 } from '~/utils/continents'
 
 export type ScenarioTemplateId =
+  | 'controlled_experiment'
   | 'diverse_world'
   | 'tax_contrast'
   | 'institution_lab'
@@ -13,6 +14,7 @@ export type ScenarioTemplateId =
   | 'demo_pitch'
 
 export const SCENARIO_TEMPLATE_IDS: ScenarioTemplateId[] = [
+  'controlled_experiment',
   'diverse_world',
   'demo_pitch',
   'tax_contrast',
@@ -187,6 +189,7 @@ export type ScenarioTemplate = {
 
 export function buildScenarioTemplate(id: ScenarioTemplateId): ScenarioTemplate {
   const builders: Record<ScenarioTemplateId, () => RegionDraft[]> = {
+    controlled_experiment: uniformBaseline,
     diverse_world: diverseWorld,
     tax_contrast: taxContrast,
     institution_lab: institutionLab,
@@ -194,6 +197,7 @@ export function buildScenarioTemplate(id: ScenarioTemplateId): ScenarioTemplate 
     demo_pitch: demoPitch,
   }
   const startYears: Record<ScenarioTemplateId, number> = {
+    controlled_experiment: 1000,
     diverse_world: 1000,
     tax_contrast: 1000,
     institution_lab: 800,
@@ -209,5 +213,9 @@ export function buildScenarioTemplate(id: ScenarioTemplateId): ScenarioTemplate 
 }
 
 export function defaultScenarioTemplateId(): ScenarioTemplateId {
-  return 'diverse_world'
+  return 'controlled_experiment'
+}
+
+export function isControlledExperimentTemplate(id: ScenarioTemplateId): boolean {
+  return id === 'controlled_experiment'
 }

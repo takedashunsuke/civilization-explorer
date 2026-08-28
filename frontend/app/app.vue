@@ -14,8 +14,15 @@ import {
   SCENARIO_TEMPLATE_IDS,
   buildScenarioTemplate,
   defaultScenarioTemplateId,
+  isControlledExperimentTemplate,
   type ScenarioTemplateId,
 } from '~/utils/scenarioTemplates'
+import {
+  EXPERIMENT_SEED,
+  EXPERIMENT_VARIANT_IDS,
+  type ExperimentSummary,
+  type ExperimentVariantId,
+} from '~/utils/experimentWorlds'
 import { buildOpeningStory, buildOutcomeArc, buildTurnStory } from '~/utils/storyNarrative'
 import { BACKGROUND_ROWS, macroOf, subregionChoices, type ContinentId, type RegionDraft } from '~/utils/continents'
 
@@ -140,6 +147,10 @@ type Simulation = {
     source?: string
   }>
   world_summary?: string
+  controlled_experiment?: boolean
+  experiment_variant?: string
+  experiment_seed?: number
+  experiment_summary?: ExperimentSummary
 }
 
 const AUTO_INTERVAL_MS = 800
@@ -222,6 +233,57 @@ const calendarEra = ref<'bc' | 'ad'>('ad')
 const calendarYear = ref(1000)
 const conditionStep = ref(1)
 const selectedTemplateId = ref<ScenarioTemplateId>(defaultScenarioTemplateId())
+const activeExperimentVariant = ref<ExperimentVariantId>('peace')
+const experimentSummaries = ref<Partial<Record<ExperimentVariantId, ExperimentSummary>>>({})
+const selectedAgentId = ref<string | null>(null)
+
+const isControlledMode = computed(
+  () => sim.value?.controlled_experiment || isControlledExperimentTemplate(selectedTemplateId.value),
+)
+
+const experimentWorldLabels: Record<ExperimentVariantId, string> = {
+  peace: 'experiment.worldPeace',
+  famine: 'experiment.worldFamine',
+  war: 'experiment.worldWar',
+  trade: 'experiment.worldTrade',
+}
+
+const experimentComparisonRows = computed(() =>
+  EXPERIMENT_VARIANT_IDS.map((id) => ({
+    id,
+    summary: experimentSummaries.value[id],
+  })).filter((row) => row.summary),
+)
+
+const spotlightAgent = computed(() => {
+  const id = selectedAgentId.value || sim.value?.experiment_summary?.spotlight_agent_id
+  if (!id || !sim.value) return null
+  return sim.value.agents.find((a) => a.id === id && a.alive) ?? sim.value.agents.find((a) => a.id === id)
+})
+
+const spotlightSettlement = computed(() => {
+  const agent = spotlightAgent.value
+  if (!agent?.settlement_id || !sim.value?.settlements) return null
+  return sim.value.settlements.find((s) => s.id === agent.settlement_id)
+})
+
+const spotlightRegionReading = computed(() => {
+  const agent = spotlightAgent.value
+  if (!agent || !sim.value?.region_readings) return null
+  const key = agent.subregion_id || agent.region_id
+  return sim.value.region_readings.find((r) => (r.subregion_id || r.region_id) === key)
+})
+
+function pctTrait(value: number | undefined): number {
+  return Math.round((Number(value) || 0) * 100)
+}
+
+function storeExperimentSummary(summary: ExperimentSummary | undefined) {
+  if (!summary?.variant) return
+  const id = summary.variant as ExperimentVariantId
+  experimentSummaries.value[id] = summary
+}
+
 const activeTemplateId = ref<ScenarioTemplateId>(defaultScenarioTemplateId())
 const digestNumbersOpen = ref(false)
 const regionDrafts = ref<RegionDraft[]>(buildScenarioTemplate(defaultScenarioTemplateId()).regions)
@@ -237,6 +299,7 @@ const templateBlurb = computed(() => t(`templates.${selectedTemplateId.value}.bl
 
 function applyScenarioTemplate(id: ScenarioTemplateId) {
   selectedTemplateId.value = id
+  conditionStep.value = 1
   const tpl = buildScenarioTemplate(id)
   regionDrafts.value = tpl.regions.map((region) => ({ ...region }))
   calendarEra.value = tpl.era
@@ -801,6 +864,17 @@ function eventDetail(row: EventRow): string {
   return translated === key ? row.detail : translated
 }
 
+function onSelectAgent(agentId: string) {
+  selectedAgentId.value = agentId
+  digestOpen.value = true
+}
+
+async function switchExperimentWorld(variant: ExperimentVariantId) {
+  if (busy.value || creating.value) return
+  activeExperimentVariant.value = variant
+  await createControlledWorld(variant)
+}
+
 async function onLocaleChange(code: string) {
   if (!code || code === locale.value) return
   await setLocale(code)
@@ -827,7 +901,46 @@ function stopAutoPlay() {
   }
 }
 
+async function createControlledWorld(variant: ExperimentVariantId) {
+  stopAutoPlay()
+  busy.value = true
+  creating.value = true
+  error.value = ''
+  selectedAgentId.value = null
+  try {
+    const result = await api<Simulation>('/simulations', {
+      method: 'POST',
+      body: {
+        start_year: draftAstroYear.value,
+        geography: 'world',
+        controlled_experiment: true,
+        experiment_variant: variant,
+        experiment_seed: EXPERIMENT_SEED,
+      },
+    })
+    sim.value = result
+    storeExperimentSummary(result.experiment_summary)
+    activeExperimentVariant.value = variant
+    activeTemplateId.value = 'controlled_experiment'
+    if (result.experiment_summary?.spotlight_agent_id) {
+      selectedAgentId.value = result.experiment_summary.spotlight_agent_id
+    }
+    conditionsOpen.value = false
+    digestOpen.value = true
+    await startAutoPlay()
+  } catch (e: unknown) {
+    error.value = formatApiError(e)
+  } finally {
+    busy.value = false
+    creating.value = false
+  }
+}
+
 async function createSimulation() {
+  if (isControlledExperimentTemplate(selectedTemplateId.value)) {
+    await createControlledWorld(activeExperimentVariant.value)
+    return
+  }
   stopAutoPlay()
   busy.value = true
   creating.value = true
@@ -887,6 +1000,10 @@ async function tick(n = 1, opts?: { silent?: boolean }) {
       method: 'POST',
       body: { n },
     })
+    storeExperimentSummary(sim.value.experiment_summary)
+    if (sim.value.experiment_summary?.spotlight_agent_id && !selectedAgentId.value) {
+      selectedAgentId.value = sim.value.experiment_summary.spotlight_agent_id
+    }
     if (turnsUntilYearCap() <= 0) stopAutoPlay()
   } catch (e: unknown) {
     const err = e as { statusCode?: number; status?: number }
@@ -1011,6 +1128,15 @@ onBeforeUnmount(() => {
             @click="tick(5)"
           />
           <Button
+            :label="t('actions.tick10')"
+            icon="pi pi-forward"
+            class="header-btn"
+            :disabled="!sim || autoPlaying || atYearCap"
+            :loading="busy && !autoPlaying"
+            severity="help"
+            @click="tick(10)"
+          />
+          <Button
             :label="autoPlaying ? t('actions.autoStop') : t('actions.autoPlay')"
             :icon="autoPlaying ? 'pi pi-stop' : 'pi pi-play'"
             class="header-btn"
@@ -1018,6 +1144,20 @@ onBeforeUnmount(() => {
             :severity="autoPlaying ? 'danger' : 'secondary'"
             @click="toggleAutoPlay"
           />
+        </div>
+        <div v-if="isControlledMode && sim" class="experiment-worlds" role="group" :aria-label="t('experiment.worldsTitle')">
+          <span class="experiment-worlds-label">{{ t('experiment.worldsTitle') }}</span>
+          <button
+            v-for="variant in EXPERIMENT_VARIANT_IDS"
+            :key="variant"
+            type="button"
+            class="experiment-world-btn"
+            :class="{ active: activeExperimentVariant === variant }"
+            :disabled="busy || creating"
+            @click="switchExperimentWorld(variant)"
+          >
+            {{ t(experimentWorldLabels[variant]) }}
+          </button>
         </div>
         <div class="header-turn-row">
           <Tag v-if="sim" :value="turnStatusLabel" severity="info" />
@@ -1079,7 +1219,7 @@ onBeforeUnmount(() => {
         </div>
         <p class="hint map-legend">{{ t('map.legend') }} {{ t('map.zoomHintFlat') }}</p>
         <div class="map-stage">
-          <WorldMap2D :sim="sim" geography="world" :seed="mapSeed" />
+          <WorldMap2D :sim="sim" geography="world" :seed="mapSeed" @select-agent="onSelectAgent" />
           <button
             v-if="sim && turnDigest"
             type="button"
@@ -1168,6 +1308,76 @@ onBeforeUnmount(() => {
                   {{ turnDigest.notableEvents.slice(0, 3).map((item) => notableEventText(item)).join(' · ') }}
                 </p>
                 <p v-else-if="!digestWorldLine && !turnStory?.paragraphs.length" class="hint">{{ t('digest.notableEmpty') }}</p>
+              </section>
+              <section v-if="experimentComparisonRows.length" class="digest-section digest-section-experiment">
+                <h3>{{ t('experiment.compareTitle') }}</h3>
+                <p class="hint experiment-fixed">{{ t('experiment.fixedNote') }}</p>
+                <table class="experiment-compare-table">
+                  <thead>
+                    <tr>
+                      <th>{{ t('experiment.colWorld') }}</th>
+                      <th>{{ t('experiment.colPopulation') }}</th>
+                      <th>{{ t('experiment.colTrade') }}</th>
+                      <th>{{ t('experiment.colConflict') }}</th>
+                      <th>{{ t('experiment.colArchetype') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in experimentComparisonRows" :key="row.id">
+                      <td>{{ t(experimentWorldLabels[row.id]) }}</td>
+                      <td>{{ row.summary?.population_delta_pct != null ? `${row.summary.population_delta_pct}%` : '—' }}</td>
+                      <td>{{ row.summary?.trade_openness_mean ?? '—' }}</td>
+                      <td>{{ row.summary?.conflicts_total ?? '—' }}</td>
+                      <td>{{ digestArchetypeLabel(row.summary?.dominant_archetype || 'none') }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <p v-if="experimentComparisonRows.length >= 2" class="experiment-unexpected">{{ t('experiment.unexpected') }}</p>
+              </section>
+              <section v-if="spotlightAgent" class="digest-section digest-section-spotlight">
+                <h3>{{ t('experiment.spotlightTitle') }}</h3>
+                <p class="hint">{{ t('experiment.spotlightHint') }}</p>
+                <p class="spotlight-name"><strong>{{ spotlightAgent.name }}</strong> <span class="spotlight-id">{{ spotlightAgent.id }}</span></p>
+                <ul class="spotlight-trait-list">
+                  <li>{{ t('experiment.traitCooperation') }} {{ pctTrait(spotlightAgent.personality?.cooperation) }}</li>
+                  <li>{{ t('experiment.traitAggression') }} {{ pctTrait(spotlightAgent.personality?.aggression) }}</li>
+                  <li>{{ t('experiment.traitAmbition') }} {{ pctTrait(spotlightAgent.personality?.ambition) }}</li>
+                  <li v-if="spotlightAgent.traits?.length">traits: {{ spotlightAgent.traits.join(', ') }}</li>
+                </ul>
+                <p v-if="spotlightSettlement" class="spotlight-supporters">
+                  {{ t('experiment.supporters', { n: spotlightSettlement.member_ids.length }) }}
+                </p>
+                <p v-if="sim?.experiment_summary?.spotlight_role" class="spotlight-role">
+                  {{ t('experiment.roleTitle') }}:
+                  {{ digestArchetypeLabel(sim.experiment_summary.spotlight_role) }}
+                </p>
+                <div v-if="spotlightRegionReading" class="digest-flow spotlight-env">
+                  <span class="digest-flow-chip signal">{{ digestPrimarySignal(spotlightRegionReading) }}</span>
+                  <span class="digest-flow-arrow" aria-hidden="true">→</span>
+                  <span class="digest-flow-chip trajectory" :data-traj="spotlightRegionReading.trajectory">
+                    {{ digestTrajectoryLabel(spotlightRegionReading.trajectory) }}
+                  </span>
+                </div>
+                <p v-if="spotlightRegionReading && digestCausalSummary({
+                  tension: spotlightRegionReading.tension,
+                  prosperity: spotlightRegionReading.prosperity,
+                  discontent: spotlightRegionReading.discontent,
+                  cohesion: spotlightRegionReading.cohesion,
+                  risingArchetype: spotlightRegionReading.rising_archetype,
+                  trajectory: spotlightRegionReading.trajectory,
+                  summary: spotlightRegionReading.summary,
+                })" class="spotlight-why">
+                  <strong>{{ t('experiment.whyTitle') }}</strong>
+                  {{ digestCausalSummary({
+                    tension: spotlightRegionReading.tension,
+                    prosperity: spotlightRegionReading.prosperity,
+                    discontent: spotlightRegionReading.discontent,
+                    cohesion: spotlightRegionReading.cohesion,
+                    risingArchetype: spotlightRegionReading.rising_archetype,
+                    trajectory: spotlightRegionReading.trajectory,
+                    summary: spotlightRegionReading.summary,
+                  }) }}
+                </p>
               </section>
               <section class="digest-section digest-section-obs">
                 <h3>
@@ -1258,15 +1468,26 @@ onBeforeUnmount(() => {
             />
             <p class="template-blurb">{{ templateBlurb }}</p>
             <p class="hint template-hint">{{ t('templates.hint') }}</p>
+            <p v-if="isControlledExperimentTemplate(selectedTemplateId)" class="hint experiment-fixed">
+              {{ t('experiment.fixedNote') }}
+            </p>
           </section>
-          <nav class="step-nav" aria-label="steps">
+          <nav v-if="!isControlledExperimentTemplate(selectedTemplateId)" class="step-nav" aria-label="steps">
             <button type="button" class="step-tab" :class="{ active: conditionStep === 1 }" @click="conditionStep = 1">{{ t('wizard.step1') }}</button>
             <button type="button" class="step-tab" :class="{ active: conditionStep === 2 }" @click="conditionStep = 2">{{ t('wizard.step2') }}</button>
             <button type="button" class="step-tab" :class="{ active: conditionStep === 3 }" @click="conditionStep = 3">{{ t('wizard.step3') }}</button>
           </nav>
-          <p class="conditions-lead">{{ t(`wizard.lead${conditionStep}`) }}</p>
+          <p v-if="!isControlledExperimentTemplate(selectedTemplateId)" class="conditions-lead">{{ t(`wizard.lead${conditionStep}`) }}</p>
+          <p v-else class="conditions-lead">{{ templateBlurb }}</p>
 
-          <section v-if="conditionStep === 1" class="conditions-section">
+          <section v-if="conditionStep === 1 && isControlledExperimentTemplate(selectedTemplateId)" class="conditions-section experiment-setup-blurb">
+            <p>{{ t('templates.controlled_experiment.opening', { year: draftAstroYear.value }) }}</p>
+            <ul class="experiment-variant-list">
+              <li v-for="variant in EXPERIMENT_VARIANT_IDS" :key="variant">{{ t(experimentWorldLabels[variant]) }}</li>
+            </ul>
+          </section>
+
+          <section v-else-if="conditionStep === 1" class="conditions-section">
             <div class="bg-table" role="table">
               <div class="bg-row bg-head" role="row">
                 <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
@@ -1292,7 +1513,7 @@ onBeforeUnmount(() => {
             </div>
           </section>
 
-          <section v-else-if="conditionStep === 2" class="conditions-section">
+          <section v-else-if="conditionStep === 2 && !isControlledExperimentTemplate(selectedTemplateId)" class="conditions-section">
             <DataTable :value="step2Axes" class="conditions-dt">
               <Column :header="t('wizard.axis')" class="dt-axis">
                 <template #body="{ data }">
@@ -1449,8 +1670,8 @@ onBeforeUnmount(() => {
           <p v-if="error" class="error">{{ error }}</p>
         </div>
         <div class="conditions-footer step-footer">
-          <Button v-if="conditionStep > 1" :label="t('wizard.back')" class="action-btn" severity="secondary" :disabled="creating" @click="conditionStep -= 1" />
-          <Button v-if="conditionStep < 3" :label="t('wizard.next')" class="action-btn" :disabled="creating" @click="conditionStep += 1" />
+          <Button v-if="conditionStep > 1 && !isControlledExperimentTemplate(selectedTemplateId)" :label="t('wizard.back')" class="action-btn" severity="secondary" :disabled="creating" @click="conditionStep -= 1" />
+          <Button v-if="conditionStep < 3 && !isControlledExperimentTemplate(selectedTemplateId)" :label="t('wizard.next')" class="action-btn" :disabled="creating" @click="conditionStep += 1" />
           <Button v-else :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy && !autoPlaying" :disabled="creating" @click="createSimulation" />
         </div>
       </div>
@@ -2855,6 +3076,85 @@ label {
 .error {
   color: #ff8f8f;
   font-size: 0.85rem;
+}
+
+.experiment-worlds {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.35rem;
+}
+
+.experiment-worlds-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.experiment-world-btn {
+  font-size: 0.68rem;
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--panel) 80%, #0b1218);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.experiment-world-btn.active {
+  border-color: color-mix(in srgb, var(--primary) 60%, var(--line));
+  background: color-mix(in srgb, var(--primary) 18%, var(--panel));
+}
+
+.experiment-compare-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.68rem;
+}
+
+.experiment-compare-table th,
+.experiment-compare-table td {
+  border: 1px solid var(--line);
+  padding: 0.25rem 0.35rem;
+  text-align: left;
+}
+
+.experiment-fixed,
+.experiment-unexpected {
+  font-size: 0.68rem;
+}
+
+.experiment-unexpected {
+  margin-top: 0.35rem;
+  color: var(--primary);
+}
+
+.spotlight-name {
+  margin: 0.25rem 0;
+  font-size: 0.78rem;
+}
+
+.spotlight-id {
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.spotlight-trait-list {
+  margin: 0.25rem 0;
+  padding-left: 1rem;
+  font-size: 0.68rem;
+}
+
+.spotlight-why {
+  margin: 0.35rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.4;
+}
+
+.experiment-variant-list {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.72rem;
 }
 
 @media (max-width: 1100px) {

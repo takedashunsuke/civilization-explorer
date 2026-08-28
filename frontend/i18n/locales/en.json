@@ -427,6 +427,7 @@
     "ticking": "Computing turn…",
     "tick": "+10 years",
     "tick5": "+50 years",
+    "tick10": "+100 years",
     "autoPlay": "Play",
     "autoStop": "Stop"
   },
@@ -460,7 +461,36 @@
       "name": "Uniform baseline",
       "blurb": "All columns aligned: democracy, mid tax, 1000 people.",
       "opening": "AD {year}. A neutral baseline — change one knob and rerun."
+    },
+    "controlled_experiment": {
+      "name": "Controlled experiment (same 5,000 × 4 worlds)",
+      "blurb": "Fixed seed, personality, traits, and spawn — only resources, disasters, institutions, and trade differ.",
+      "opening": "AD {year}. The same 5,000 people placed into four different environments."
     }
+  },
+  "experiment": {
+    "worldsTitle": "Switch world",
+    "worldPeace": "A Peace",
+    "worldFamine": "B Famine",
+    "worldWar": "C War",
+    "worldTrade": "D Trade",
+    "compareTitle": "After 100 years (same people, different worlds)",
+    "colWorld": "World",
+    "colPopulation": "Population",
+    "colTrade": "Trade",
+    "colConflict": "Conflict",
+    "colArchetype": "Rising type",
+    "unexpected": "Same humans — different roles",
+    "spotlightTitle": "Zoom on one person",
+    "spotlightHint": "Click a dot on the map",
+    "traitCooperation": "Cooperation",
+    "traitAggression": "Aggression",
+    "traitAmbition": "Ambition",
+    "envTitle": "Environment",
+    "roleTitle": "Role in this world",
+    "supporters": "Group size {n}",
+    "whyTitle": "Why this person?",
+    "fixedNote": "Fixed: ID, personality, traits, spawn, seed, population"
   },
   "story": {
     "regionOpening": "· {region} ({sub}) — {institution}, tax {tax}%, {religion}",

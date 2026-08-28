@@ -65,6 +65,10 @@ const props = defineProps<{
   seed: number
 }>()
 
+const emit = defineEmits<{
+  selectAgent: [agentId: string]
+}>()
+
 const { t } = useI18n()
 const wrapRef = ref<HTMLElement | null>(null)
 const canvasRef = ref<HTMLCanvasElement | null>(null)
@@ -84,6 +88,7 @@ let scale = 1
 let ox = 0
 let oy = 0
 let drag: { x: number; y: number; ox: number; oy: number } | null = null
+let dragStart: { x: number; y: number } | null = null
 let raf = 0
 let disposed = false
 let resizeObs: ResizeObserver | null = null
@@ -450,8 +455,38 @@ function zoomOut() {
 
 function onPointerDown(ev: PointerEvent) {
   panning.value = true
+  dragStart = { x: ev.clientX, y: ev.clientY }
   drag = { x: ev.clientX, y: ev.clientY, ox, oy }
   ;(ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId)
+}
+
+function findAgentAt(clientX: number, clientY: number): MapAgent | null {
+  const canvas = canvasRef.value
+  const earth = earthCanvas
+  if (!canvas || !earth || !props.sim) return null
+  const rect = canvas.getBoundingClientRect()
+  const { dpr } = viewSize()
+  const sx = (clientX - rect.left) * dpr
+  const sy = (clientY - rect.top) * dpr
+  const wx = (sx - ox) / scale
+  const wy = (sy - oy) / scale
+  const leaders = new Set(
+    (props.sim.settlements ?? []).map((s) => s.leader_id).filter((id): id is string => Boolean(id)),
+  )
+  let best: MapAgent | null = null
+  let bestDist = Infinity
+  for (const agent of props.sim.agents) {
+    if (!agent.alive) continue
+    const [ax, ay] = projectAgent(agent, earth)
+    const isLeader = leaders.has(agent.id)
+    const r = ((isLeader ? 5.5 : 4) + Math.min(4, agent.wealth / 250)) / scale
+    const dist = Math.hypot(wx - ax, wy - ay)
+    if (dist <= r + 6 / scale && dist < bestDist) {
+      bestDist = dist
+      best = agent
+    }
+  }
+  return best
 }
 
 function onPointerMove(ev: PointerEvent) {
@@ -461,9 +496,17 @@ function onPointerMove(ev: PointerEvent) {
   oy = drag.oy + (ev.clientY - drag.y) * dpr
 }
 
-function onPointerUp() {
+function onPointerUp(ev: PointerEvent) {
+  if (dragStart) {
+    const moved = Math.hypot(ev.clientX - dragStart.x, ev.clientY - dragStart.y)
+    if (moved < 8) {
+      const hit = findAgentAt(ev.clientX, ev.clientY)
+      if (hit) emit('selectAgent', hit.id)
+    }
+  }
   panning.value = false
   drag = null
+  dragStart = null
 }
 
 function onWheel(ev: WheelEvent) {

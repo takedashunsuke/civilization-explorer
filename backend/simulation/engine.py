@@ -115,8 +115,10 @@ def _build_region(params: RegionParams, seed: int) -> RegionState:
     preset = resolve_preset(params.id, params.subregion_id)
     landform = preset["landform"]
     climate = preset["climate"]
-    resource_pool = float(preset["resource_pool"])
-    disaster_frequency = float(preset["disaster_frequency"])
+    resource_pool = float(params.resource_pool if params.resource_pool is not None else preset["resource_pool"])
+    disaster_frequency = float(
+        params.disaster_frequency if params.disaster_frequency is not None else preset["disaster_frequency"]
+    )
     sanitation = float(preset.get("sanitation", 0.5))
     terrain = generate_terrain(landform, climate, _region_seed(seed, params.subregion_id or params.id.value))
     return RegionState(
@@ -189,32 +191,13 @@ def region_terrain(sim: SimulationState, agent: AgentState):
     return region.terrain if region else sim.world.terrain
 
 
-def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
-    rng = random.Random(params.seed)
-    region_params = list(params.regions)
-    if not region_params:
-        theater, landform = resolve_theater_and_landform(params.geography, params.landform)
-        region_params = [
-            RegionParams(
-                id=theater if theater in CONTINENT_PRESETS else GeographyType.asia,
-                subregion_id=resolve_subregion(
-                    theater if theater in CONTINENT_PRESETS else GeographyType.asia,
-                    None,
-                ),
-                population=max(POPULATION_MIN, min(POPULATION_MAX, params.population)),
-                institution=params.institution,
-                tax_rate=params.tax_rate,
-                education_level=params.education_level,
-                religion=params.religion,
-                initial_values=params.initial_values,
-            )
-        ]
-    regions = [_build_region(item, params.seed) for item in region_params]
+def generate_agent_roster(region_params: list[RegionParams], seed: int) -> list[AgentState]:
+    """Build a fixed agent population for controlled experiments (identity only)."""
+    rng = random.Random(seed)
+    regions = [_build_region(item, seed) for item in region_params]
     agents: list[AgentState] = []
     idx = 0
     for spec, region in zip(region_params, regions):
-        # Several camps across the region so individuals read as a scattered band,
-        # not one tight blob. Nearby camps still merge via SETTLEMENT_DISTANCE.
         n_camps = max(4, min(20, spec.population // 60))
         homes = [
             random_land_position(region.terrain, rng, region.landform, region.climate)
@@ -235,7 +218,6 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
             if "genius" in traits:
                 wealth += 4
             home = homes[rng.randrange(len(homes))]
-            # Mild radial bias so camps look organic rather than a hard square.
             angle = rng.uniform(0, 2 * math.pi)
             radius = local_jitter * (rng.random() ** 0.55)
             pos = snap_to_land(
@@ -259,6 +241,51 @@ def create_simulation(sim_id: str, params: WorldParams) -> SimulationState:
                     subregion_id=region.subregion_id,
                 )
             )
+    return agents
+
+
+def clone_roster_for_world(roster: list[AgentState]) -> list[AgentState]:
+    """Fresh runtime copy: reset affiliations but keep identity (id, personality, traits, spawn)."""
+    out: list[AgentState] = []
+    for agent in roster:
+        copy = agent.model_copy(deep=True)
+        copy.settlement_id = None
+        copy.allegiance = Allegiance.neutral
+        copy.alive = True
+        copy.memory = []
+        copy.goal = "survive and grow"
+        out.append(copy)
+    return out
+
+
+def create_simulation(
+    sim_id: str,
+    params: WorldParams,
+    agent_roster: list[AgentState] | None = None,
+) -> SimulationState:
+    region_params = list(params.regions)
+    if not region_params:
+        theater, landform = resolve_theater_and_landform(params.geography, params.landform)
+        region_params = [
+            RegionParams(
+                id=theater if theater in CONTINENT_PRESETS else GeographyType.asia,
+                subregion_id=resolve_subregion(
+                    theater if theater in CONTINENT_PRESETS else GeographyType.asia,
+                    None,
+                ),
+                population=max(POPULATION_MIN, min(POPULATION_MAX, params.population)),
+                institution=params.institution,
+                tax_rate=params.tax_rate,
+                education_level=params.education_level,
+                religion=params.religion,
+                initial_values=params.initial_values,
+            )
+        ]
+    regions = [_build_region(item, params.seed) for item in region_params]
+    if agent_roster is not None:
+        agents = clone_roster_for_world(agent_roster)
+    else:
+        agents = generate_agent_roster(region_params, params.seed)
 
     primary = regions[0]
     world = WorldState(

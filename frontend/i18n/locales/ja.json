@@ -427,6 +427,7 @@
     "ticking": "ターン計算中…",
     "tick": "+10年",
     "tick5": "+50年",
+    "tick10": "+100年",
     "autoPlay": "再生",
     "autoStop": "停止"
   },
@@ -460,7 +461,36 @@
       "name": "均一な基準",
       "blurb": "全列を同じ民主・中税率・1000人に揃えた対照用の基準線。",
       "opening": "西暦{year}年。条件を揃えた基準世界——ここから1項目だけ変えて比較する。"
+    },
+    "controlled_experiment": {
+      "name": "対照実験（同一5000人×4世界）",
+      "blurb": "seed・人格・初期位置を固定し、資源・災害・制度・交易だけを変えた4つの世界。",
+      "opening": "西暦{year}年。同じ5000人を、違う環境の世界へ同時に送り出す controlled experiment。"
     }
+  },
+  "experiment": {
+    "worldsTitle": "世界を切り替え",
+    "worldPeace": "A 平和",
+    "worldFamine": "B 飢饉",
+    "worldWar": "C 戦争",
+    "worldTrade": "D 交易",
+    "compareTitle": "100年後の差（同一人口の別世界）",
+    "colWorld": "世界",
+    "colPopulation": "人口",
+    "colTrade": "交易",
+    "colConflict": "紛争",
+    "colArchetype": "台頭タイプ",
+    "unexpected": "同じ人間なのに、役割が変わった",
+    "spotlightTitle": "人物にズーム",
+    "spotlightHint": "地図の点をクリック",
+    "traitCooperation": "協調性",
+    "traitAggression": "攻撃性",
+    "traitAmbition": "野心",
+    "envTitle": "環境",
+    "roleTitle": "この世界での役割",
+    "supporters": "所属集団 {n} 人",
+    "whyTitle": "なぜこの人物だったのか？",
+    "fixedNote": "固定: ID・人格・traits・初期位置・seed・人口"
   },
   "story": {
     "regionOpening": "・{region}（{sub}）— {institution}、税{tax}%、{religion}",
