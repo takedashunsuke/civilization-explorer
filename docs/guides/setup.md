@@ -1,11 +1,11 @@
-# ローカル起動（MVP スタブ）
+# ローカル起動
 
 ## 前提
 
 * Node.js 22.19+（Nuxt 4 の engines 要件）
 * Python 3.12+（macOS では `python` ではなく `python3` のことが多い）
-* （任意）Ollama — `LLM_PROVIDER=ollama` で意思決定に接続。失敗時はヒューリスティック。手順は下記「Ollama」
-* （任意）Docker / Supabase CLI — 永続化 Phase 4 以降。MVP の結果キャッシュはブラウザの localStorage（1日）で足りる
+* （任意）Ollama — `LLM_PROVIDER=ollama` で地域観測・集団方針に接続。失敗時はヒューリスティック。手順は下記「Ollama」
+* （任意）Docker / Supabase CLI — 永続化 Phase 4 以降。MVP はインメモリ + `GET /simulations/{id}/replay`
 ## Backend
 
 ### macOS / Linux
@@ -91,16 +91,17 @@ API だけ確認する場合: `http://127.0.0.1:11434/api/tags`
 LLM_PROVIDER=ollama
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 OLLAMA_MODEL=llama3.2:1b
-LLM_MAX_AGENTS_PER_TURN=4
+LLM_GROUP_SAMPLE_PER_REGION=12
 LLM_TIMEOUT_SEC=8
 LLM_CONCURRENCY=1
+LLM_NARRATIVE_LANG=ja
 ```
 
-`LLM_PROVIDER=stub` のままだとヒューリスティックのまま。切替後に Backend を再起動し、`http://127.0.0.1:8000/health` の `llm.wired` が `true` であることを確認する。
+`LLM_PROVIDER=stub` のままだとヒューリスティックのみ。切替後に Backend を再起動し、`http://127.0.0.1:8000/health` の `llm.wired` が `true` であることを確認する。
 
 要約・理由の表示言語は `LLM_NARRATIVE_LANG=ja`（既定）または `en`。
 
-各ターン、リーダー／特異 traits を優先して最大 `LLM_MAX_AGENTS_PER_TURN` 人だけ LLM が行動を選ぶ。残りと失敗時はヒューリスティック。出来事パネルに LLM 理由が表示される。
+各ターン末、LLM（接続時）が地域ごとに観測し、次ターンの集団方針を決める。方針は列あたり最大 `LLM_GROUP_SAMPLE_PER_REGION` 人のサンプル実行者（リーダー・特異 traits 優先）に反映される。失敗時はヒューリスティック。状況パネルと出来事に要約・理由が表示される。
 
 ### トラブル
 
@@ -114,53 +115,14 @@ LLM_CONCURRENCY=1
 
 1. （任意）Ollama を起動し、モデルを pull する
 2. Backend / Frontend を起動
-3. UI で Create → Tick（または Tick ×5）
-4. 2D マップと Event / メトリクスが更新されることを確認
+3. UI で Create → Tick（または Tick ×5 / 自動再生）
+4. 平面地図・状況パネル・出来事が更新されることを確認
 
-## 結果のブラウザ保存（MVP）
+## 結果の保存（将来）
 
-Postgres の前段として、シミュレーション結果は **localStorage に簡単な JSON、有効期限 1 日** で足りる。ワールド全文・地形・全 Event は入れない（容量の上限にすぐ届く）。
+Postgres（Drizzle Phase 4）の前段として、以下が想定されている。
 
-既存の `GET /simulations/{id}/replay`（再実行用パラメータ）と `last_metrics` / `history` をそのまま載せる形が最適。
+* `GET /simulations/{id}/replay` で同条件再 Create 用パラメータを取得
+* ブラウザ localStorage への簡易 JSON 保存（設計メモのみ。**現行フロント未実装**）
 
-```json
-{
-  "v": 1,
-  "savedAt": "2026-08-24T01:00:00.000Z",
-  "expiresAt": "2026-08-25T01:00:00.000Z",
-  "params": {
-    "seed": 42,
-    "population": 8,
-    "resource_pool": 100,
-    "education_level": 0.5,
-    "tax_rate": 0.1,
-    "institution": "democracy",
-    "start_year": 700,
-    "geography": "asia",
-    "landform": "continent",
-    "climate": "temperate",
-    "initial_values": { "cooperation": 0.5, "authority_acceptance": 0.5 }
-  },
-  "outcome": {
-    "id": "uuid",
-    "turn": 24,
-    "population": 8,
-    "status": "paused",
-    "last_metrics": {
-      "inequality": 0.2,
-      "mean_trust": 0.1,
-      "cooperation_rate": 0.4,
-      "authority": 0.5,
-      "mean_happiness": 0.5
-    },
-    "history": [
-      { "turn": 24, "summary": "…", "metrics": {} }
-    ]
-  }
-}
-```
-
-* `params` だけで同条件の再 Create ができる
-* `outcome` は観測用の要約。`history` は直近数十ターンまでに切る
-* キーは 1 本に配列で複数 run を入れ、起動時に `expiresAt` を過ぎたものを捨てる
-* 読めなければ新規作成にフォールバックする（容量超過・別 origin は想定内）
+永続化が必要になったら `frontend/server/db/` に Drizzle schema を追加する。

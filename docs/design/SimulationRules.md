@@ -1,10 +1,10 @@
 # Simulation Rules（最小定義）
 
 MVP 向けの最小ルール。  
-「LLM が意思決定し、ルールが結果を確定する」二層構造とする。
+「LLM が観測・方針を担い、ルールが結果を確定する」二層構造とする。
 
-* **意思決定層（LLM）**: 何をするか選ぶ
-* **解決層（ルール）**: 選ばれた行動が世界状態をどう変えるか確定する
+* **観測・方針層（LLM / ヒューリスティック）**: ターン末に地域を読み、次ターンの集団方針を決める
+* **実行層（サンプル + ルール）**: 方針に沿った行動をサンプル実行者に適用し、数値・勝敗・移動を確定する
 
 ---
 
@@ -18,12 +18,12 @@ MVP 向けの最小ルール。
 1 Turn の順序は固定する。
 
 ```text
-1. 観測スナップショット作成（全 Agent 共通の世界見え方を固定）
-2. 各 Agent が行動を決定（LLM またはフォールバック）
-3. 行動を優先度順に解決
-4. 世界パラメータ・メトリクス更新
-5. Event / History 記録
-6. Turn 番号を +1
+1. 前ターン末に決まった地域ごとの集団方針（RegionPolicy）を読み込む
+2. 列あたり最大 LLM_GROUP_SAMPLE_PER_REGION 人のサンプル実行者が方針に沿って行動を選ぶ
+3. 行動を優先度順に解決（ルール層）
+4. ターン末の世界処理（出生・加齢・死亡・集落再編・災害・体制遷移など）
+5. 地域観測（LLM 接続時）またはヒューリスティック観測 → 次ターン方針を更新
+6. Event / History 記録、Turn 番号を +1
 ```
 
 同時行動の衝突は「解決優先度」で処理する（後述）。ランダム性が必要な箇所は `seed` で再現可能にする。
@@ -135,29 +135,45 @@ World の `institution` に加え、実行時に次を持つ。
 | `birth` | 新生 Agent | ターン末の世界処理。親の近くに子が生まれる |
 | `resist` | 制度 | 制度に反抗し、納税拒否・権威低下 |
 
-### 3.1 意思決定（LLM）
+### 3.1 意思決定（LLM / 集団方針）
 
-LLM への入力（最小）
+現行実装は **全 Agent 個別 LLM** ではなく、**地域観測 → 集団方針 → サンプル実行** とする。
 
-* 自分の状態（wealth, energy, happiness, personality, goal, memory）
-* 近傍 Agent 一覧（id, 距離, trust）
-* 世界の要約（turn, tax_rate, institution, authority, resource_pool）
+#### ターン末: 地域観測（`observe_and_steer_regions`）
 
-LLM の出力（JSON 必須）
+入力（地域 factsheet）
 
-```json
-{
-  "action": "cooperate",
-  "target_id": "agent_3",
-  "reason": "信頼が高い相手と資源を増やしたい"
-}
-```
+* 人口、リーダー、当ターンの行動集計、衝撃イベント
+* 制度・税率・権威・宗教など
 
-制約
+出力（`RegionReading` + `RegionPolicy`）
 
-* `target_id` が必要な行動で対象不正 → `wait` にフォールバック
-* energy が閾値未満 → `wait` 強制
-* パース失敗・タイムアウト → personality に基づくヒューリスティック
+* 緊張・繁栄・不満・結束（0–1）
+* 台頭人物アーキタイプ（reformer / warlord / merchant / priest / bureaucrat / explorer / none）
+* 軌道（war / industry / reform / stagnation / exodus / faith）
+* 因果要約（`summary`）、次ターンの推奨行動・強度・理由
+
+`LLM_PROVIDER=stub` または呼び出し失敗時はヒューリスティックにフォールバック。
+
+#### 次ターン: サンプル実行（`decide_actions`）
+
+* 列あたり最大 `LLM_GROUP_SAMPLE_PER_REGION`（既定 12）人をリーダー・特異 traits 優先で選ぶ
+* 方針の `intensity` に応じてサンプル内の一部に行動を適用
+* 行動空間: `wait` / `cooperate` / `conflict` / `migrate` / `obey` / `resist`
+
+#### レガシー: 個人単位 LLM（`decide_one` / `decide_batch`）
+
+コード上は残るが、現行 `engine.tick` からは呼ばれない。将来の拡張用。
+
+#### 設定（`.env`）
+
+| 変数 | 既定 | 説明 |
+|------|------|------|
+| `LLM_PROVIDER` | `stub` | `stub` / `ollama` / `openai` |
+| `LLM_GROUP_SAMPLE_PER_REGION` | `12` | 列あたりのサンプル実行者数 |
+| `LLM_TIMEOUT_SEC` | `8` | 1 回の LLM 呼び出し上限（秒） |
+| `LLM_CONCURRENCY` | `1` | 並列ワーカー数 |
+| `LLM_NARRATIVE_LANG` | `ja` | UI 向け要約・理由の言語（`ja` / `en`） |
 
 ### 3.2 解決ルール（最小）
 
@@ -293,9 +309,10 @@ power(x) = x.wealth * 0.4 + x.energy * 0.3 + x.aggression * 0.3 + noise()
 2. World パラメータを適用
 3. `geography` でアジア／ヨーロッパ／中東／アメリカの広域舞台を選び、観測 UI の平面地図に投影する。`landform`（大陸／島）と `climate`（温帯／寒冷／湿地／乾燥）でシミュレーション地形を変える
 4. Agent を列ごとに `population` 人生成（1000〜10000）
-   * position は列の拠点付近の陸タイル上（平野・川・海岸寄り）  
-   * personality / wealth / goal を初期価値観からサンプリング  
-   * 移動・出生も海には出さない（最も近い陸へスナップ） 
+   * position は列内の **複数キャンプ** に分散（キャンプ内は軽い放射状ジッター）
+   * 近いキャンプはターン末の集落マージでまとまる
+   * personality / wealth / goal を初期価値観からサンプリング
+   * 移動・出生も海には出さない（最も近い陸へスナップ）
 5. Relationship は空（接触後に生成）で開始してよい
 6. Institution を設定（`authority` 初期値は制度により変える）  
    * `anarchy`: 0.1  
@@ -317,12 +334,14 @@ power(x) = x.wealth * 0.4 + x.energy * 0.3 + x.aggression * 0.3 + noise()
 
 ## 8. 実装チェックリスト
 
-* [ ] World / Agent / Relationship / Settlement / Institution の状態がコード上で表現できる
-* [ ] 1 Turn の順序が実装と一致している
-* [ ] 6 行動が解決でき、Event が残る
-* [ ] LLM 出力が不正でもシミュレーションが止まらない
-* [ ] 同 `seed` + 同初期条件で、ルール解決部分が再現できる  
-  （LLM 非決定性がある場合でも、スタブ意思決定では完全再現できること）
+* [x] World / Agent / Relationship / Settlement / Institution の状態がコード上で表現できる
+* [x] 1 Turn の順序が実装と一致している
+* [x] 6 行動が解決でき、Event が残る
+* [x] LLM 出力が不正でもシミュレーションが止まらない
+* [x] 同 `seed` + 同初期条件で、ルール解決部分が再現できる
+* [x] `LLM_PROVIDER=stub` でも tick が完走する
+* [x] `LLM_PROVIDER=ollama|openai` で地域観測・集団方針が動く（失敗時ヒューリスティック）
+* [ ] デモ用シナリオ（seed・パラメータ）の実測記録（[../hackathon/RESULTS.md](../hackathon/RESULTS.md)）
 
 ---
 
