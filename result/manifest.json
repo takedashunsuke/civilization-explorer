@@ -13,24 +13,28 @@
       "variant": "lush",
       "label_ja": "豊か",
       "path": "result/raw/civ-lush-AD1100-turn10.txt",
+      "json_path": "result/raw/civ-lush-AD1100-turn10.json",
       "status": "pending"
     },
     {
       "variant": "lean",
       "label_ja": "乏しい",
       "path": "result/raw/civ-lean-AD1100-turn10.txt",
+      "json_path": "result/raw/civ-lean-AD1100-turn10.json",
       "status": "pending"
     },
     {
       "variant": "volatile",
       "label_ja": "災害多",
       "path": "result/raw/civ-volatile-AD1100-turn10.txt",
+      "json_path": "result/raw/civ-volatile-AD1100-turn10.json",
       "status": "pending"
     },
     {
       "variant": "balanced",
       "label_ja": "標準",
       "path": "result/raw/civ-balanced-AD1100-turn10.txt",
+      "json_path": "result/raw/civ-balanced-AD1100-turn10.json",
       "status": "pending"
     }
   ]

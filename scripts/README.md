@@ -11,8 +11,12 @@ chmod +x scripts/*.sh   # 初回のみ
 ```
 
 - 4 環境（豊か / 乏しい / 災害多 / 標準）× 10 ターン（100 年）を実行
-- `result/raw/civ-*.txt` を生成し `result/manifest.json` を更新
-- Backend 起動不要（シミュレーションエンジンを直接呼び出し）
+- `result/raw/civ-*.json`（`experiment_summary`・定量の正）と `civ-*.txt`（全文ログ）を生成
+- `result/manifest.json` を更新
+- Backend 起動不要。`simulation.engine` を直接呼び出し（画面の API と同一エンジン・同一 Ollama）
+- `backend/.env` を自動読み込み
+
+詳細: [docs/guides/execution-paths.md](../docs/guides/execution-paths.md)
 
 オプション:
 

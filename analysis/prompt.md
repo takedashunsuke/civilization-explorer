@@ -1,7 +1,11 @@
 # LLM 解析プロンプト（4 世界比較）
 
-以下を LLM（ChatGPT / Claude / Ollama 等）に渡してください。  
-添付ファイルは `result/raw/` の 4 本のマイルストーンレポート（`.txt`）です。
+以下を LLM（ChatGPT / Claude / Ollama 等）に渡してください。
+
+**推奨:** `result/raw/` の 4 本の **`.json`**（`experiment_summary` が定量の正）。  
+**任意:** 同じベース名の **`.txt`**（出来事ログ全文・定性用）。
+
+実行経路・共通化: [docs/guides/execution-paths.md](../docs/guides/execution-paths.md)
 
 ---
 
@@ -17,7 +21,7 @@
 - 各世界を 100 年（10 ターン）進めた時点のレポートが添付されている
 
 ## 依頼
-各 .txt の「実験サマリー（API）」節を主な根拠に、次を日本語で出力してください。
+各 .json の `experiment_summary`（または .txt の「実験サマリー（API）」節）を主な根拠に、次を日本語で出力してください。
 
 1. **定量比較表**（Markdown 表）
    - 列: 豊か / 乏しい / 災害多 / 標準
@@ -42,12 +46,12 @@
 
 ## 添付ファイル一覧（デモ後に確認）
 
-| 環境 | パス |
-|------|------|
-| 豊か | `result/raw/civ-lush-AD1100-turn10.txt` |
-| 乏しい | `result/raw/civ-lean-AD1100-turn10.txt` |
-| 災害多 | `result/raw/civ-volatile-AD1100-turn10.txt` |
-| 標準 | `result/raw/civ-balanced-AD1100-turn10.txt` |
+| 環境 | JSON（推奨） | TXT（任意） |
+|------|-------------|-------------|
+| 豊か | `result/raw/civ-lush-AD1100-turn10.json` | `...txt` |
+| 乏しい | `result/raw/civ-lean-AD1100-turn10.json` | `...txt` |
+| 災害多 | `result/raw/civ-volatile-AD1100-turn10.json` | `...txt` |
+| 標準 | `result/raw/civ-balanced-AD1100-turn10.json` | `...txt` |
 
 一覧は [result/manifest.json](../result/manifest.json) でも管理します。
 

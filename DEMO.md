@@ -8,8 +8,10 @@
 ## 前提
 
 - [README.md](./README.md) の「環境構築」まで完了していること
-- **方法 A（推奨・ブラウザ不要）:** `./scripts/run-experiment.sh` で 4 世界 × 100 年を一括実行し `result/raw/` に `.txt` を出力
+- **方法 A（推奨・ブラウザ不要）:** `./scripts/run-experiment.sh` → `result/raw/` に `.json` + `.txt`
 - **方法 B（ライブデモ用）:** Backend / Frontend を起動し、ブラウザで操作（下記「ブラウザ操作」）
+
+**UI と CLI（同じエンジン・同じ Ollama・結果の共通化）:** [docs/guides/execution-paths.md](./docs/guides/execution-paths.md)
 
 ### 方法 A — CLI（ブラウザ不要）
 
@@ -21,7 +23,14 @@
 単一環境のみ: `./scripts/run-experiment.sh --variant lush`  
 ターン数変更: `./scripts/run-experiment.sh --turns 10`（既定）
 
-> CLI はシミュレーションエンジンを直接呼び出します。Backend の起動は不要です（`LLM_PROVIDER=stub` 相当。地域観測はヒューリスティック）。
+各環境ごとに **2 ファイル**を出力します:
+
+| ファイル | 内容 |
+|----------|------|
+| `civ-{variant}-AD{年}-turn{N}.json` | **`experiment_summary`（定量の正）** + LLM 設定 |
+| `civ-{variant}-AD{年}-turn{N}.txt` | 人間向けレポート（出来事ログ全文） |
+
+> CLI は `simulation.engine` を直接呼び出し、`backend/.env` の `LLM_PROVIDER`（`ollama` 含む）を自動読み込みします。画面操作時の Backend API と **同じエンジン・同じ Ollama** です（[execution-paths.md](./docs/guides/execution-paths.md)）。
 
 ### 方法 B — ブラウザ（ライブ発表向け）
 

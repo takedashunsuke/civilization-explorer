@@ -1,6 +1,6 @@
 # LLM 解析
 
-4 世界の生ログ（`result/raw/*.txt`）を LLM で比較・要約するためのファイル群です。
+4 世界の実行結果（`result/raw/`）を LLM で比較・要約するためのファイル群です。
 
 ## ディレクトリ
 
@@ -14,15 +14,23 @@ analysis/
 
 ## 手順
 
-1. [DEMO.md](../DEMO.md) で 4 本の `.txt` を `result/raw/` に保存
-2. `prompt.md` を開き、4 ファイルの内容を添付（または `result/raw/` のパスを LLM に読ませる）
-3. LLM の応答を `output/` に保存（例: `output/comparison-2026-08-29.md`）
-4. 定量表・発表用の要点を `summary.md` に転記
+1. [DEMO.md](../DEMO.md) で `./scripts/run-experiment.sh` を実行（またはブラウザで同等の実験）
+2. `result/raw/` に `.json`（定量）と `.txt`（全文ログ）が揃っていることを確認
+3. `prompt.md` を LLM に渡す（`.json` 4 本推奨。長文比較なら `.txt` も可）
+4. 応答を `output/` に保存し、要点を `summary.md` に転記
+
+## 数値の正
+
+| 優先 | ファイル | 内容 |
+|------|----------|------|
+| **1** | `result/raw/*.json` | `experiment_summary` — 画面 API と CLI で同一 |
+| 2 | `result/raw/*.txt` | 「実験サマリー（API）」節（`.json` と同値） |
+
+実行経路の説明: [docs/guides/execution-paths.md](../docs/guides/execution-paths.md)
 
 ## 注意
 
-- 数値の**正**は各 `.txt` の「実験サマリー（API）」節。LLM は要約・比較の補助に使う
-- `LLM_PROVIDER=stub` で取得したログでも解析可能（観測ソースは `heuristic`）
+- LLM は要約・比較の補助。数値は `experiment_summary` をそのまま転記する
 - API キーはコミットしない
 
-開発用の詳細メモ: [docs/hackathon/RESULTS.md](../docs/hackathon/RESULTS.md)
+開発用索引: [docs/hackathon/RESULTS.md](../docs/hackathon/RESULTS.md)

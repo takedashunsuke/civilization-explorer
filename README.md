@@ -24,7 +24,7 @@
 | [README.md](./README.md) | 本ファイル — 環境構築・起動 |
 | [DEMO.md](./DEMO.md) | ウェブ画面での再生手順（4 世界 × 100 年） |
 | [scripts/](./scripts/) | `run-experiment.sh`（CLI・ブラウザ不要）/ `start-*.sh`（UI） |
-| [result/raw/](./result/raw/) | マイルストーン出力の生ログ（`.txt`） |
+| [result/raw/](./result/raw/) | 実行結果（`.json` = 定量の正、`.txt` = 全文ログ） |
 | [analysis/](./analysis/) | LLM 解析用プロンプト・解析後サマリー |
 
 ---
@@ -114,8 +114,10 @@ OLLAMA_MODEL=llama3.2:1b
 **ライブ発表:** [DEMO.md](./DEMO.md) のブラウザ手順で画面を見せながら操作。
 
 1. 4 環境（豊か / 乏しい / 災害多 / 標準）それぞれ 100 年まで進める
-2. `.txt` を `result/raw/` に保存（CLI なら自動）
+2. `.json` / `.txt` を `result/raw/` に保存（CLI なら自動）
 3. [analysis/prompt.md](./analysis/prompt.md) で LLM 比較 → [analysis/summary.md](./analysis/summary.md) に整理
+
+UI と CLI は同じ Python エンジン・同じ Ollama 設定。詳細: [docs/guides/execution-paths.md](./docs/guides/execution-paths.md)
 
 固定: 5,000 人・seed 42・性格・位置。変える: **共有資源と災害のみ**。
 

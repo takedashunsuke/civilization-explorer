@@ -156,6 +156,7 @@
 
 - [ ] 4 世界のバッチ作成・永続化一覧
 - [ ] 全員 LLM 意思決定
+- [ ] **マイルストーン `.txt` 出力の一本化**（現状: CLI=Python / UI=TypeScript。定量は `experiment_summary` で共通化済み → Backend `milestone_export` + API 経由に寄せる）
 - [ ] Peace/Famine/War/Trade という **別名 variant の新設**（今は豊か/乏しい/災害多/標準で足りるなら不要）
 
 ---

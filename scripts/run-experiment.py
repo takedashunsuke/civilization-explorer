@@ -32,6 +32,8 @@ from simulation.experiment import (  # noqa: E402
     fresh_roster_copy,
     world_params_for_variant,
 )
+from config import get_settings  # noqa: E402
+from simulation.llm import describe_provider  # noqa: E402
 from simulation.models import SimulationState  # noqa: E402
 
 DEFAULT_TURNS = 10
@@ -183,11 +185,16 @@ def update_manifest(out_dir: Path, records: list[dict]) -> None:
     for entry in data.get("files", []):
         vid = entry.get("variant")
         if vid in by_variant:
-            entry["path"] = f"result/raw/{by_variant[vid]['filename']}"
+            rec = by_variant[vid]
+            entry["path"] = f"result/raw/{rec['filename']}"
+            entry["json_path"] = f"result/raw/{rec['json_filename']}"
             entry["status"] = "done"
     data["recorded_at"] = datetime.now(timezone.utc).isoformat()
     data["milestone_turn"] = records[0]["turn"] if records else data.get("milestone_turn")
-    data["llm_provider"] = "stub (CLI — no LLM calls in batch script)"
+    settings = get_settings()
+    data["llm_provider"] = settings.llm_provider
+    if settings.llm_provider == "ollama":
+        data["ollama_model"] = settings.ollama_model
     manifest_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
@@ -212,7 +219,14 @@ def main() -> int:
     variants = [args.variant] if args.variant else list(WORLD_VARIANT_IDS)
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"Controlled experiment — seed={args.seed}, turns={args.turns} ({args.turns * DEFAULT_YEARS_PER_TURN} years)")
+    llm = describe_provider()
+    print(
+        f"Controlled experiment — seed={args.seed}, turns={args.turns} "
+        f"({args.turns * DEFAULT_YEARS_PER_TURN} years), LLM={llm.get('provider')} "
+        f"(wired={llm.get('wired')})",
+    )
+    if llm.get("provider") == "ollama":
+        print(f"  Ollama: {llm.get('ollama_model')} @ {get_settings().ollama_base_url}")
     records: list[dict] = []
 
     for variant in variants:
@@ -231,11 +245,32 @@ def main() -> int:
         filename = _export_filename(variant, _calendar_year(sim), sim.world.turn)
         out_path = args.out_dir / filename
         out_path.write_text(report, encoding="utf-8")
+        json_name = filename.replace(".txt", ".json")
+        json_payload = {
+            "format": "civ-experiment-result-v1",
+            "variant": variant,
+            "variant_label_ja": _VARIANT_LABEL_JA.get(variant, variant),
+            "experiment_seed": args.seed,
+            "simulation_id": sim_id,
+            "turn": sim.world.turn,
+            "calendar_year": _calendar_year(sim),
+            "llm": llm,
+            "experiment_summary": summary,
+            "report_txt": f"result/raw/{filename}",
+        }
+        json_path = args.out_dir / json_name
+        json_path.write_text(json.dumps(json_payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(
-            f"     saved {out_path.name} | pop={summary['population_alive']} "
+            f"     saved {out_path.name}, {json_path.name} | pop={summary['population_alive']} "
             f"conflicts={summary['conflicts_total']} archetype={summary['dominant_archetype']}",
         )
-        records.append({"variant": variant, "filename": filename, "turn": sim.world.turn, "summary": summary})
+        records.append({
+            "variant": variant,
+            "filename": filename,
+            "json_filename": json_name,
+            "turn": sim.world.turn,
+            "summary": summary,
+        })
 
     update_manifest(args.out_dir, records)
     print(f"\nDone. {len(records)} report(s) in {args.out_dir}")
