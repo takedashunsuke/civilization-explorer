@@ -28,6 +28,7 @@ defineProps<{
 const emit = defineEmits<{
   continue: []
   changeConditions: []
+  export: []
 }>()
 
 const { t } = useI18n()
@@ -107,6 +108,15 @@ function deltaLabel(delta: number): string {
       <footer class="milestone-actions">
         <p class="milestone-change-hint">{{ t('milestone.changeHint') }}</p>
         <div class="milestone-buttons">
+          <Button
+            :label="t('milestone.export')"
+            icon="pi pi-download"
+            class="milestone-btn"
+            severity="secondary"
+            outlined
+            :disabled="busy"
+            @click="emit('export')"
+          />
           <Button
             :label="t('milestone.continue')"
             icon="pi pi-play"

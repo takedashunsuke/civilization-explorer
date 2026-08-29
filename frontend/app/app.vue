@@ -28,6 +28,11 @@ import {
   type ExperimentVariantId,
 } from '~/utils/experimentWorlds'
 import { buildOpeningStory, buildOutcomeArc, buildTurnStory } from '~/utils/storyNarrative'
+import {
+  buildMilestoneExportText,
+  downloadTextFile,
+  milestoneExportFilename,
+} from '~/utils/milestoneExport'
 import { BACKGROUND_ROWS, CONTINENT_IDS, DEFAULT_SUBREGION, macroOf, subregionChoices, type ContinentId, type RegionDraft } from '~/utils/continents'
 
 type Agent = {
@@ -1413,6 +1418,37 @@ function changeConditionsFromMilestone() {
   conditionsOpen.value = true
 }
 
+function exportMilestoneReport() {
+  if (!sim.value || !milestoneSnapshot.value) return
+  const formatters = {
+    formatYearLabel,
+    actionLabel,
+    actorLabel,
+    eventDetail,
+    isHeadlineEvent,
+    headlineText,
+    archetypeLabel: digestArchetypeLabel,
+    trajectoryLabel: digestTrajectoryLabel,
+    regionLabel: digestRegionLabel,
+    institutionLabel: (key: string) => {
+      const path = `institutions.${key}`
+      const translated = t(path)
+      return translated === path ? key : translated
+    },
+    variantLabel: (variant: string) => {
+      const key = experimentWorldLabels[variant as ExperimentVariantId]
+      return key ? t(key) : variant
+    },
+  }
+  const text = buildMilestoneExportText(
+    sim.value,
+    milestoneYear.value,
+    milestoneSnapshot.value,
+    formatters,
+  )
+  downloadTextFile(milestoneExportFilename(sim.value, milestoneYear.value), text)
+}
+
 function stopAutoPlay() {
   autoPlaying.value = false
   if (autoTimer != null) {
@@ -1980,6 +2016,7 @@ onBeforeUnmount(() => {
       :busy="busy"
       @continue="continueFromMilestone"
       @change-conditions="changeConditionsFromMilestone"
+      @export="exportMilestoneReport"
     />
 
     <div v-if="conditionsOpen" class="modal-backdrop" @click="!creating && (conditionsOpen = false)" />

@@ -9,7 +9,7 @@ AI 文明そのものが目的ではなく、**人間社会の問い（格差・
 
 | | |
 |--|--|
-| GitHub | https://github.com/tsuide-takeda/civ-explorer |
+| GitHub | https://github.com/takedashunsuke/civilization-explorer |
 | 提出物一覧 | [docs/hackathon/submission.md](./docs/hackathon/submission.md) |
 | 実行結果 | [docs/hackathon/RESULTS.md](./docs/hackathon/RESULTS.md) |
 | スライド原稿 | [docs/hackathon/slides.md](./docs/hackathon/slides.md) |
@@ -35,7 +35,7 @@ AI 文明そのものが目的ではなく、**人間社会の問い（格差・
 
 ## いま動く範囲
 
-- 初期条件（開始年・五大陸列・サブ地域・地形・気候・列あたり人口 1000〜10000・制度・税率・教育・宗教・対外開放）からシミュレーションを作成できる。西暦 2500 年まで（1ターン＝10年、開始年既定 AD 1000）
+- 初期条件（開始年・五大陸列・サブ地域・地形・気候・列あたり人口 1000〜10000・制度・税率・教育・信条・対外開放）からシミュレーションを作成できる。西暦 2500 年まで（1ターン＝10年、開始年既定 AD 1000）
 - Tick（+10年 / +50年）でエージェントが動き、集団領域・争い・出来事が平面世界地図に出る。大きな衝撃はヘッダ見出しと「世界の便り」
 - **状況パネル**（地図左）で地域ごとの緊張・繁栄・不満・結束・台頭人物・軌道を読める
 - **LLM**（Ollama / OpenAI、`LLM_PROVIDER` で切替）がターン末に地域を観測し、次ターンの集団方針を決める。失敗時はヒューリスティック。`stub` でも完走する

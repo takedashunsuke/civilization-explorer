@@ -685,6 +685,7 @@
     "dominantArchetype": "台頭する型",
     "continue": "そのまま続ける",
     "changeConditions": "条件を変える",
+    "export": "レポートを出力 (.txt)",
     "changeHint": "条件を変えても、人口・配置・これまでの歴史はそのまま残ります。"
   },
   "layout": {

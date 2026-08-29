@@ -4,7 +4,7 @@
 
 | 提出物 | 場所 | 状態 |
 |--------|------|------|
-| GitHub リポジトリ | https://github.com/tsuide-takeda/civ-explorer | 公開前に下の確認を通す |
+| GitHub リポジトリ | https://github.com/takedashunsuke/civilization-explorer | 公開済み |
 | README | [../../README.md](../../README.md) | 目的・環境・使い方をルートに記載 |
 | スライド原稿 | [slides.md](./slides.md) | PPT / Google スライドへ転記 |
 | デモ台本 | [demo-v3.md](./demo-v3.md) | 設計・当日操作 |
@@ -27,7 +27,7 @@
 clone:
 
 ```bash
-git clone https://github.com/tsuide-takeda/civ-explorer.git
+git clone https://github.com/takedashunsuke/civilization-explorer.git
 cd civ-explorer
 ```
 

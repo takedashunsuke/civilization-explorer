@@ -685,6 +685,7 @@
     "dominantArchetype": "Rising archetype",
     "continue": "Continue as is",
     "changeConditions": "Change conditions",
+    "export": "Export report (.txt)",
     "changeHint": "Changing conditions keeps population, layout, and history — only policies and environment update."
   },
   "layout": {
