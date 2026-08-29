@@ -1,0 +1,37 @@
+{
+  "experiment": "controlled_experiment",
+  "experiment_seed": 42,
+  "milestone_turn": 10,
+  "milestone_years": 100,
+  "years_per_turn": 10,
+  "start_year": 1000,
+  "population": 5000,
+  "llm_provider": "(記入: stub / ollama / openai)",
+  "recorded_at": "(記入: ISO8601)",
+  "files": [
+    {
+      "variant": "lush",
+      "label_ja": "豊か",
+      "path": "result/raw/civ-lush-AD1100-turn10.txt",
+      "status": "pending"
+    },
+    {
+      "variant": "lean",
+      "label_ja": "乏しい",
+      "path": "result/raw/civ-lean-AD1100-turn10.txt",
+      "status": "pending"
+    },
+    {
+      "variant": "volatile",
+      "label_ja": "災害多",
+      "path": "result/raw/civ-volatile-AD1100-turn10.txt",
+      "status": "pending"
+    },
+    {
+      "variant": "balanced",
+      "label_ja": "標準",
+      "path": "result/raw/civ-balanced-AD1100-turn10.txt",
+      "status": "pending"
+    }
+  ]
+}

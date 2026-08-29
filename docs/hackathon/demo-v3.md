@@ -80,7 +80,7 @@ API: `POST /simulations` に `controlled_experiment: true`, `experiment_variant`
 
 - controlled experiment の 1 枚（固定 vs 変更は **共有資源と災害のみ**。食の背景は固定）
 - 4 環境のヘッダー切替で数値・状況パネルを比べる
-- 実測値は [RESULTS.md](./RESULTS.md) を根拠に話す（未記入なら先に実測）
+- 実測値は [analysis/summary.md](../../analysis/summary.md)（生ログ: [result/raw/](../../result/raw/)）を根拠に話す（未記入なら先に実測）
 
 ### LLM の役割
 
@@ -136,7 +136,7 @@ LLM に歴史を作らせない。`LLM_PROVIDER=stub` でもデモ完走可。
 7. 地図の点 **クリック** → その世界での地域観測を読む
 8. （余裕）体制転換イベント → 社会が環境を変えるフィードバック
 
-起動: [checklist.md](./checklist.md) / [../guides/setup.md](../guides/setup.md)
+起動: [checklist.md](./checklist.md) / [../../DEMO.md](../../DEMO.md) / [../guides/setup.md](../guides/setup.md)
 
 ### 指差しポイント
 
@@ -169,5 +169,6 @@ LLM に歴史を作らせない。`LLM_PROVIDER=stub` でもデモ完走可。
 - [slides.md](./slides.md) — スライド原稿のみ
 - [gap.md](./gap.md) — AS-IS / ギャップ / TODO
 - [overview.md](./overview.md) — 30 秒ピッチ
-- [RESULTS.md](./RESULTS.md) — 実測記入用
+- [analysis/summary.md](../../analysis/summary.md) — 実測記入（提出用）
+- [RESULTS.md](./RESULTS.md) — 上記への索引
 - [review.md](./review.md) — テーマ根拠

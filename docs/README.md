@@ -1,13 +1,15 @@
 # docs/
 
-Civilization Explorer のドキュメント置き場。
+Civilization Explorer の**開発用**ドキュメント置き場。
+
+**ハッカソン提出物（審査員向け）はリポジトリルート:** [README.md](../README.md)、[DEMO.md](../DEMO.md)、[result/](../result/)、[analysis/](../analysis/)、[scripts/](../scripts/)
 
 | ディレクトリ | 用途 |
 |--------------|------|
 | [design/](./design/) | 要件・設計・ルール・エージェント指針 |
 | [updates/](./updates/) | 進捗メモ・変更記録（日付ごと） |
 | [guides/](./guides/) | セットアップ・デモ・運用手順 |
-| [hackathon/](./hackathon/) | ハッカソン発表・デモ・提出（索引: [hackathon/README.md](./hackathon/README.md)） |
+| [hackathon/](./hackathon/) | 発表・デモ設計（提出物の正はルート） |
 | [decisions/](./decisions/) | 設計判断の記録（ADR） |
 
 詳細な索引は各ディレクトリの `README.md` を参照。

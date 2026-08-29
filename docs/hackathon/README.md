@@ -1,8 +1,19 @@
 # hackathon/
 
-ハッカソン発表・デモ・提出向けの資料。**設計の正は `docs/design/`、発表・デモの正は [demo-v3.md](./demo-v3.md)。**
+ハッカソン発表・デモ向けの**開発用**資料。  
+**審査員向け提出物はリポジトリルート**（[README.md](../../README.md)、[DEMO.md](../../DEMO.md)、[result/](../../result/)、[analysis/](../../analysis/)）。
 
-## どこに何を書くか
+## 提出物（ルート）
+
+| 場所 | 内容 |
+|------|------|
+| [../../README.md](../../README.md) | 環境構築・起動 |
+| [../../DEMO.md](../../DEMO.md) | ウェブ再生手順 |
+| [../../scripts/](../../scripts/) | セットアップ・起動 |
+| [../../result/](../../result/) | 生ログ |
+| [../../analysis/](../../analysis/) | LLM 解析・サマリー |
+
+## このフォルダ（開発・発表）
 
 | ファイル | 書くこと |
 |----------|----------|
@@ -10,19 +21,19 @@
 | [slides.md](./slides.md) | **スライド原稿のみ**（PPT 転記用） |
 | [overview.md](./overview.md) | 30 秒ピッチ |
 | [checklist.md](./checklist.md) | 起動・事前確認・障害時 |
-| [RESULTS.md](./RESULTS.md) | 実測数値（デモ後） |
+| [RESULTS.md](./RESULTS.md) | → ルート [analysis/summary.md](../../analysis/summary.md) への索引 |
 | [gap.md](./gap.md) | 方針と実装の AS-IS / ギャップ / TODO |
 | [world-model.md](./world-model.md) | **固定・変動・創発**の四層モデル（概念の正） |
 | [review.md](./review.md) | テーマ根拠・経緯 |
 | [faq.md](./faq.md) | 想定 Q&A |
-| [submission.md](./submission.md) | 提出物一覧 |
+| [submission.md](./submission.md) | 提出物一覧（ルート + docs） |
 
 ## 読む順
 
 1. [overview.md](./overview.md) — 30 秒で全体像
 2. [demo-v3.md](./demo-v3.md) — 設計 + 発表当日 / [slides.md](./slides.md) — 投影用
 3. [checklist.md](./checklist.md) — 起動・障害時
-4. [RESULTS.md](./RESULTS.md) — デモ後に記入
+4. [analysis/summary.md](../../analysis/summary.md) — デモ後に記入（生ログは [result/](../../result/)）
 
 実装・セットアップ: [../guides/setup.md](../guides/setup.md)  
 プロダクト要件: [../design/FeatureSpec.md](../design/FeatureSpec.md)  

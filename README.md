@@ -4,127 +4,145 @@
 
 > What if...? を何度も試す。
 
-人間は初期条件・環境・制度だけを変え、エージェント同士の相互作用から文明が生まれる過程を観測する。  
-AI 文明そのものが目的ではなく、**人間社会の問い（格差・権力・幸福・少数派など）を探る実験場**として使う。
+同一の人間ロスターに、違う外的環境だけを与えて文明の創発を比較する対照実験デモです。
 
 | | |
 |--|--|
 | GitHub | https://github.com/takedashunsuke/civilization-explorer |
-| 提出物一覧 | [docs/hackathon/submission.md](./docs/hackathon/submission.md) |
-| 実行結果 | [docs/hackathon/RESULTS.md](./docs/hackathon/RESULTS.md) |
-| スライド原稿 | [docs/hackathon/slides.md](./docs/hackathon/slides.md) |
-| デモ台本 | [docs/hackathon/demo-v3.md](./docs/hackathon/demo-v3.md) |
-| テーマ根拠 | [docs/hackathon/review.md](./docs/hackathon/review.md) |
+| デモ再生手順 | [DEMO.md](./DEMO.md) |
+| 実行結果（生ログ） | [result/](./result/) |
+| 解析サマリー | [analysis/summary.md](./analysis/summary.md) |
+
+開発用ドキュメント（設計・発表原稿など）は [docs/](./docs/) にあります。
 
 ---
 
-## 目的
+## 提出物（ルート）
 
-社会シミュレーションは未来予測でも、人間への助言でもない。
-
-**どんな条件から、どんな文明が繰り返し生まれるのか**を探索する。
-
-| 役割 | やること |
-|------|----------|
-| 人間 | 世界の法則と初期条件を変え、結果を観測・比較する |
-| Agent | 協力・争い・移住・服従などを自律的に決める |
-
-今回のデモで固定する問い: **もし、同じ人間が違う世界に生きていたら、どんな社会と人物が生まれるか。**（[docs/hackathon/demo-v3.md](./docs/hackathon/demo-v3.md)）
+| ファイル / フォルダ | 内容 |
+|---------------------|------|
+| [README.md](./README.md) | 本ファイル — 環境構築・起動 |
+| [DEMO.md](./DEMO.md) | ウェブ画面での再生手順（4 世界 × 100 年） |
+| [scripts/](./scripts/) | `run-experiment.sh`（CLI・ブラウザ不要）/ `start-*.sh`（UI） |
+| [result/raw/](./result/raw/) | マイルストーン出力の生ログ（`.txt`） |
+| [analysis/](./analysis/) | LLM 解析用プロンプト・解析後サマリー |
 
 ---
 
-## いま動く範囲
+## 環境構築
 
-- 初期条件（開始年・五大陸列・サブ地域・地形・気候・列あたり人口 1000〜10000・制度・税率・教育・信条・対外開放）からシミュレーションを作成できる。西暦 2500 年まで（1ターン＝10年、開始年既定 AD 1000）
-- Tick（+10年 / +50年）でエージェントが動き、集団領域・争い・出来事が平面世界地図に出る。大きな衝撃はヘッダ見出しと「世界の便り」
-- **状況パネル**（地図左）で地域ごとの緊張・繁栄・不満・結束・台頭人物・軌道を読める
-- **LLM**（Ollama / OpenAI、`LLM_PROVIDER` で切替）がターン末に地域を観測し、次ターンの集団方針を決める。失敗時はヒューリスティック。`stub` でも完走する
-- 初期配置は列内の複数キャンプに分散し、地図上で個人が点在して見える
+### 必要なもの
 
-やらない（MVP）: 支援チャット、正解の制度提案、衛星写真、地球儀を主画面にすること、数千回バッチ UI、Postgres 永続化（メモリ + API の replay のみ）
+| 項目 | バージョン |
+|------|------------|
+| Node.js | 22.19 以上 |
+| Python | 3.12 以上 |
+| （任意）Ollama | `LLM_PROVIDER=ollama` で地域観測に接続 |
 
----
+### 初回セットアップ（macOS / Linux）
 
-## 実行環境
+```bash
+git clone https://github.com/takedashunsuke/civilization-explorer.git
+cd civilization-explorer
+chmod +x scripts/*.sh
+./scripts/setup.sh
+```
 
-| 層 | 技術 |
-|----|------|
-| Frontend | Nuxt 4 / Vue 3 / PrimeVue 3 / Canvas 2D 平面地図 |
-| Backend | Python 3.12+ / FastAPI |
-| LLM | Ollama（ローカル）または OpenAI 等（`.env` で切替。既定は `stub`） |
-| DB | MVP では未接続（インメモリ）。将来 Drizzle + ローカル Postgres（Supabase CLI） |
-
-必要なもの:
-
-- Node.js 22.19 以上
-- Python 3.12 以上
-- （任意）[Ollama](https://ollama.com/download) — `LLM_PROVIDER=ollama` で地域観測・集団方針に接続
-
-詳細: [docs/guides/setup.md](./docs/guides/setup.md)
-
----
-
-## 使い方
+Windows は下記「手動セットアップ」を参照。詳細: [docs/guides/setup.md](./docs/guides/setup.md)
 
 ### 起動
 
-```powershell
-# 端末1 — API
+```bash
+# 端末 1 — API
+./scripts/start-backend.sh
+
+# 端末 2 — UI
+./scripts/start-frontend.sh
+```
+
+| URL | 用途 |
+|-----|------|
+| http://127.0.0.1:3000/ | シミュレーション UI |
+| http://127.0.0.1:8000/docs | API ドキュメント |
+| http://127.0.0.1:8000/health | LLM 接続状態 |
+
+### 手動セットアップ（全 OS）
+
+**Backend**
+
+```bash
 cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+python3 -m venv .venv          # Windows: python -m venv .venv
+source .venv/bin/activate      # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-copy .env.example .env
+cp .env.example .env           # Windows: copy .env.example .env
 uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-```powershell
-# 端末2 — UI
+**Frontend**
+
+```bash
 cd frontend
-copy .env.example .env
+cp .env.example .env           # Windows: copy .env.example .env
 npm install
 npm run dev -- --host 127.0.0.1 --port 3000
 ```
 
-macOS / Linux は `python3`、`source .venv/bin/activate`、`cp .env.example .env`。
+### LLM（任意）
 
-- UI: http://127.0.0.1:3000/
-- API: http://127.0.0.1:8000/docs
-- ヘルス（LLM 状態）: http://127.0.0.1:8000/health
+`backend/.env` で切り替え（既定は `stub` = ヒューリスティックのみ）:
 
-### 操作
+```env
+LLM_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=llama3.2:1b
+```
 
-1. 初期条件モーダル（3ステップ）で舞台・サブ地域・社会・列人口を決める
-2. 作成する（準備中オーバーレイが出る間は待つ）
-3. Tick（または自動再生）でターンを進める
-4. 地図の領域・争いの破線、**状況パネル**、**出来事**を読む
-5. 対照するときは **seed 以外は1項目だけ**変えて作り直す
-
-LLM を使う場合は `backend/.env` で `LLM_PROVIDER=ollama`（または `openai`）にし、Backend を再起動する。
-
-実行ログの書き方: [docs/hackathon/RESULTS.md](./docs/hackathon/RESULTS.md)
+変更後は Backend を再起動。Ollama の手順: [docs/guides/setup.md](./docs/guides/setup.md)
 
 ---
 
-## ドキュメント
+## デモの流れ（概要）
 
-索引: [docs/README.md](./docs/README.md)
+**提出用ログの取得（ブラウザ不要）:**
 
-| 場所 | 内容 |
-|------|------|
-| [docs/hackathon/](./docs/hackathon/) | 提出・発表・デモ・結果 |
-| [docs/design/](./docs/design/) | 要件・設計・ルール |
-| [docs/guides/setup.md](./docs/guides/setup.md) | セットアップ詳細 |
-| [docs/decisions/](./docs/decisions/) | ADR |
+```bash
+./scripts/setup.sh           # 初回のみ
+./scripts/run-experiment.sh  # → result/raw/ に 4 本の .txt
+```
+
+**ライブ発表:** [DEMO.md](./DEMO.md) のブラウザ手順で画面を見せながら操作。
+
+1. 4 環境（豊か / 乏しい / 災害多 / 標準）それぞれ 100 年まで進める
+2. `.txt` を `result/raw/` に保存（CLI なら自動）
+3. [analysis/prompt.md](./analysis/prompt.md) で LLM 比較 → [analysis/summary.md](./analysis/summary.md) に整理
+
+固定: 5,000 人・seed 42・性格・位置。変える: **共有資源と災害のみ**。
 
 ---
 
-## 構成
+## 技術スタック
+
+| 層 | 技術 |
+|----|------|
+| Frontend | Nuxt 4 / Vue 3 / PrimeVue / Canvas 2D |
+| Backend | Python 3.12+ / FastAPI |
+| LLM | Ollama または OpenAI（`.env` で切替） |
+| DB | MVP では未使用（インメモリ） |
+
+---
+
+## リポジトリ構成
 
 ```text
-docs/          仕様・提出・手順
-frontend/      Nuxt 観測 UI
-backend/       FastAPI + シミュレーション
+README.md          提出用 — 環境構築・起動
+DEMO.md            提出用 — ウェブ操作手順
+scripts/           提出用 — setup / 起動スクリプト
+result/raw/        提出用 — 実行生ログ (.txt)
+analysis/          提出用 — LLM プロンプト・解析サマリー
+docs/              開発用 — 設計・発表原稿・ADR
+frontend/          Nuxt 観測 UI
+backend/           FastAPI + シミュレーション
 ```
 
 ---
