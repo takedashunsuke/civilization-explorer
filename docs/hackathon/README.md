@@ -6,7 +6,8 @@
 
 | ファイル | 書くこと |
 |----------|----------|
-| [demo-v3.md](./demo-v3.md) | **設計・スライド・台本**（発表当日はここだけ見る） |
+| [demo-v3.md](./demo-v3.md) | 設計・発表当日の操作 |
+| [slides.md](./slides.md) | **スライド原稿のみ**（PPT 転記用） |
 | [overview.md](./overview.md) | 30 秒ピッチ |
 | [checklist.md](./checklist.md) | 起動・事前確認・障害時 |
 | [RESULTS.md](./RESULTS.md) | 実測数値（デモ後） |
@@ -17,7 +18,7 @@
 ## 読む順
 
 1. [overview.md](./overview.md) — 30 秒で全体像
-2. [demo-v3.md](./demo-v3.md) — 設計 + 発表当日
+2. [demo-v3.md](./demo-v3.md) — 設計 + 発表当日 / [slides.md](./slides.md) — 投影用
 3. [checklist.md](./checklist.md) — 起動・障害時
 4. [RESULTS.md](./RESULTS.md) — デモ後に記入
 

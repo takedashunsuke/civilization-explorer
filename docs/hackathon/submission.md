@@ -6,7 +6,8 @@
 |--------|------|------|
 | GitHub リポジトリ | https://github.com/tsuide-takeda/civ-explorer | 公開前に下の確認を通す |
 | README | [../../README.md](../../README.md) | 目的・環境・使い方をルートに記載 |
-| プレゼン・台本 | [demo-v3.md](./demo-v3.md) | 設計・スライド原稿・当日操作（PPT 未作成なら § スライド原稿を転記） |
+| スライド原稿 | [slides.md](./slides.md) | PPT / Google スライドへ転記 |
+| デモ台本 | [demo-v3.md](./demo-v3.md) | 設計・当日操作 |
 | 実行結果のまとめ | [RESULTS.md](./RESULTS.md) | LLM 接続済み。数値はデモ後に埋める |
 
 設計の正は [../design/FeatureSpec.md](../design/FeatureSpec.md)。テーマ原案は [../design/memo.md](../design/memo.md)。
