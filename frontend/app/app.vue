@@ -260,6 +260,8 @@ let tickInFlight = false
 const calendarEra = ref<'bc' | 'ad'>('ad')
 const calendarYear = ref(1000)
 const conditionStep = ref(1)
+const scenarioSetupStep = ref(1)
+const conditionsFieldsEl = ref<HTMLElement | null>(null)
 const selectedTemplateId = ref<ScenarioTemplateId>(defaultScenarioTemplateId())
 const activeExperimentVariant = ref<ExperimentVariantId>('balanced')
 const experimentSummaries = ref<Partial<Record<ExperimentVariantId, ExperimentSummary>>>({})
@@ -552,6 +554,27 @@ function syncConditionsFromSim() {
   syncRegionDraftsFromSimRegions()
 }
 
+function scrollConditionsToTop() {
+  nextTick(() => {
+    conditionsFieldsEl.value?.scrollTo({ top: 0, behavior: 'smooth' })
+  })
+}
+
+function goToScenarioSetupStep(step: 1 | 2) {
+  scenarioSetupStep.value = step
+  if (step === 2) conditionStep.value = 1
+  scrollConditionsToTop()
+}
+
+function handleCustomWizardBack() {
+  if (conditionStep.value > 1) {
+    conditionStep.value -= 1
+    scrollConditionsToTop()
+    return
+  }
+  goToScenarioSetupStep(1)
+}
+
 function toggleConditionsModal() {
   if (conditionsOpen.value) {
     conditionsOpen.value = false
@@ -559,6 +582,9 @@ function toggleConditionsModal() {
   }
   if (isMidrunConditionsEdit.value) {
     syncConditionsFromSim()
+  } else {
+    scenarioSetupStep.value = 1
+    conditionStep.value = 1
   }
   conditionsOpen.value = true
 }
@@ -1534,6 +1560,8 @@ async function tick(n = 1, opts?: { silent?: boolean }) {
     stopAutoPlay()
     if (status === 404) {
       sim.value = null
+      scenarioSetupStep.value = 1
+      conditionStep.value = 1
       conditionsOpen.value = true
     }
   } finally {
@@ -1967,57 +1995,30 @@ onBeforeUnmount(() => {
         <button type="button" class="events-close" :aria-label="t('layout.closeConditions')" :disabled="creating" @click="conditionsOpen = false">×</button>
       </div>
       <div class="conditions-form">
-        <div class="conditions-fields">
-          <SimulationConceptIntro compact />
-          <p v-if="isMidrunConditionsEdit" class="conditions-midrun-lead">{{ t('scenario.midrunLead') }}</p>
-          <section v-if="!isMidrunConditionsEdit" class="scenario-mode-picker">
-            <p class="scenario-mode-lead">{{ t('scenario.pickMode') }}</p>
-            <div class="scenario-mode-cards">
-              <button
-                type="button"
-                class="scenario-mode-card"
-                :class="{ active: scenarioMode === 'experiment' }"
-                :disabled="creating"
-                @click="setScenarioMode('experiment')"
-              >
-                <strong>{{ t('scenario.modeExperiment') }}</strong>
-                <span>{{ t('scenario.modeExperimentDesc') }}</span>
-              </button>
-              <button
-                type="button"
-                class="scenario-mode-card"
-                :class="{ active: scenarioMode === 'custom' }"
-                :disabled="creating"
-                @click="setScenarioMode('custom')"
-              >
-                <strong>{{ t('scenario.modeCustom') }}</strong>
-                <span>{{ t('scenario.modeCustomDesc') }}</span>
-              </button>
-            </div>
-          </section>
-
-          <section v-if="scenarioMode === 'experiment'" class="conditions-section scenario-worlds-section">
-            <p class="conditions-lead">{{ t('scenario.experimentPickWorld') }}</p>
-            <div class="world-card-grid">
-              <button
-                v-for="variant in EXPERIMENT_VARIANT_IDS"
-                :key="variant"
-                type="button"
-                class="world-card"
-                :class="{ active: activeExperimentVariant === variant }"
-                :disabled="creating"
-                @click="activeExperimentVariant = variant"
-              >
-                <strong>{{ t(experimentWorldLabels[variant]) }}</strong>
-                <span>{{ t(`experiment.worldDesc.${variant}`) }}</span>
-              </button>
-            </div>
-            <p class="hint scenario-fixed-hint">{{ isMidrunConditionsEdit ? t('scenario.experimentMidrunHint') : t('scenario.experimentFixed') }}</p>
-          </section>
-
-          <section v-if="isMidrunConditionsEdit" class="conditions-section conditions-midrun-policy">
-            <p class="conditions-lead">{{ t('scenario.midrunSocialLead') }}</p>
-            <DataTable :value="midrunPolicyAxes" class="conditions-dt">
+        <div ref="conditionsFieldsEl" class="conditions-fields">
+          <template v-if="isMidrunConditionsEdit">
+            <p class="conditions-midrun-lead">{{ t('scenario.midrunLead') }}</p>
+            <section v-if="scenarioMode === 'experiment'" class="conditions-section scenario-worlds-section">
+              <p class="conditions-lead">{{ t('scenario.experimentPickWorld') }}</p>
+              <div class="world-card-grid">
+                <button
+                  v-for="variant in EXPERIMENT_VARIANT_IDS"
+                  :key="variant"
+                  type="button"
+                  class="world-card"
+                  :class="{ active: activeExperimentVariant === variant }"
+                  :disabled="creating"
+                  @click="activeExperimentVariant = variant"
+                >
+                  <strong>{{ t(experimentWorldLabels[variant]) }}</strong>
+                  <span>{{ t(`experiment.worldDesc.${variant}`) }}</span>
+                </button>
+              </div>
+              <p class="hint scenario-fixed-hint">{{ t('scenario.experimentMidrunHint') }}</p>
+            </section>
+            <section class="conditions-section conditions-midrun-policy">
+              <p class="conditions-lead">{{ t('scenario.midrunSocialLead') }}</p>
+              <DataTable :value="midrunPolicyAxes" class="conditions-dt">
                 <Column :header="t('wizard.axis')" class="dt-axis">
                   <template #body="{ data }">
                     <span class="axis-label">
@@ -2088,232 +2089,288 @@ onBeforeUnmount(() => {
                   </template>
                 </Column>
               </DataTable>
-          </section>
+            </section>
+          </template>
 
-          <template v-if="!isMidrunConditionsEdit && scenarioMode !== 'experiment'">
-            <section class="custom-preset-picker">
-              <p class="conditions-lead">{{ t('scenario.customLead') }}</p>
-              <div class="custom-preset-cards">
+          <template v-else-if="scenarioSetupStep === 1">
+            <SimulationConceptIntro compact />
+            <section class="scenario-mode-picker">
+              <p class="setup-step-label">{{ t('scenario.step1Label') }}</p>
+              <p class="scenario-mode-lead">{{ t('scenario.pickMode') }}</p>
+              <div class="scenario-mode-cards">
                 <button
-                  v-for="presetId in CUSTOM_PRESET_IDS"
-                  :key="presetId"
                   type="button"
-                  class="custom-preset-card"
-                  :class="{ active: selectedTemplateId === presetId }"
+                  class="scenario-mode-card"
+                  :class="{ active: scenarioMode === 'experiment' }"
                   :disabled="creating"
-                  @click="applyScenarioTemplate(presetId)"
+                  @click="setScenarioMode('experiment')"
                 >
-                  <strong>{{ t(`templates.${presetId}.name`) }}</strong>
-                  <span>{{ t(`templates.${presetId}.blurb`) }}</span>
+                  <strong>{{ t('scenario.modeExperiment') }}</strong>
+                  <span>{{ t('scenario.modeExperimentDesc') }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="scenario-mode-card"
+                  :class="{ active: scenarioMode === 'custom' }"
+                  :disabled="creating"
+                  @click="setScenarioMode('custom')"
+                >
+                  <strong>{{ t('scenario.modeCustom') }}</strong>
+                  <span>{{ t('scenario.modeCustomDesc') }}</span>
                 </button>
               </div>
-              <button
-                type="button"
-                class="advanced-toggle"
-                @click="showAdvancedScenarios = !showAdvancedScenarios"
-              >
-                {{ showAdvancedScenarios ? t('scenario.hideAdvanced') : t('scenario.showAdvanced') }}
-              </button>
-              <div v-if="showAdvancedScenarios" class="advanced-template-row">
-                <Dropdown
-                  input-id="scenario-template-advanced"
-                  :model-value="selectedTemplateId"
-                  :options="advancedTemplateOptions"
-                  option-label="label"
-                  option-value="value"
-                  class="template-select field-control"
+            </section>
+          </template>
+
+          <template v-else>
+            <p class="setup-step-label">
+              {{ scenarioMode === 'experiment' ? t('scenario.step2LabelExperiment') : t('scenario.step2LabelCustom') }}
+            </p>
+
+            <section v-if="scenarioMode === 'experiment'" class="conditions-section scenario-worlds-section">
+              <p class="conditions-lead">{{ t('scenario.experimentPickWorld') }}</p>
+              <div class="world-card-grid">
+                <button
+                  v-for="variant in EXPERIMENT_VARIANT_IDS"
+                  :key="variant"
+                  type="button"
+                  class="world-card"
+                  :class="{ active: activeExperimentVariant === variant }"
                   :disabled="creating"
-                  @update:model-value="applyScenarioTemplate($event as ScenarioTemplateId)"
-                />
+                  @click="activeExperimentVariant = variant"
+                >
+                  <strong>{{ t(experimentWorldLabels[variant]) }}</strong>
+                  <span>{{ t(`experiment.worldDesc.${variant}`) }}</span>
+                </button>
               </div>
+              <p class="hint scenario-fixed-hint">{{ t('scenario.experimentFixed') }}</p>
             </section>
 
-            <nav class="step-nav" aria-label="steps">
-              <button type="button" class="step-tab" :class="{ active: conditionStep === 1 }" @click="conditionStep = 1">{{ t('wizard.stepSocial') }}</button>
-              <button type="button" class="step-tab" :class="{ active: conditionStep === 2 }" @click="conditionStep = 2">{{ t('wizard.stepPop') }}</button>
-            </nav>
-            <p class="conditions-lead">{{ conditionStep === 1 ? t('wizard.leadSocial') : t('wizard.leadPop') }}</p>
-
-            <section v-if="conditionStep === 1" class="conditions-section">
-              <DataTable :value="step2Axes" class="conditions-dt">
-              <Column :header="t('wizard.axis')" class="dt-axis">
-                <template #body="{ data }">
-                  <span class="axis-label">
-                    {{ step2AxisLabel(data.key) }}
-                    <i
-                      v-if="data.key === 'institution'"
-                      v-tooltip.right="t('institutionHint')"
-                      class="pi pi-info-circle axis-info"
-                      tabindex="0"
-                    />
-                  </span>
-                </template>
-              </Column>
-              <Column v-for="region in regionDrafts" :key="region.id">
-                <template #header>
-                  <div class="col-head">
-                    <span>{{ t(`geographies.${region.id}`) }}</span>
-                    <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
-                  </div>
-                </template>
-                <template #body="{ data }">
+            <template v-else>
+              <section class="custom-preset-picker">
+                <p class="conditions-lead">{{ t('scenario.customLead') }}</p>
+                <div class="custom-preset-cards">
+                  <button
+                    v-for="presetId in CUSTOM_PRESET_IDS"
+                    :key="presetId"
+                    type="button"
+                    class="custom-preset-card"
+                    :class="{ active: selectedTemplateId === presetId }"
+                    :disabled="creating"
+                    @click="applyScenarioTemplate(presetId)"
+                  >
+                    <strong>{{ t(`templates.${presetId}.name`) }}</strong>
+                    <span>{{ t(`templates.${presetId}.blurb`) }}</span>
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  class="advanced-toggle"
+                  @click="showAdvancedScenarios = !showAdvancedScenarios"
+                >
+                  {{ showAdvancedScenarios ? t('scenario.hideAdvanced') : t('scenario.showAdvanced') }}
+                </button>
+                <div v-if="showAdvancedScenarios" class="advanced-template-row">
                   <Dropdown
-                    v-if="data.key === 'institution'"
-                    v-model="region.institution"
-                    :options="institutionOptions"
+                    input-id="scenario-template-advanced"
+                    :model-value="selectedTemplateId"
+                    :options="advancedTemplateOptions"
                     option-label="label"
                     option-value="value"
-                    class="field-control"
-                  />
-                  <LevelRating
-                    v-else-if="data.key === 'taxRate'"
-                    v-model="region.taxRate"
-                    :steps="TAX_STEPS"
-                    :labels="levelLabels"
-                  />
-                  <LevelRating
-                    v-else-if="data.key === 'education'"
-                    v-model="region.education"
-                    :steps="LEVEL_STEPS"
-                    :labels="levelLabels"
-                  />
-                  <Dropdown
-                    v-else-if="data.key === 'religion'"
-                    v-model="region.religion"
-                    :options="religionOptions"
-                    option-label="label"
-                    option-value="value"
-                    class="field-control"
-                  />
-                  <LevelRating
-                    v-else-if="data.key === 'trade'"
-                    v-model="region.tradeOpenness"
-                    :steps="LEVEL_STEPS"
-                    :labels="levelLabels"
-                  />
-                  <LevelRating
-                    v-else-if="data.key === 'cooperation'"
-                    v-model="region.cooperation"
-                    :steps="LEVEL_STEPS"
-                    :labels="levelLabels"
-                  />
-                  <LevelRating
-                    v-else-if="data.key === 'ambition'"
-                    v-model="region.ambition"
-                    :steps="LEVEL_STEPS"
-                    :labels="levelLabels"
-                  />
-                  <LevelRating
-                    v-else-if="data.key === 'inequality'"
-                    v-model="region.inequality"
-                    :steps="LEVEL_STEPS"
-                    :labels="levelLabels"
-                  />
-                </template>
-              </Column>
-            </DataTable>
-            <div class="year-block">
-              <div class="conditions-field year-field">
-                <label>{{ t('calendarYear') }}</label>
-                <div class="year-row">
-                  <Dropdown
-                    v-model="calendarEra"
-                    :options="calendarEraOptions"
-                    option-label="label"
-                    option-value="value"
-                    class="era-select"
-                  />
-                  <InputNumber
-                    v-model="calendarYear"
-                    :min="calendarYearMin"
-                    :max="calendarYearMax"
-                    :step="100"
-                    show-buttons
-                    class="year-input"
+                    class="template-select field-control"
+                    :disabled="creating"
+                    @update:model-value="applyScenarioTemplate($event as ScenarioTemplateId)"
                   />
                 </div>
-              </div>
-              <div class="era-preview" aria-live="polite">
-                <span class="era-preview-title">{{ t('eraPreview.title') }}</span>
-                <span class="era-banner-year">{{ draftYearLabel }}</span>
-                <span class="header-era-sep" aria-hidden="true">·</span>
-                <span><span class="era-k">{{ t('eraPreview.japan') }}</span>{{ draftJapanEra }}</span>
-                <span class="header-era-sep" aria-hidden="true">·</span>
-                <span><span class="era-k">{{ t('eraPreview.world') }}</span>{{ draftWorldEra }}</span>
-              </div>
-              <p class="hint year-hint">{{ t('calendarYearHint') }}</p>
-            </div>
-              <details class="geo-details">
-                <summary>{{ t('wizard.geoDetails') }}</summary>
-                <div class="bg-table" role="table">
-                  <div class="bg-row bg-head" role="row">
-                    <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
-                    <div v-for="region in regionDrafts" :key="`${region.id}-h1`" class="bg-cell col-head" role="columnheader">
+              </section>
+
+              <nav class="step-nav" aria-label="steps">
+                <button type="button" class="step-tab" :class="{ active: conditionStep === 1 }" @click="conditionStep = 1; scrollConditionsToTop()">{{ t('wizard.stepSocial') }}</button>
+                <button type="button" class="step-tab" :class="{ active: conditionStep === 2 }" @click="conditionStep = 2; scrollConditionsToTop()">{{ t('wizard.stepPop') }}</button>
+              </nav>
+              <p class="conditions-lead">{{ conditionStep === 1 ? t('wizard.leadSocial') : t('wizard.leadPop') }}</p>
+
+              <section v-if="conditionStep === 1" class="conditions-section">
+                <DataTable :value="step2Axes" class="conditions-dt">
+                <Column :header="t('wizard.axis')" class="dt-axis">
+                  <template #body="{ data }">
+                    <span class="axis-label">
+                      {{ step2AxisLabel(data.key) }}
+                      <i
+                        v-if="data.key === 'institution'"
+                        v-tooltip.right="t('institutionHint')"
+                        class="pi pi-info-circle axis-info"
+                        tabindex="0"
+                      />
+                    </span>
+                  </template>
+                </Column>
+                <Column v-for="region in regionDrafts" :key="region.id">
+                  <template #header>
+                    <div class="col-head">
                       <span>{{ t(`geographies.${region.id}`) }}</span>
                       <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
                     </div>
-                  </div>
-                  <div class="bg-row bg-form" role="row">
-                    <div class="bg-stub" role="rowheader">{{ t('wizard.rows.subregion') }}</div>
-                    <div v-for="region in regionDrafts" :key="`${region.id}-sub`" class="bg-cell" role="cell">
-                      <Dropdown v-model="region.subregion" :options="subregionOptions(region.id)" option-label="label" option-value="value" class="field-control" />
-                    </div>
-                  </div>
-                  <div class="bg-row" role="row">
-                    <div class="bg-stub" role="rowheader">{{ t('wizard.rows.focus') }}</div>
-                    <div v-for="region in regionDrafts" :key="`${region.id}-focus`" class="bg-cell bg-focus" role="cell">{{ t(`wizard.blurbs.${region.subregion}`) }}</div>
-                  </div>
-                  <div v-for="row in BACKGROUND_ROWS" :key="row" class="bg-row" role="row">
-                    <div class="bg-stub" role="rowheader">{{ t(`wizard.rows.${row}`) }}</div>
-                    <div v-for="region in regionDrafts" :key="`${region.id}-${row}`" class="bg-cell" role="cell">{{ t(`wizard.table.${region.subregion}.${row}`) }}</div>
+                  </template>
+                  <template #body="{ data }">
+                    <Dropdown
+                      v-if="data.key === 'institution'"
+                      v-model="region.institution"
+                      :options="institutionOptions"
+                      option-label="label"
+                      option-value="value"
+                      class="field-control"
+                    />
+                    <LevelRating
+                      v-else-if="data.key === 'taxRate'"
+                      v-model="region.taxRate"
+                      :steps="TAX_STEPS"
+                      :labels="levelLabels"
+                    />
+                    <LevelRating
+                      v-else-if="data.key === 'education'"
+                      v-model="region.education"
+                      :steps="LEVEL_STEPS"
+                      :labels="levelLabels"
+                    />
+                    <Dropdown
+                      v-else-if="data.key === 'religion'"
+                      v-model="region.religion"
+                      :options="religionOptions"
+                      option-label="label"
+                      option-value="value"
+                      class="field-control"
+                    />
+                    <LevelRating
+                      v-else-if="data.key === 'trade'"
+                      v-model="region.tradeOpenness"
+                      :steps="LEVEL_STEPS"
+                      :labels="levelLabels"
+                    />
+                    <LevelRating
+                      v-else-if="data.key === 'cooperation'"
+                      v-model="region.cooperation"
+                      :steps="LEVEL_STEPS"
+                      :labels="levelLabels"
+                    />
+                    <LevelRating
+                      v-else-if="data.key === 'ambition'"
+                      v-model="region.ambition"
+                      :steps="LEVEL_STEPS"
+                      :labels="levelLabels"
+                    />
+                    <LevelRating
+                      v-else-if="data.key === 'inequality'"
+                      v-model="region.inequality"
+                      :steps="LEVEL_STEPS"
+                      :labels="levelLabels"
+                    />
+                  </template>
+                </Column>
+              </DataTable>
+              <div class="year-block">
+                <div class="conditions-field year-field">
+                  <label>{{ t('calendarYear') }}</label>
+                  <div class="year-row">
+                    <Dropdown
+                      v-model="calendarEra"
+                      :options="calendarEraOptions"
+                      option-label="label"
+                      option-value="value"
+                      class="era-select"
+                    />
+                    <InputNumber
+                      v-model="calendarYear"
+                      :min="calendarYearMin"
+                      :max="calendarYearMax"
+                      :step="100"
+                      show-buttons
+                      class="year-input"
+                    />
                   </div>
                 </div>
-              </details>
-            </section>
+                <div class="era-preview" aria-live="polite">
+                  <span class="era-preview-title">{{ t('eraPreview.title') }}</span>
+                  <span class="era-banner-year">{{ draftYearLabel }}</span>
+                  <span class="header-era-sep" aria-hidden="true">·</span>
+                  <span><span class="era-k">{{ t('eraPreview.japan') }}</span>{{ draftJapanEra }}</span>
+                  <span class="header-era-sep" aria-hidden="true">·</span>
+                  <span><span class="era-k">{{ t('eraPreview.world') }}</span>{{ draftWorldEra }}</span>
+                </div>
+                <p class="hint year-hint">{{ t('calendarYearHint') }}</p>
+              </div>
+                <details class="geo-details">
+                  <summary>{{ t('wizard.geoDetails') }}</summary>
+                  <div class="bg-table" role="table">
+                    <div class="bg-row bg-head" role="row">
+                      <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
+                      <div v-for="region in regionDrafts" :key="`${region.id}-h1`" class="bg-cell col-head" role="columnheader">
+                        <span>{{ t(`geographies.${region.id}`) }}</span>
+                        <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
+                      </div>
+                    </div>
+                    <div class="bg-row bg-form" role="row">
+                      <div class="bg-stub" role="rowheader">{{ t('wizard.rows.subregion') }}</div>
+                      <div v-for="region in regionDrafts" :key="`${region.id}-sub`" class="bg-cell" role="cell">
+                        <Dropdown v-model="region.subregion" :options="subregionOptions(region.id)" option-label="label" option-value="value" class="field-control" />
+                      </div>
+                    </div>
+                    <div class="bg-row" role="row">
+                      <div class="bg-stub" role="rowheader">{{ t('wizard.rows.focus') }}</div>
+                      <div v-for="region in regionDrafts" :key="`${region.id}-focus`" class="bg-cell bg-focus" role="cell">{{ t(`wizard.blurbs.${region.subregion}`) }}</div>
+                    </div>
+                    <div v-for="row in BACKGROUND_ROWS" :key="row" class="bg-row" role="row">
+                      <div class="bg-stub" role="rowheader">{{ t(`wizard.rows.${row}`) }}</div>
+                      <div v-for="region in regionDrafts" :key="`${region.id}-${row}`" class="bg-cell" role="cell">{{ t(`wizard.table.${region.subregion}.${row}`) }}</div>
+                    </div>
+                  </div>
+                </details>
+              </section>
 
-            <section v-else class="conditions-section">
-              <DataTable :value="step3Axes" class="conditions-dt">
-              <Column :header="t('wizard.axis')" class="dt-axis">
-                <template #body="{ data }">
-                  <span class="axis-label">
-                    {{ step3AxisLabel(data.key) }}
-                    <i v-tooltip.right="step3AxisHint(data.key)" class="pi pi-info-circle axis-info" tabindex="0" />
-                  </span>
-                </template>
-              </Column>
-              <Column v-for="region in regionDrafts" :key="region.id">
-                <template #header>
-                  <div class="col-head">
-                    <span>{{ t(`geographies.${region.id}`) }}</span>
-                    <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
-                  </div>
-                </template>
-                <template #body="{ data }">
-                  <LevelRating
-                    v-if="data.key === 'notable'"
-                    v-model="region.traitRate"
-                    :steps="NOTABLE_STEPS"
-                    :labels="levelLabels"
-                  />
-                  <LevelRating
-                    v-else-if="data.key === 'welfare'"
-                    v-model="region.welfareRate"
-                    :steps="WELFARE_STEPS"
-                    :labels="welfareLabels"
-                  />
-                  <div v-else class="pop-slider">
-                    <Slider
-                      v-model="region.population"
-                      :min="COLUMN_POP_MIN"
-                      :max="COLUMN_POP_MAX"
-                      :step="100"
+              <section v-else class="conditions-section">
+                <DataTable :value="step3Axes" class="conditions-dt">
+                <Column :header="t('wizard.axis')" class="dt-axis">
+                  <template #body="{ data }">
+                    <span class="axis-label">
+                      {{ step3AxisLabel(data.key) }}
+                      <i v-tooltip.right="step3AxisHint(data.key)" class="pi pi-info-circle axis-info" tabindex="0" />
+                    </span>
+                  </template>
+                </Column>
+                <Column v-for="region in regionDrafts" :key="region.id">
+                  <template #header>
+                    <div class="col-head">
+                      <span>{{ t(`geographies.${region.id}`) }}</span>
+                      <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
+                    </div>
+                  </template>
+                  <template #body="{ data }">
+                    <LevelRating
+                      v-if="data.key === 'notable'"
+                      v-model="region.traitRate"
+                      :steps="NOTABLE_STEPS"
+                      :labels="levelLabels"
                     />
-                    <span class="pop-slider-value">{{ t('wizard.columnPopCount', { n: region.population }) }}</span>
-                  </div>
-                </template>
-              </Column>
-            </DataTable>
-            </section>
+                    <LevelRating
+                      v-else-if="data.key === 'welfare'"
+                      v-model="region.welfareRate"
+                      :steps="WELFARE_STEPS"
+                      :labels="welfareLabels"
+                    />
+                    <div v-else class="pop-slider">
+                      <Slider
+                        v-model="region.population"
+                        :min="COLUMN_POP_MIN"
+                        :max="COLUMN_POP_MAX"
+                        :step="100"
+                      />
+                      <span class="pop-slider-value">{{ t('wizard.columnPopCount', { n: region.population }) }}</span>
+                    </div>
+                  </template>
+                </Column>
+              </DataTable>
+              </section>
+            </template>
           </template>
           <p v-if="error" class="error">{{ error }}</p>
         </div>
@@ -2328,7 +2385,22 @@ onBeforeUnmount(() => {
               @click="applySimulationConditions"
             />
           </template>
+          <template v-else-if="scenarioSetupStep === 1">
+            <Button
+              :label="t('wizard.next')"
+              class="action-btn"
+              :disabled="creating"
+              @click="goToScenarioSetupStep(2)"
+            />
+          </template>
           <template v-else-if="scenarioMode === 'experiment'">
+            <Button
+              :label="t('wizard.back')"
+              class="action-btn"
+              severity="secondary"
+              :disabled="creating"
+              @click="goToScenarioSetupStep(1)"
+            />
             <Button
               :label="t('actions.create')"
               icon="pi pi-plus"
@@ -2340,19 +2412,18 @@ onBeforeUnmount(() => {
           </template>
           <template v-else>
             <Button
-              v-if="conditionStep > 1"
               :label="t('wizard.back')"
               class="action-btn"
               severity="secondary"
               :disabled="creating"
-              @click="conditionStep -= 1"
+              @click="handleCustomWizardBack"
             />
             <Button
               v-if="conditionStep < 2"
               :label="t('wizard.next')"
               class="action-btn"
               :disabled="creating"
-              @click="conditionStep += 1"
+              @click="conditionStep += 1; scrollConditionsToTop()"
             />
             <Button
               v-else
@@ -2820,6 +2891,15 @@ h2 {
 
 .scenario-mode-picker {
   margin-bottom: 0.75rem;
+}
+
+.setup-step-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #8eb4d9;
 }
 
 .conditions-midrun-policy {

@@ -11,6 +11,8 @@
 | [overview.md](./overview.md) | 30 秒ピッチ |
 | [checklist.md](./checklist.md) | 起動・事前確認・障害時 |
 | [RESULTS.md](./RESULTS.md) | 実測数値（デモ後） |
+| [gap.md](./gap.md) | 方針と実装の AS-IS / ギャップ / TODO |
+| [world-model.md](./world-model.md) | **固定・変動・創発**の四層モデル（概念の正） |
 | [review.md](./review.md) | テーマ根拠・経緯 |
 | [faq.md](./faq.md) | 想定 Q&A |
 | [submission.md](./submission.md) | 提出物一覧 |

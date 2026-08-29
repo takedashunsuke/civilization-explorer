@@ -1,4 +1,4 @@
-"""Controlled experiment: identical agent roster × external environment only."""
+"""Controlled experiment: identical agent roster; vary shared resource pool and disasters only."""
 
 from __future__ import annotations
 
@@ -163,6 +163,48 @@ def describe_experiment() -> dict[str, Any]:
             "resource_pool",
             "disaster_frequency",
         ],
+        "varied_label_ja": [
+            "共有資源（resource_pool）",
+            "災害（disaster_frequency）",
+        ],
+        "fixed_background_ja": "舞台: サブ地域・気候・地形・衛生・食の説明（UI叙事。数値はサブ地域プリセット）",
+        "not_modeled_ja": [
+            "食料・水・木材・石油などの個別資源",
+            "時代による重要資源の切り替え",
+        ],
+        "layers": [
+            {
+                "id": "stage",
+                "label_ja": "① 舞台",
+                "fields": ["subregion_id", "climate", "landform", "sanitation", "terrain"],
+                "experiment": "fixed_per_column",
+            },
+            {
+                "id": "knobs",
+                "label_ja": "② 実験ノブ",
+                "fields": ["resource_pool", "disaster_frequency"],
+                "experiment": "varied_across_worlds",
+            },
+            {
+                "id": "roster",
+                "label_ja": "③ 人間ロスター",
+                "fields": ["agent_id", "personality", "traits", "initial_position"],
+                "experiment": "fixed_same_roster",
+            },
+            {
+                "id": "social_initial",
+                "label_ja": "③′ 社会の初期値",
+                "fields": ["institution", "tax_rate", "education_level", "religion", "trade_openness", "welfare_rate"],
+                "experiment": "neutral_same_start",
+            },
+            {
+                "id": "emergent",
+                "label_ja": "④ 創発",
+                "fields": ["settlements", "leaders", "conflict", "regime", "wealth", "population"],
+                "experiment": "changes_during_play",
+            },
+        ],
+        "docs": "docs/hackathon/world-model.md",
         "emerges_in_play": [
             "settlements",
             "institutions",
