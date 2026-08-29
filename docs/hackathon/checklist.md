@@ -9,8 +9,8 @@
 * [ ] `http://127.0.0.1:8000/health` で `llm` 状態を確認（`wired: true` なら LLM 接続済み）
 * [ ] LLM 使用時: Ollama（または外部 API）が応答する
 * [ ] デモ用シナリオを決める（推奨: 対照実験・[RESULTS.md](./RESULTS.md)）
-* [ ] 4 環境それぞれ 100 年まで進め、マイルストーンで **レポートを出力 (.txt)** → `result/raw/` に保存
-* [ ] [analysis/summary.md](../../analysis/summary.md) に定量表を記入（または LLM 解析後に転記）
+* [ ] 実証ログ: `./scripts/run-experiment-batch.sh`（AD 1750→1950・200年×10 seed）または単発 CLI
+* [ ] 各 `result/raw/run-NNN/` に 4 本 `.json` + `.txt`、[analysis/summary.md](../../analysis/summary.md) 索引を更新
 * [ ] 発表の問いを [demo-v3.md](./demo-v3.md) と一致しているか確認
 * [ ] ピッチが「支援 AI」になっていないか [overview.md](./overview.md) で確認
 * [ ] 録画バックアップを用意する（ライブ失敗用）

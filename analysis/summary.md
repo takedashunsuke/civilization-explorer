@@ -1,87 +1,34 @@
-# 実行結果サマリー（解析後）
+# 実行結果サマリー（解析索引）
 
-> 提出用の要約。**生ログ**は [result/raw/](../result/raw/)。**取得手順**は [DEMO.md](../DEMO.md)。  
-> LLM 解析手順: [prompt.md](./prompt.md) / 生出力: [output/](./output/)
+> 実行回ごとの解析は **`analysis/output/run-NNN/`** に格納（`result/raw/run-NNN/` と同じ ID）。
 
-意思決定は **地域観測 + 集団方針** モデル。`LLM_PROVIDER=stub`（既定）ではヒューリスティックのみ。
-
----
-
-## 実行環境
+## 実証実験プロトコル
 
 | 項目 | 値 |
 |------|-----|
-| OS | （記入） |
-| Python | 3.12+ |
-| Node.js | 22.19+ |
-| Backend | `http://127.0.0.1:8000` |
-| Frontend | `http://127.0.0.1:3000` |
-| LLM | `stub` / `ollama` / `openai` |
-| 生ログ | [result/manifest.json](../result/manifest.json) |
+| 暦年（ラベル） | AD **1750 → 1950** |
+| 年数 | **200 年** |
+| 繰り返し | seed **42 … 51**（10 run） |
+| 一括実行 | `./scripts/run-experiment-batch.sh` |
 
----
+各 run は 4 環境（豊か / 乏しい / 災害多 / 標準）の対照実験。開始年は表示用、**再現性は `experiment_seed`**。
 
-## 対照実験（100 年時点）
+## 完了済み run
 
-シナリオ: **同一 5,000 人 × 4 世界** — `experiment_seed: 42`、列あたり 1,000 人。
+| 実行回 | 条件 | 生ログ | 解析 |
+|--------|------|--------|------|
+| **test-001** | AD 1000→1100・100年・seed 42（パイロット） | [raw/test-001/](../result/raw/test-001/) | [output/test-001/](./output/test-001/summary.md) |
 
-| 世界 | variant | UI ラベル |
-|------|---------|-----------|
-| A | `lush` | 豊か |
-| B | `lean` | 乏しい |
-| C | `volatile` | 災害多 |
-| D | `balanced` | 標準 |
+実証 run（バッチ後）: `run-001` … `run-010`（AD 1750→1950・seed 42…51）— [result/manifest.json](../result/manifest.json) の `runs[]`
 
-記入元: 各 `result/raw/*.txt` の「実験サマリー（API）」、または LLM 解析結果（`analysis/output/`）。
+## 全実行回
 
-### 定量比較
+索引: [output/manifest.json](./output/manifest.json) · 生ログ: [result/manifest.json](../result/manifest.json)
 
-| 指標 | A 豊か | B 乏しい | C 災害多 | D 標準 |
-|------|--------|--------|--------|--------|
-| 生存人口 | | | | |
-| 人口変化 % | | | | |
-| 共有資源（合計） | | | | |
-| 交易開放（平均） | | | | |
-| 争い（累計） | | | | |
-| 共同（累計） | | | | |
-| 体制転換（累計） | | | | |
-| 災害（累計） | | | | |
-| 台頭タイプ（代表） | | | | |
-| 観測ソース | | | | |
+## 手順
 
-### 定性メモ（発表用）
+1. `./scripts/run-experiment-batch.sh` → `result/raw/run-NNN/` × 10（`analysis/output/run-NNN/` も自動作成）
+2. [prompt.md](./prompt.md) で LLM 比較（パスに `run-NNN` を指定）
+3. 応答・要点を `analysis/output/run-NNN/` に保存
 
-**環境ごとの要約**
-
-- 豊か: （記入）
-- 乏しい: （記入）
-- 災害多: （記入）
-- 標準: （記入）
-
-**意外な差・フック**
-
-（記入）
-
-**同一 Agent ID の役割差**（実測がある場合のみ）
-
-| Agent ID | 豊か | 乏しい | 災害多 | 標準 |
-|----------|------|--------|--------|------|
-| | | | | |
-
----
-
-## LLM 解析ログ
-
-| ファイル | 内容 |
-|----------|------|
-| （未） | `analysis/output/` に LLM 応答を保存 |
-
----
-
-## スクリーンショット・録画
-
-| ファイル | 内容 |
-|----------|------|
-| （未） | 4 世界比較画面 |
-| （未） | 状況パネル・人物ズーム |
-| （未） | ライブ失敗用録画 |
+取得手順: [DEMO.md](../DEMO.md)

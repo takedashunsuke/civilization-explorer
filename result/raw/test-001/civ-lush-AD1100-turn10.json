@@ -1,0 +1,59 @@
+{
+  "format": "civ-experiment-result-v1",
+  "variant": "lush",
+  "variant_label_ja": "豊かな自然",
+  "experiment_seed": 42,
+  "simulation_id": "04646cc8-27e1-4d1b-9400-0139bf7e58f5",
+  "turn": 10,
+  "calendar_year": 1100,
+  "llm": {
+    "provider": "ollama",
+    "ollama_model": "llama3.2:1b",
+    "openai_model": "gpt-4o-mini",
+    "wired": true,
+    "mode": "group",
+    "max_agents_per_turn": 4,
+    "group_sample_per_region": 12,
+    "timeout_sec": 8.0,
+    "note": "Group/institution LLM stance (≤12 actors/region); masses follow bulk rules."
+  },
+  "experiment_summary": {
+    "variant": "lush",
+    "variant_label_ja": "豊かな自然",
+    "seed": 42,
+    "turn": 10,
+    "calendar_year": 1100,
+    "population_alive": 1034,
+    "population_delta_pct": -79.3,
+    "resource_pool": 856.0,
+    "trade_openness_mean": 0.5,
+    "conflicts_total": 29,
+    "cooperations_total": 6,
+    "regime_shifts": 2,
+    "disasters": 6,
+    "dominant_archetype": "warlord",
+    "archetypes": [
+      "warlord",
+      "warlord",
+      "warlord",
+      "warlord"
+    ],
+    "trajectories": [
+      "exodus",
+      "war",
+      "war",
+      "exodus",
+      "exodus"
+    ],
+    "institutions": [
+      "anarchy",
+      "anarchy",
+      "anarchy",
+      "democracy",
+      "democracy"
+    ],
+    "spotlight_agent_id": "a5341",
+    "spotlight_role": "leader"
+  },
+  "report_txt": "result/raw/civ-lush-AD1100-turn10.txt"
+}

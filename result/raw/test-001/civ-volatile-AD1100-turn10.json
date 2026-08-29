@@ -1,0 +1,58 @@
+{
+  "format": "civ-experiment-result-v1",
+  "variant": "volatile",
+  "variant_label_ja": "災害が多い",
+  "experiment_seed": 42,
+  "simulation_id": "3237856d-f984-484e-b841-4adeea45e3f3",
+  "turn": 10,
+  "calendar_year": 1100,
+  "llm": {
+    "provider": "ollama",
+    "ollama_model": "llama3.2:1b",
+    "openai_model": "gpt-4o-mini",
+    "wired": true,
+    "mode": "group",
+    "max_agents_per_turn": 4,
+    "group_sample_per_region": 12,
+    "timeout_sec": 8.0,
+    "note": "Group/institution LLM stance (≤12 actors/region); masses follow bulk rules."
+  },
+  "experiment_summary": {
+    "variant": "volatile",
+    "variant_label_ja": "災害が多い",
+    "seed": 42,
+    "turn": 10,
+    "calendar_year": 1100,
+    "population_alive": 995,
+    "population_delta_pct": -80.1,
+    "resource_pool": 479.0,
+    "trade_openness_mean": 0.5,
+    "conflicts_total": 48,
+    "cooperations_total": 11,
+    "regime_shifts": 1,
+    "disasters": 10,
+    "dominant_archetype": "warlord",
+    "archetypes": [
+      "warlord",
+      "warlord",
+      "warlord"
+    ],
+    "trajectories": [
+      "exodus",
+      "war",
+      "faith",
+      "faith",
+      "exodus"
+    ],
+    "institutions": [
+      "anarchy",
+      "anarchy",
+      "anarchy",
+      "democracy",
+      "anarchy"
+    ],
+    "spotlight_agent_id": "a5563",
+    "spotlight_role": "leader"
+  },
+  "report_txt": "result/raw/civ-volatile-AD1100-turn10.txt"
+}

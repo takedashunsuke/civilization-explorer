@@ -2,7 +2,7 @@
 """Run controlled experiment without browser (4 worlds × N turns).
 
 Uses the simulation engine directly — Backend server is NOT required.
-Output: result/raw/civ-{variant}-AD{year}-turn{N}.txt
+Output: result/raw/run-NNN/civ-{variant}-AD{year}-turn{N}.{txt,json}
 
 Usage (from repo root):
   ./scripts/run-experiment.sh
@@ -21,7 +21,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "backend"))
+sys.path.insert(0, str(SCRIPTS))
+
+from experiment_runs import (  # noqa: E402
+    analysis_run_dir,
+    relative_repo_path,
+    resolve_run_dir,
+    upsert_run_manifest,
+)
 
 from simulation import create_simulation, tick  # noqa: E402
 from simulation.experiment import (  # noqa: E402
@@ -70,7 +79,7 @@ def _export_filename(variant: str, milestone_year: int, turn: int) -> str:
     return f"civ-{variant}-AD{milestone_year}-turn{turn}.txt"
 
 
-def build_report(sim: SimulationState, summary: dict) -> str:
+def build_report(sim: SimulationState, summary: dict, *, run_id: str | None = None) -> str:
     lines: list[str] = []
     turn = sim.world.turn
     ypt = sim.world.years_per_turn
@@ -86,6 +95,8 @@ def build_report(sim: SimulationState, summary: dict) -> str:
     lines.append(_line("対照実験", "yes"))
     lines.append(_line("環境パターン", _VARIANT_LABEL_JA.get(sim.experiment_variant or "", sim.experiment_variant)))
     lines.append(_line("実験シード", sim.experiment_seed))
+    if run_id:
+        lines.append(_line("実行回", run_id))
 
     lines.append(_section("節目"))
     lines.append(_line("暦年", f"AD {milestone_year}"))
@@ -176,26 +187,31 @@ def build_report(sim: SimulationState, summary: dict) -> str:
     return "\n".join(lines)
 
 
-def update_manifest(out_dir: Path, records: list[dict]) -> None:
-    manifest_path = ROOT / "result" / "manifest.json"
-    if not manifest_path.exists():
-        return
-    data = json.loads(manifest_path.read_text(encoding="utf-8"))
-    by_variant = {r["variant"]: r for r in records}
-    for entry in data.get("files", []):
-        vid = entry.get("variant")
-        if vid in by_variant:
-            rec = by_variant[vid]
-            entry["path"] = f"result/raw/{rec['filename']}"
-            entry["json_path"] = f"result/raw/{rec['json_filename']}"
-            entry["status"] = "done"
-    data["recorded_at"] = datetime.now(timezone.utc).isoformat()
-    data["milestone_turn"] = records[0]["turn"] if records else data.get("milestone_turn")
+def update_manifest(
+    run_dir: Path,
+    run_id: str,
+    records: list[dict],
+    *,
+    experiment_seed: int,
+    start_year: int,
+    years_per_turn: int,
+    milestone_turn: int,
+) -> None:
     settings = get_settings()
-    data["llm_provider"] = settings.llm_provider
-    if settings.llm_provider == "ollama":
-        data["ollama_model"] = settings.ollama_model
-    manifest_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    upsert_run_manifest(
+        ROOT / "result" / "manifest.json",
+        run_id=run_id,
+        run_dir=run_dir,
+        repo_root=ROOT,
+        records=records,
+        llm_provider=settings.llm_provider,
+        ollama_model=settings.ollama_model if settings.llm_provider == "ollama" else None,
+        milestone_turn=milestone_turn,
+        milestone_years=milestone_turn * years_per_turn,
+        start_year=start_year,
+        years_per_turn=years_per_turn,
+        experiment_seed=experiment_seed,
+    )
 
 
 def main() -> int:
@@ -205,28 +221,70 @@ def main() -> int:
         choices=list(WORLD_VARIANT_IDS),
         help="Run a single variant (default: all four)",
     )
-    parser.add_argument("--turns", type=int, default=DEFAULT_TURNS, help="Ticks to advance (default: 10 = 100 years)")
+    duration = parser.add_mutually_exclusive_group()
+    duration.add_argument(
+        "--turns",
+        type=int,
+        default=None,
+        help=f"Ticks to advance (default: 10 = {DEFAULT_TURNS * DEFAULT_YEARS_PER_TURN} years)",
+    )
+    duration.add_argument(
+        "--years",
+        type=int,
+        default=None,
+        help=f"Simulated years to advance (must be multiple of {DEFAULT_YEARS_PER_TURN}; e.g. 100, 200)",
+    )
     parser.add_argument("--seed", type=int, default=EXPERIMENT_SEED)
-    parser.add_argument("--start-year", type=int, default=DEFAULT_START_YEAR)
+    parser.add_argument(
+        "--start-year",
+        type=int,
+        default=DEFAULT_START_YEAR,
+        help=f"Calendar start year AD (default: {DEFAULT_START_YEAR})",
+    )
+    parser.add_argument(
+        "--run",
+        metavar="ID",
+        help="Run folder under result/raw/ (e.g. run-002 or 2). Default: auto next run-NNN",
+    )
     parser.add_argument(
         "--out-dir",
         type=Path,
-        default=ROOT / "result" / "raw",
-        help="Output directory for .txt reports",
+        default=None,
+        help="Override output directory (advanced; skips run-NNN layout)",
     )
     args = parser.parse_args()
 
+    years_per_turn = DEFAULT_YEARS_PER_TURN
+    if args.years is not None:
+        if args.years <= 0 or args.years % years_per_turn != 0:
+            parser.error(f"--years must be a positive multiple of {years_per_turn}")
+        turns = args.years // years_per_turn
+    else:
+        turns = DEFAULT_TURNS if args.turns is None else args.turns
+    if turns <= 0:
+        parser.error("--turns must be positive")
+
     variants = [args.variant] if args.variant else list(WORLD_VARIANT_IDS)
-    args.out_dir.mkdir(parents=True, exist_ok=True)
+    raw_root = ROOT / "result" / "raw"
+    if args.out_dir is not None:
+        out_dir = args.out_dir
+        run_id = None
+    else:
+        out_dir, run_id = resolve_run_dir(raw_root, args.run)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     llm = describe_provider()
+    milestone_years = turns * years_per_turn
+    end_year = args.start_year + milestone_years
     print(
-        f"Controlled experiment — seed={args.seed}, turns={args.turns} "
-        f"({args.turns * DEFAULT_YEARS_PER_TURN} years), LLM={llm.get('provider')} "
-        f"(wired={llm.get('wired')})",
+        f"Controlled experiment — seed={args.seed}, "
+        f"AD {args.start_year} → AD {end_year} ({milestone_years} years, {turns} turns), "
+        f"LLM={llm.get('provider')} (wired={llm.get('wired')})",
     )
     if llm.get("provider") == "ollama":
         print(f"  Ollama: {llm.get('ollama_model')} @ {get_settings().ollama_base_url}")
+    if run_id:
+        print(f"  Run: {run_id} → {relative_repo_path(out_dir, ROOT)}")
     records: list[dict] = []
 
     for variant in variants:
@@ -239,26 +297,32 @@ def main() -> int:
         sim.experiment_variant = variant
         sim.experiment_seed = args.seed
         sim.status = "running"
-        tick(sim, n=args.turns)
+        tick(sim, n=turns)
         summary = experiment_summary(sim)
-        report = build_report(sim, summary)
+        report = build_report(sim, summary, run_id=run_id)
         filename = _export_filename(variant, _calendar_year(sim), sim.world.turn)
-        out_path = args.out_dir / filename
+        out_path = out_dir / filename
         out_path.write_text(report, encoding="utf-8")
         json_name = filename.replace(".txt", ".json")
+        run_rel = relative_repo_path(out_dir, ROOT)
         json_payload = {
             "format": "civ-experiment-result-v1",
+            "run_id": run_id,
             "variant": variant,
             "variant_label_ja": _VARIANT_LABEL_JA.get(variant, variant),
             "experiment_seed": args.seed,
+            "start_year": args.start_year,
+            "years_per_turn": years_per_turn,
+            "milestone_turn": sim.world.turn,
+            "milestone_years": milestone_years,
             "simulation_id": sim_id,
             "turn": sim.world.turn,
             "calendar_year": _calendar_year(sim),
             "llm": llm,
             "experiment_summary": summary,
-            "report_txt": f"result/raw/{filename}",
+            "report_txt": f"{run_rel}/{filename}",
         }
-        json_path = args.out_dir / json_name
+        json_path = out_dir / json_name
         json_path.write_text(json.dumps(json_payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         print(
             f"     saved {out_path.name}, {json_path.name} | pop={summary['population_alive']} "
@@ -272,9 +336,25 @@ def main() -> int:
             "summary": summary,
         })
 
-    update_manifest(args.out_dir, records)
-    print(f"\nDone. {len(records)} report(s) in {args.out_dir}")
-    print("Next: analysis/prompt.md で LLM 比較 → analysis/summary.md に転記")
+    if run_id:
+        update_manifest(
+            out_dir,
+            run_id,
+            records,
+            experiment_seed=args.seed,
+            start_year=args.start_year,
+            years_per_turn=years_per_turn,
+            milestone_turn=turns,
+        )
+        analysis_dir = analysis_run_dir(ROOT, run_id)
+        print(f"\nDone. {len(records)} report(s) in {out_dir}")
+        print(f"Analysis: {relative_repo_path(analysis_dir, ROOT)}/ （comparison・summary 等を配置）")
+    else:
+        print(f"\nDone. {len(records)} report(s) in {out_dir}")
+    if run_id:
+        print(f"Next: analysis/prompt.md で LLM 比較 → analysis/output/{run_id}/ に保存")
+    else:
+        print("Next: analysis/prompt.md で LLM 比較 → analysis/output/run-NNN/ に保存")
     return 0
 
 

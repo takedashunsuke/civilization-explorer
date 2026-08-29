@@ -6,36 +6,52 @@
   "years_per_turn": 10,
   "start_year": 1000,
   "population": 5000,
-  "llm_provider": "(記入: stub / ollama / openai)",
-  "recorded_at": "(記入: ISO8601)",
-  "files": [
+  "latest_run": null,
+  "llm_provider": "ollama",
+  "ollama_model": "llama3.2:1b",
+  "recorded_at": "2026-08-29T13:27:42.744631+00:00",
+  "tests": [
     {
-      "variant": "lush",
-      "label_ja": "豊か",
-      "path": "result/raw/civ-lush-AD1100-turn10.txt",
-      "json_path": "result/raw/civ-lush-AD1100-turn10.json",
-      "status": "pending"
-    },
-    {
-      "variant": "lean",
-      "label_ja": "乏しい",
-      "path": "result/raw/civ-lean-AD1100-turn10.txt",
-      "json_path": "result/raw/civ-lean-AD1100-turn10.json",
-      "status": "pending"
-    },
-    {
-      "variant": "volatile",
-      "label_ja": "災害多",
-      "path": "result/raw/civ-volatile-AD1100-turn10.txt",
-      "json_path": "result/raw/civ-volatile-AD1100-turn10.json",
-      "status": "pending"
-    },
-    {
-      "variant": "balanced",
-      "label_ja": "標準",
-      "path": "result/raw/civ-balanced-AD1100-turn10.txt",
-      "json_path": "result/raw/civ-balanced-AD1100-turn10.json",
-      "status": "pending"
+      "id": "test-001",
+      "path": "result/raw/test-001",
+      "recorded_at": "2026-08-29T13:27:42.744631+00:00",
+      "experiment_seed": 42,
+      "start_year": 1000,
+      "milestone_turn": 10,
+      "milestone_years": 100,
+      "llm_provider": "ollama",
+      "ollama_model": "llama3.2:1b",
+      "files": [
+        {
+          "variant": "lush",
+          "label_ja": "豊か",
+          "path": "result/raw/test-001/civ-lush-AD1100-turn10.txt",
+          "json_path": "result/raw/test-001/civ-lush-AD1100-turn10.json",
+          "status": "done"
+        },
+        {
+          "variant": "lean",
+          "label_ja": "乏しい",
+          "path": "result/raw/test-001/civ-lean-AD1100-turn10.txt",
+          "json_path": "result/raw/test-001/civ-lean-AD1100-turn10.json",
+          "status": "done"
+        },
+        {
+          "variant": "volatile",
+          "label_ja": "災害多",
+          "path": "result/raw/test-001/civ-volatile-AD1100-turn10.txt",
+          "json_path": "result/raw/test-001/civ-volatile-AD1100-turn10.json",
+          "status": "done"
+        },
+        {
+          "variant": "balanced",
+          "label_ja": "標準",
+          "path": "result/raw/test-001/civ-balanced-AD1100-turn10.txt",
+          "json_path": "result/raw/test-001/civ-balanced-AD1100-turn10.json",
+          "status": "done"
+        }
+      ]
     }
-  ]
+  ],
+  "runs": []
 }

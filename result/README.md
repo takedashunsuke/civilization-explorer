@@ -6,50 +6,64 @@ CLI またはブラウザのマイルストーン出力を格納します。
 
 ```text
 result/
-  README.md          本ファイル
-  raw/               生ログ — 提出用
-    *.json           定量の正（experiment_summary）
-    *.txt            人間向けレポート（出来事ログ全文）
-  manifest.json      収録ファイル一覧（CLI 実行時に自動更新）
+  manifest.json          全実行回の索引（latest_run・runs[]）
+  raw/
+    test-001/            パイロット（AD 1000→1100・100年）
+    run-001/             実証 1 回目（バッチ後）
+      run.json           当該回のメタデータ
+      civ-lush-*.json / .txt
+      civ-lean-*.json / .txt
+      civ-volatile-*.json / .txt
+      civ-balanced-*.json / .txt
+    run-002/             2 回目（同条件の再実行）
+    run-003/             3 回目 …
 ```
 
-**UI と CLI の違い・共通化方針:** [docs/guides/execution-paths.md](../docs/guides/execution-paths.md)
+**UI と CLI の違い:** [docs/guides/execution-paths.md](../docs/guides/execution-paths.md)
 
-## ファイル命名規則
+## 実証実験プロトコル（提出）
 
-```text
-civ-{variant}-{暦年}-turn{ターン}.json   ← 定量比較はこちらを正とする
-civ-{variant}-{暦年}-turn{ターン}.txt    ← LLM への長文投入・目視確認用
-```
-
-| variant | UI ラベル | 例 |
-|---------|-----------|-----|
-| `lush` | 豊か | `civ-lush-AD1100-turn10.json` / `.txt` |
-| `lean` | 乏しい | `civ-lean-AD1100-turn10.json` / `.txt` |
-| `volatile` | 災害多 | `civ-volatile-AD1100-turn10.json` / `.txt` |
-| `balanced` | 標準 | `civ-balanced-AD1100-turn10.json` / `.txt` |
-
-## 何を共通化しているか
-
-| データ | 画面 | CLI |
-|--------|------|-----|
-| 定量 (`experiment_summary`) | API JSON | `*.json` — **同一関数の出力** |
-| 全文レポート (`.txt`) | `milestoneExport.ts` | `run-experiment.py` — **実装は別（将来 Backend 一本化予定）** |
-
-`analysis/summary.md` への転記は **`.json` の `experiment_summary`** を優先してください。
-
-## 収録手順
-
-**A. CLI（推奨）**
+| 項目 | 値 |
+|------|-----|
+| 暦年ラベル | AD **1750 → 1950** |
+| 年数 | **200 年**（20 ターン） |
+| 繰り返し | seed **42 … 51**（10 回） |
+| 一括実行 | `./scripts/run-experiment-batch.sh` |
 
 ```bash
-./scripts/run-experiment.sh
+./scripts/run-experiment.sh                              # 自動で次の run-NNN（例: run-002）
+./scripts/run-experiment.sh --start-year 1750 --years 200 --seed 42   # 実証 1 回分
+./scripts/run-experiment-batch.sh                      # 10 run 一括
 ```
 
-**B. ブラウザ**
+1 ターン = 10 年。ファイル名は `civ-{variant}-AD{終了年}-turn{N}`（実証なら `AD1950-turn20`）。
 
-1. [DEMO.md](../DEMO.md) に従い 4 環境それぞれ 100 年まで進める
-2. マイルストーンで `.txt` をダウンロードし `result/raw/` に保存（`.json` は API から手動取得するか CLI を推奨）
-3. `manifest.json` を更新
+`result/manifest.json` の `latest_run` と `runs[]` が更新されます。
 
-解析は [analysis/](../analysis/) へ。
+## ファイル命名（各 run フォルダ内）
+
+```text
+civ-{variant}-AD{暦年}-turn{ターン}.json   ← 定量の正（experiment_summary）
+civ-{variant}-AD{暦年}-turn{ターン}.txt    ← 全文ログ
+```
+
+| variant | UI ラベル |
+|---------|-----------|
+| `lush` | 豊か |
+| `lean` | 乏しい |
+| `volatile` | 災害多 |
+| `balanced` | 標準 |
+
+## ブラウザから保存する場合
+
+1. [DEMO.md](../DEMO.md) の手順で 4 環境を進める
+2. `.txt` を **手動で** `result/raw/run-NNN/` に保存（次の空き番号）
+3. `manifest.json` と当該 `run.json` を更新（CLI 実行なら自動）
+
+## 解析
+
+- 1 回分の比較: その `run-NNN/` 内の 4 本 `.json`
+- 解析の保存先: **`analysis/output/run-NNN/`**（同じ番号）
+- 複数回の再現性: `run-001` vs `run-002` … で同指標を並べる（パイロットは `test-001`）
+
+[analysis/](../analysis/) · [analysis/output/manifest.json](../analysis/output/manifest.json)

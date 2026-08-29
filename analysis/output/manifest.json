@@ -1,0 +1,17 @@
+{
+  "latest_run": null,
+  "tests": [
+    {
+      "id": "test-001",
+      "path": "analysis/output/test-001",
+      "result_run_path": "result/raw/test-001",
+      "updated_at": "2026-08-29T13:27:42.744631+00:00",
+      "files": {
+        "summary": "analysis/output/test-001/summary.md",
+        "comparison": "analysis/output/test-001/comparison-2026-08-29.md",
+        "agent_role_deep_dive": "analysis/output/test-001/agent-role-deep-dive-2026-08-29.md"
+      }
+    }
+  ],
+  "runs": []
+}

@@ -8,8 +8,8 @@
 | 場所 | 内容 |
 |------|------|
 | [../../README.md](../../README.md) | 環境構築・起動 |
-| [../../DEMO.md](../../DEMO.md) | ウェブ再生手順 |
-| [../../scripts/](../../scripts/) | セットアップ・起動 |
+| [../../DEMO.md](../../DEMO.md) | 再生手順・実証プロトコル（AD 1750→1950） |
+| [../../scripts/run-experiment-batch.sh](../../scripts/run-experiment-batch.sh) | 10 run 一括 |
 | [../../result/](../../result/) | 生ログ |
 | [../../analysis/](../../analysis/) | LLM 解析・サマリー |
 

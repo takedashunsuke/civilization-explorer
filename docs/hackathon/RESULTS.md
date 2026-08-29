@@ -4,12 +4,12 @@
 >
 > | 用途 | 場所 |
 > |------|------|
-> | 生ログ（.txt） | [result/raw/](../../result/raw/) |
+> | 生ログ | [result/raw/](../../result/raw/)（`run-NNN/`） |
 > | 再生手順 | [DEMO.md](../../DEMO.md) |
 > | 解析プロンプト | [analysis/prompt.md](../../analysis/prompt.md) |
-> | 解析後サマリー | [analysis/summary.md](../../analysis/summary.md) |
+> | 解析索引 | [analysis/summary.md](../../analysis/summary.md) → `output/run-NNN/` |
 
-デモ後は `analysis/summary.md` に数値を記入し、4 本の `.txt` を `result/raw/` に置いてください。  
+デモ後は `./scripts/run-experiment-batch.sh`（AD 1750→1950・200年×10 seed）で生ログを揃え、要点を `analysis/output/run-NNN/summary.md` に記入してください。  
 設計: [demo-v3.md](./demo-v3.md)
 
 ---

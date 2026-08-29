@@ -9,10 +9,11 @@
 | GitHub リポジトリ | https://github.com/takedashunsuke/civilization-explorer | 公開済み |
 | README | [../../README.md](../../README.md) | 環境構築・起動 |
 | デモ再生手順 | [../../DEMO.md](../../DEMO.md) | CLI またはブラウザ |
-| 実行スクリプト | [../../scripts/run-experiment.sh](../../scripts/run-experiment.sh) | **ブラウザ不要**で 4 世界実行 |
-| 生ログ | [../../result/raw/](../../result/raw/) | デモ後に `.txt` を格納 |
-| LLM 解析 | [../../analysis/](../../analysis/) | `prompt.md` + `output/` |
-| 解析サマリー | [../../analysis/summary.md](../../analysis/summary.md) | デモ後に記入 |
+| 実行スクリプト | [../../scripts/run-experiment-batch.sh](../../scripts/run-experiment-batch.sh) | **10 run 一括**（AD 1750→1950） |
+| 単発 CLI | [../../scripts/run-experiment.sh](../../scripts/run-experiment.sh) | カスタム条件 |
+| 生ログ | [../../result/raw/](../../result/raw/) | `run-NNN/` に `.json` + `.txt` |
+| LLM 解析 | [../../analysis/](../../analysis/) | `prompt.md` + `output/run-NNN/` |
+| 解析サマリー | [../../analysis/summary.md](../../analysis/summary.md) | 索引 → `output/run-NNN/summary.md` |
 
 ## docs/hackathon（開発・発表用）
 
@@ -34,8 +35,9 @@
 - [ ] `origin` が上記 URL で、審査が clone できる（private なら招待）
 - [ ] `.env` / API キーがコミットされていない（`.gitignore`）
 - [ ] ルート README → DEMO → result / analysis に辿れる
-- [ ] `result/raw/` に 4 本の `.txt`（または manifest で pending 理由を明記）
-- [ ] `analysis/summary.md` に定量表を記入（未実施なら空欄のまま可だがデモ前に埋める）
+- [ ] `./scripts/run-experiment-batch.sh` で実証 10 run 完了（または manifest で pending 理由を明記）
+- [ ] 各 `result/raw/run-NNN/` に 4 本の `.json` + `.txt`
+- [ ] `analysis/output/run-NNN/summary.md` に定量表を記入（索引は `analysis/summary.md`）
 - [ ] デフォルトブランチ `main` に動くコードがある
 
 clone:

@@ -3,6 +3,24 @@
 対照実験 **同一 5,000 人 × 4 環境** を、審査員がローカルで再現するための手順です。  
 設計の背景は開発用ドキュメント [docs/hackathon/demo-v3.md](./docs/hackathon/demo-v3.md) を参照してください。
 
+## 実証実験プロトコル（提出）
+
+| 項目 | 値 |
+|------|-----|
+| 暦年（ラベル） | **AD 1750 → AD 1950**（激動の二百年） |
+| シミュレーション年数 | **200 年**（20 ターン） |
+| 繰り返し | **10 回**（`experiment_seed` 42 … 51） |
+| 各 run | 4 環境 × `.json` + `.txt` → `result/raw/run-NNN/` |
+
+開始年は表示・ファイル名用。**力学とロスターは `experiment_seed` で決まる**（同 seed なら開始年を変えても数値は同じ）。
+
+```bash
+./scripts/setup.sh                  # 初回のみ
+./scripts/run-experiment-batch.sh   # 上記 10 run を一括（目安 約 4〜5 時間・Ollama）
+```
+
+出力例: `civ-lush-AD1950-turn20.json`（各 run フォルダに 4 本 × 2 形式）
+
 ---
 
 ## 前提
@@ -15,20 +33,33 @@
 
 ### 方法 A — CLI（ブラウザ不要）
 
+**提出用（推奨）:**
+
 ```bash
-./scripts/setup.sh              # 初回のみ
-./scripts/run-experiment.sh     # 4 環境 × 10 ターン（100 年）→ result/raw/
+./scripts/setup.sh
+./scripts/run-experiment-batch.sh     # AD 1750→1950・200年 × seed 10 回
 ```
 
-単一環境のみ: `./scripts/run-experiment.sh --variant lush`  
-ターン数変更: `./scripts/run-experiment.sh --turns 10`（既定）
+**単発・カスタム:**
 
-各環境ごとに **2 ファイル**を出力します:
+```bash
+./scripts/run-experiment.sh                              # 既定: AD 1000→1100・100年
+./scripts/run-experiment.sh --start-year 1750 --years 200   # 実証 1 回分
+./scripts/run-experiment.sh --seed 43 --start-year 1750 --years 200
+```
 
-| ファイル | 内容 |
-|----------|------|
-| `civ-{variant}-AD{年}-turn{N}.json` | **`experiment_summary`（定量の正）** + LLM 設定 |
-| `civ-{variant}-AD{年}-turn{N}.txt` | 人間向けレポート（出来事ログ全文） |
+ドライラン（コマンド確認のみ）: `./scripts/run-experiment-batch.sh --dry-run`
+
+各 **run フォルダ**に 4 環境 × 2 ファイル（`.json` + `.txt`）:
+
+```text
+result/raw/test-001/          # パイロット（AD 1000→1100）
+result/raw/run-001/           # 実証 1 回目（バッチ後）
+  run.json
+  civ-lush-AD1100-turn10.json
+  civ-lush-AD1100-turn10.txt
+  …（lean / volatile / balanced）
+```
 
 > CLI は `simulation.engine` を直接呼び出し、`backend/.env` の `LLM_PROVIDER`（`ollama` 含む）を自動読み込みします。画面操作時の Backend API と **同じエンジン・同じ Ollama** です（[execution-paths.md](./docs/guides/execution-paths.md)）。
 
@@ -82,10 +113,10 @@ Backend / Frontend を起動:
 
 | 環境 | 保存先（例） |
 |------|----------------|
-| 豊か | `result/raw/civ-lush-AD1100-turn10.txt` |
-| 乏しい | `result/raw/civ-lean-AD1100-turn10.txt` |
-| 災害多 | `result/raw/civ-volatile-AD1100-turn10.txt` |
-| 標準 | `result/raw/civ-balanced-AD1100-turn10.txt` |
+| 豊か | `result/raw/run-NNN/civ-lush-AD1100-turn10.txt` |
+| 乏しい | `result/raw/run-NNN/civ-lean-AD1100-turn10.txt` |
+| 災害多 | `result/raw/run-NNN/civ-volatile-AD1100-turn10.txt` |
+| 標準 | `result/raw/run-NNN/civ-balanced-AD1100-turn10.txt` |
 
 > ヘッダー切替は同一ブラウザ内で別世界を開き直す操作です。各環境は独立したシミュレーションです。
 
@@ -100,8 +131,7 @@ Backend / Frontend を起動:
 
 ### 4. LLM 解析（任意）
 
-4 本の `.txt` を [analysis/prompt.md](./analysis/prompt.md) のプロンプトで LLM に渡し、要約を [analysis/summary.md](./analysis/summary.md) に記入する。  
-解析結果の保存先: `analysis/output/`
+4 本の `.json`（または `.txt`）を [analysis/prompt.md](./analysis/prompt.md) のプロンプトで LLM に渡し、応答・要点を **`analysis/output/run-NNN/`**（生ログと同じ番号）に保存する。索引は [analysis/summary.md](./analysis/summary.md)。
 
 ---
 
@@ -127,4 +157,4 @@ Backend / Frontend を起動:
 | 実行スクリプト | [scripts/](./scripts/) |
 | 生ログ | [result/raw/](./result/raw/) |
 | LLM プロンプト | [analysis/prompt.md](./analysis/prompt.md) |
-| 解析後サマリー | [analysis/summary.md](./analysis/summary.md) |
+| 解析索引 / サマリー | [analysis/summary.md](./analysis/summary.md) · [analysis/output/run-NNN/](./analysis/output/) |

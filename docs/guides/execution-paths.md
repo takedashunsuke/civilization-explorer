@@ -44,7 +44,7 @@
 
 | データ | 定義場所 | 画面 | CLI |
 |--------|----------|------|-----|
-| 定量サマリー | `experiment.experiment_summary()` | API JSON の `experiment_summary` | `result/raw/*.json` の `experiment_summary` |
+| 定量サマリー | `experiment.experiment_summary()` | API JSON の `experiment_summary` | `result/raw/run-NNN/*.json` の `experiment_summary` |
 | シミュレーション本体 | `SimulationState` | API JSON（全フィールド） | エンジン内（`.txt` に要約して書き出し） |
 
 **数値比較・`analysis/summary.md` への転記は `experiment_summary` を正とする。** 画面の状況パネルもこの API 応答と同源です。
@@ -60,9 +60,9 @@
 
 ### 推奨（提出・再現）
 
-1. **定量:** `result/raw/*.json` の `experiment_summary`（CLI 実行時に自動出力）
-2. **定性・出来事ログ:** `result/raw/*.txt`（CLI 推奨。ブラウザ出力を使う場合は同フォルダに手動配置）
-3. **LLM 比較:** [analysis/prompt.md](../../analysis/prompt.md) — `.json` 4 本でも `.txt` 4 本でも可
+1. **定量:** `result/raw/run-NNN/*.json` の `experiment_summary`（CLI 実行時に自動出力）
+2. **定性・出来事ログ:** `result/raw/run-NNN/*.txt`（CLI 推奨。ブラウザ出力を使う場合は同フォルダに手動配置）
+3. **LLM 比較:** [analysis/prompt.md](../../analysis/prompt.md) — 応答は `analysis/output/run-NNN/` に保存
 
 ### 将来の一本化（TODO）
 

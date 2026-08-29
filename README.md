@@ -22,10 +22,10 @@
 | ファイル / フォルダ | 内容 |
 |---------------------|------|
 | [README.md](./README.md) | 本ファイル — 環境構築・起動 |
-| [DEMO.md](./DEMO.md) | ウェブ画面での再生手順（4 世界 × 100 年） |
-| [scripts/](./scripts/) | `run-experiment.sh`（CLI・ブラウザ不要）/ `start-*.sh`（UI） |
-| [result/raw/](./result/raw/) | 実行結果（`.json` = 定量の正、`.txt` = 全文ログ） |
-| [analysis/](./analysis/) | LLM 解析用プロンプト・解析後サマリー |
+| [DEMO.md](./DEMO.md) | デモ再生手順（実証: AD 1750→1950 × 10 回） |
+| [scripts/](./scripts/) | `run-experiment-batch.sh`（一括）/ `run-experiment.sh`（単発） |
+| [result/raw/](./result/raw/) | 実行結果（`test-001/` パイロット、`run-NNN/` 実証） |
+| [analysis/](./analysis/) | LLM 解析用プロンプト・`output/run-NNN/` に解析結果 |
 
 ---
 
@@ -107,15 +107,17 @@ OLLAMA_MODEL=llama3.2:1b
 **提出用ログの取得（ブラウザ不要）:**
 
 ```bash
-./scripts/setup.sh           # 初回のみ
-./scripts/run-experiment.sh  # → result/raw/ に 4 本の .txt
+./scripts/setup.sh                    # 初回のみ
+./scripts/run-experiment-batch.sh     # 実証: AD 1750→1950・200年 × seed 10 回（約 4〜5 時間）
+./scripts/run-experiment.sh           # 単発（自動で result/raw/run-NNN/）
 ```
+
+実証プロトコル: **同一 5,000 人ロスター**を 4 環境に投入し、**AD 1750 から 200 年**（終了 AD 1950）を **seed 42〜51 で 10 回**繰り返す。開始年は暦年ラベル（力学は seed で決まる）。
 
 **ライブ発表:** [DEMO.md](./DEMO.md) のブラウザ手順で画面を見せながら操作。
 
-1. 4 環境（豊か / 乏しい / 災害多 / 標準）それぞれ 100 年まで進める
-2. `.json` / `.txt` を `result/raw/` に保存（CLI なら自動）
-3. [analysis/prompt.md](./analysis/prompt.md) で LLM 比較 → [analysis/summary.md](./analysis/summary.md) に整理
+1. 上記バッチまたは単発 CLI で `result/raw/run-NNN/` に保存
+2. [analysis/prompt.md](./analysis/prompt.md) で LLM 比較 → [analysis/summary.md](./analysis/summary.md) 索引から各 run を参照
 
 UI と CLI は同じ Python エンジン・同じ Ollama 設定。詳細: [docs/guides/execution-paths.md](./docs/guides/execution-paths.md)
 

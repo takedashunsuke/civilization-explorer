@@ -80,7 +80,7 @@ API: `POST /simulations` に `controlled_experiment: true`, `experiment_variant`
 
 - controlled experiment の 1 枚（固定 vs 変更は **共有資源と災害のみ**。食の背景は固定）
 - 4 環境のヘッダー切替で数値・状況パネルを比べる
-- 実測値は [analysis/summary.md](../../analysis/summary.md)（生ログ: [result/raw/](../../result/raw/)）を根拠に話す（未記入なら先に実測）
+- 実測値は [analysis/summary.md](../../analysis/summary.md)（生ログ: [result/raw/](../../result/raw/)）。提出用は `./scripts/run-experiment-batch.sh`（AD 1750→1950・200年×10 seed）
 
 ### LLM の役割
 

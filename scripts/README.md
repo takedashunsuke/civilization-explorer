@@ -2,29 +2,42 @@
 
 ローカル実行用スクリプトです。
 
-## 対照実験（提出用ログ）— ブラウザ不要
+## 実証実験バッチ（提出用）— ブラウザ不要
 
 ```bash
 chmod +x scripts/*.sh   # 初回のみ
 ./scripts/setup.sh      # 初回: venv + npm install
+./scripts/run-experiment-batch.sh
+```
+
+| 項目 | 値 |
+|------|-----|
+| 暦年 | AD **1750 → 1950**（200 年） |
+| 繰り返し | **10 回**（seed 42 … 51） |
+| 出力 | `result/raw/run-NNN/`（自動採番）+ `analysis/output/run-NNN/` |
+| 目安時間 | **約 4〜5 時間**（Ollama `llama3.2:1b`） |
+
+`--dry-run` で実行コマンドのみ表示。
+
+## 単発実行
+
+```bash
 ./scripts/run-experiment.sh
 ```
 
-- 4 環境（豊か / 乏しい / 災害多 / 標準）× 10 ターン（100 年）を実行
-- `result/raw/civ-*.json`（`experiment_summary`・定量の正）と `civ-*.txt`（全文ログ）を生成
-- `result/manifest.json` を更新
-- Backend 起動不要。`simulation.engine` を直接呼び出し（画面の API と同一エンジン・同一 Ollama）
-- `backend/.env` を自動読み込み
-
-詳細: [docs/guides/execution-paths.md](../docs/guides/execution-paths.md)
+- 4 環境 × 既定 100 年（AD 1000 開始）
+- `result/manifest.json` の `runs[]` を更新
+- Backend 起動不要。`simulation.engine` を直接呼び出し
 
 オプション:
 
 ```bash
-./scripts/run-experiment.sh --variant lush    # 1 環境のみ
-./scripts/run-experiment.sh --turns 5         # 50 年
+./scripts/run-experiment.sh --variant lush
+./scripts/run-experiment.sh --start-year 1750 --years 200 --seed 42
 ./scripts/run-experiment.py --help
 ```
+
+詳細: [docs/guides/execution-paths.md](../docs/guides/execution-paths.md) · [DEMO.md](../DEMO.md)
 
 ## UI 起動（ライブデモ用）
 
