@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 提出用・実証実験の一括実行
-# AD 1750 → 1950（200 年）× seed 10 本 → result/raw/run-NNN/ に自動採番
+# 暦年ラベル AD 1750→1950（表示用）・200 年 × seed 10 本 → result/raw/run-NNN/
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -22,7 +22,7 @@ END_YEAR=$((START_YEAR + YEARS))
 TURNS=$((YEARS / 10))
 
 echo "=== Civilization Explorer — 実証実験バッチ ==="
-echo "  期間: AD ${START_YEAR} → AD ${END_YEAR}（${YEARS} 年 / ${TURNS} ターン）"
+echo "  期間: AD ${START_YEAR} → AD ${END_YEAR}（${YEARS} 年 / ${TURNS} ターン・暦年は表示用ラベル）"
 echo "  繰り返し: ${REPS} 回（seed ${SEED_START} … $((SEED_START + REPS - 1))）"
 echo "  各 run: 4 環境 × 2 ファイル（.json + .txt）"
 echo "  目安時間: 約 $((REPS * 26)) 分（Ollama llama3.2:1b・1 run ≈ 26 分）"
