@@ -371,7 +371,7 @@ B
 ### C. 提出・発表
 
 - [x] `docs/guides/setup.md` に LLM の起動手順を書く
-- [ ] `docs/hackathon/demo-script.md` を実際の画面操作に合わせて直す
+- [ ] `docs/hackathon/demo-v3.md` § 発表当日を実際の画面操作に合わせて直す
 - [ ] checklist（起動順・API キーが映らない・デモデータを戻す）を通す
 - [ ] （任意）seed 付き再実行が一言で説明できる
 

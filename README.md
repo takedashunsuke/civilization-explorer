@@ -12,7 +12,7 @@ AI 文明そのものが目的ではなく、**人間社会の問い（格差・
 | GitHub | https://github.com/tsuide-takeda/civ-explorer |
 | 提出物一覧 | [docs/hackathon/submission.md](./docs/hackathon/submission.md) |
 | 実行結果 | [docs/hackathon/RESULTS.md](./docs/hackathon/RESULTS.md) |
-| プレゼン原稿 | [docs/hackathon/slides.md](./docs/hackathon/slides.md) |
+| プレゼン・台本 | [docs/hackathon/demo-v3.md](./docs/hackathon/demo-v3.md) |
 | テーマ根拠 | [docs/hackathon/review.md](./docs/hackathon/review.md) |
 
 ---
