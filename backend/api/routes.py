@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from simulation import create_simulation, tick
+from simulation import apply_conditions_update, create_simulation, tick
 from simulation.experiment import (
     EXPERIMENT_SEED,
     describe_experiment,
@@ -72,6 +72,22 @@ class TickRequest(BaseModel):
     n: int = Field(default=1, ge=1, le=50)
 
 
+class RegionConditionsPatch(BaseModel):
+    id: str
+    institution: str | None = None
+    tax_rate: float | None = Field(default=None, ge=0, le=1)
+    education_level: float | None = Field(default=None, ge=0, le=1)
+    religion: str | None = None
+    trade_openness: float | None = Field(default=None, ge=0, le=1)
+    welfare_rate: float | None = Field(default=None, ge=0, le=1)
+    trait_rate: float | None = Field(default=None, ge=0, le=1)
+
+
+class UpdateConditionsRequest(BaseModel):
+    regions: list[RegionConditionsPatch] | None = None
+    experiment_variant: str | None = None
+
+
 def _to_public(sim: SimulationState) -> dict[str, Any]:
     return sim.model_dump()
 
@@ -89,7 +105,7 @@ def experiment_design() -> dict[str, Any]:
 @router.post("/simulations")
 def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
     if body.controlled_experiment:
-        variant = (body.experiment_variant or "peace").strip().lower()
+        variant = (body.experiment_variant or "balanced").strip().lower()
         if variant not in WORLD_VARIANT_IDS:
             raise HTTPException(status_code=400, detail=f"invalid experiment_variant: {variant}")
         seed = body.experiment_seed if body.experiment_seed is not None else EXPERIMENT_SEED
@@ -232,6 +248,68 @@ def pause_sim(sim_id: str) -> dict[str, Any]:
         raise HTTPException(status_code=404, detail="simulation not found")
     sim.status = "paused"
     return _to_public(sim)
+
+
+@router.patch("/simulations/{sim_id}/conditions")
+def update_conditions(sim_id: str, body: UpdateConditionsRequest) -> dict[str, Any]:
+    sim = _STORE.get(sim_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="simulation not found")
+    if sim.world.turn <= 0 and not body.regions and not body.experiment_variant:
+        raise HTTPException(status_code=400, detail="nothing to update")
+
+    region_payload: list[dict[str, object]] | None = None
+    if body.regions:
+        region_payload = []
+        for item in body.regions:
+            patch: dict[str, object] = {"id": item.id}
+            if item.institution is not None:
+                try:
+                    InstitutionType(item.institution)
+                except ValueError as exc:
+                    raise HTTPException(
+                        status_code=400, detail=f"invalid institution: {item.institution}"
+                    ) from exc
+                patch["institution"] = item.institution
+            if item.religion is not None:
+                try:
+                    ReligionType(item.religion)
+                except ValueError as exc:
+                    raise HTTPException(status_code=400, detail=f"invalid religion: {item.religion}") from exc
+                patch["religion"] = item.religion
+            for field in (
+                "tax_rate",
+                "education_level",
+                "trade_openness",
+                "welfare_rate",
+                "trait_rate",
+            ):
+                value = getattr(item, field)
+                if value is not None:
+                    patch[field] = value
+            region_payload.append(patch)
+
+    variant = body.experiment_variant
+    if variant is not None:
+        variant = variant.strip().lower()
+        if variant not in WORLD_VARIANT_IDS:
+            raise HTTPException(status_code=400, detail=f"invalid experiment_variant: {variant}")
+        if not sim.controlled_experiment:
+            raise HTTPException(status_code=400, detail="not a controlled experiment simulation")
+
+    try:
+        apply_conditions_update(
+            sim,
+            regions=region_payload,
+            experiment_variant=variant,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    payload = _to_public(sim)
+    if sim.controlled_experiment:
+        payload["experiment_summary"] = experiment_summary(sim)
+    return payload
 
 
 @router.post("/simulations/{sim_id}/tick")

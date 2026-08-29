@@ -1,12 +1,12 @@
 export const EXPERIMENT_SEED = 42
 
-export type ExperimentVariantId = 'peace' | 'famine' | 'war' | 'trade'
+export type ExperimentVariantId = 'lush' | 'lean' | 'volatile' | 'balanced'
 
 export const EXPERIMENT_VARIANT_IDS: ExperimentVariantId[] = [
-  'peace',
-  'famine',
-  'war',
-  'trade',
+  'lush',
+  'lean',
+  'volatile',
+  'balanced',
 ]
 
 export type ExperimentSummary = {
@@ -37,6 +37,7 @@ export type ExperimentDesign = {
   total_agents: number
   fixed: string[]
   varied: string[]
+  emerges_in_play?: string[]
   variants: Array<{
     id: ExperimentVariantId
     label_ja: string

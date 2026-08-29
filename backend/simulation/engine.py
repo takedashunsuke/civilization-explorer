@@ -1899,6 +1899,72 @@ def end_of_turn(
     sim.world.turn += 1
 
 
+def _recompute_world_aggregates(sim: SimulationState) -> None:
+    regions = sim.world.regions
+    if not regions:
+        return
+    n = len(regions)
+    sim.world.resource_pool = sum(r.resource_pool for r in regions)
+    sim.world.education_level = sum(r.education_level for r in regions) / n
+    sim.world.tax_rate = sum(r.tax_rate for r in regions) / n
+    sim.world.disaster_frequency = sum(r.disaster_frequency for r in regions) / n
+    sim.world.institution = regions[0].institution
+    sim.world.religion = regions[0].religion
+
+
+def apply_conditions_update(
+    sim: SimulationState,
+    *,
+    regions: list[dict[str, object]] | None = None,
+    experiment_variant: str | None = None,
+) -> None:
+    """Apply mid-simulation policy / environment changes without resetting progress."""
+    from simulation.experiment import apply_variant_to_sim
+
+    changed = False
+    if sim.controlled_experiment and experiment_variant:
+        apply_variant_to_sim(sim, experiment_variant.strip().lower())
+        changed = True
+    if regions:
+        by_id = {str(item["id"]): item for item in regions}
+        for region in sim.world.regions:
+            rid = region.id.value if hasattr(region.id, "value") else str(region.id)
+            patch = by_id.get(rid)
+            if not patch:
+                continue
+            if patch.get("institution") is not None:
+                region.institution = InstitutionType(str(patch["institution"]))
+                changed = True
+            for field, attr in (
+                ("tax_rate", "tax_rate"),
+                ("education_level", "education_level"),
+                ("trade_openness", "trade_openness"),
+                ("welfare_rate", "welfare_rate"),
+                ("trait_rate", "trait_rate"),
+            ):
+                if patch.get(field) is not None:
+                    setattr(region, attr, float(patch[field]))  # type: ignore[arg-type]
+                    changed = True
+            if patch.get("religion") is not None:
+                region.religion = ReligionType(str(patch["religion"]))
+                changed = True
+
+    if not changed:
+        return
+
+    _recompute_world_aggregates(sim)
+    sim.region_policies = []
+    sim.events.append(
+        EventRecord(
+            turn=sim.world.turn,
+            actor_id="world",
+            action=ActionType.observe,
+            detail_key="policy_update",
+            detail="Mid-simulation conditions updated.",
+        )
+    )
+
+
 def _turns_until_year_cap(sim: SimulationState) -> int:
     years = max(1, int(getattr(sim.world, "years_per_turn", YEARS_PER_TURN)))
     max_turn = (MAX_CALENDAR_YEAR - int(sim.world.start_year)) // years

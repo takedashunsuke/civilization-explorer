@@ -22,6 +22,18 @@ export const SCENARIO_TEMPLATE_IDS: ScenarioTemplateId[] = [
   'uniform_baseline',
 ]
 
+/** 日常向け — カード2枚 */
+export const CUSTOM_PRESET_IDS: ScenarioTemplateId[] = ['diverse_world', 'demo_pitch']
+
+/** 上級者向け — 折りたたみ内 */
+export const ADVANCED_SCENARIO_IDS: ScenarioTemplateId[] = [
+  'tax_contrast',
+  'institution_lab',
+  'uniform_baseline',
+]
+
+export type ScenarioMode = 'experiment' | 'custom'
+
 /** 列ごとの「性格」— 五地域が最初から違う社会として見えるようにする */
 const REGION_CHARACTER: Record<ContinentId, Partial<RegionDraft>> = {
   africa: {

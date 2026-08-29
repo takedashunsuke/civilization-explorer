@@ -9,12 +9,16 @@ import Tag from 'primevue/tag'
 import ProgressBar from 'primevue/progressbar'
 import { polityKind, settlementColor } from '~/utils/groupColors'
 import WorldMap2D from '~/components/WorldMap2D.vue'
+import SimulationConceptIntro from '~/components/SimulationConceptIntro.vue'
+import SimulationMilestoneModal, { type MilestoneSnapshot } from '~/components/SimulationMilestoneModal.vue'
 import { buildTurnDigest } from '~/utils/turnDigest'
 import {
-  SCENARIO_TEMPLATE_IDS,
+  ADVANCED_SCENARIO_IDS,
+  CUSTOM_PRESET_IDS,
   buildScenarioTemplate,
   defaultScenarioTemplateId,
   isControlledExperimentTemplate,
+  type ScenarioMode,
   type ScenarioTemplateId,
 } from '~/utils/scenarioTemplates'
 import {
@@ -24,7 +28,7 @@ import {
   type ExperimentVariantId,
 } from '~/utils/experimentWorlds'
 import { buildOpeningStory, buildOutcomeArc, buildTurnStory } from '~/utils/storyNarrative'
-import { BACKGROUND_ROWS, macroOf, subregionChoices, type ContinentId, type RegionDraft } from '~/utils/continents'
+import { BACKGROUND_ROWS, CONTINENT_IDS, DEFAULT_SUBREGION, macroOf, subregionChoices, type ContinentId, type RegionDraft } from '~/utils/continents'
 
 type Agent = {
   id: string
@@ -89,10 +93,11 @@ type Settlement = {
   id: string
   position: { x: number; y: number }
   member_ids: string[]
-    leader_id?: string | null
-    region_id?: string | null
-    subregion_id?: string | null
-  }
+  shared_wealth?: number
+  leader_id?: string | null
+  region_id?: string | null
+  subregion_id?: string | null
+}
 
 type Terrain = {
   cols: number
@@ -124,6 +129,15 @@ type Simulation = {
       tax_rate?: number
       education_level?: number
       religion?: string
+      trade_openness?: number
+      trait_rate?: number
+      welfare_rate?: number
+      initial_values?: {
+        cooperation?: number
+        authority_acceptance?: number
+        ambition?: number
+        inequality?: number
+      }
     }>
     terrain?: Terrain
     initial_population?: number
@@ -146,6 +160,14 @@ type Simulation = {
     summary: string
     source?: string
   }>
+  region_policies?: Array<{
+    region_id: string
+    subregion_id?: string | null
+    action: string
+    intensity: number
+    reason: string
+    source?: string
+  }>
   world_summary?: string
   controlled_experiment?: boolean
   experiment_variant?: string
@@ -162,8 +184,13 @@ useHead(() => ({
 }))
 
 const conditionsOpen = ref(true)
-const eventsOpen = ref(false)
-const digestOpen = ref(false)
+const conceptOpen = ref(false)
+const milestoneOpen = ref(false)
+const milestoneYear = ref(0)
+const lastAcknowledgedMilestoneYear = ref(0)
+type DigestSidebarTab = 'situation' | 'events'
+const digestSidebarTab = ref<DigestSidebarTab>('situation')
+const selectedDigestRegionId = ref<string | null>(null)
 
 const config = useRuntimeConfig()
 const apiBase = config.public.apiBase as string
@@ -226,6 +253,7 @@ const busy = ref(false)
 const creating = ref(false)
 const error = ref('')
 const autoPlaying = ref(false)
+const autoSpeedX5 = ref(false)
 let autoTimer: ReturnType<typeof setInterval> | null = null
 let tickInFlight = false
 
@@ -233,19 +261,24 @@ const calendarEra = ref<'bc' | 'ad'>('ad')
 const calendarYear = ref(1000)
 const conditionStep = ref(1)
 const selectedTemplateId = ref<ScenarioTemplateId>(defaultScenarioTemplateId())
-const activeExperimentVariant = ref<ExperimentVariantId>('peace')
+const activeExperimentVariant = ref<ExperimentVariantId>('balanced')
 const experimentSummaries = ref<Partial<Record<ExperimentVariantId, ExperimentSummary>>>({})
 const selectedAgentId = ref<string | null>(null)
+const selectedSettlementId = ref<string | null>(null)
 
 const isControlledMode = computed(
   () => sim.value?.controlled_experiment || isControlledExperimentTemplate(selectedTemplateId.value),
 )
 
+const isMidrunConditionsEdit = computed(
+  () => Boolean(sim.value && sim.value.world.turn > 0),
+)
+
 const experimentWorldLabels: Record<ExperimentVariantId, string> = {
-  peace: 'experiment.worldPeace',
-  famine: 'experiment.worldFamine',
-  war: 'experiment.worldWar',
-  trade: 'experiment.worldTrade',
+  lush: 'experiment.worldLush',
+  lean: 'experiment.worldLean',
+  volatile: 'experiment.worldVolatile',
+  balanced: 'experiment.worldBalanced',
 }
 
 const experimentComparisonRows = computed(() =>
@@ -274,6 +307,148 @@ const spotlightRegionReading = computed(() => {
   return sim.value.region_readings.find((r) => (r.subregion_id || r.region_id) === key)
 })
 
+const selectedSettlement = computed(() => {
+  const id = selectedSettlementId.value
+  if (!id || !sim.value?.settlements) return null
+  return sim.value.settlements.find((s) => s.id === id) ?? null
+})
+
+const selectedSettlementKind = computed(() => {
+  const settlement = selectedSettlement.value
+  if (!settlement) return null
+  return polityKind(settlement.member_ids.length)
+})
+
+const selectedSettlementMembers = computed(() => {
+  const settlement = selectedSettlement.value
+  if (!settlement || !sim.value) return []
+  const ids = new Set(settlement.member_ids)
+  return sim.value.agents.filter((a) => a.alive && ids.has(a.id))
+})
+
+const selectedSettlementLeader = computed(() => {
+  const settlement = selectedSettlement.value
+  if (!settlement?.leader_id || !sim.value) return null
+  return sim.value.agents.find((a) => a.id === settlement.leader_id) ?? null
+})
+
+const selectedSettlementRegionReading = computed(() => {
+  const settlement = selectedSettlement.value
+  if (!settlement || !sim.value?.region_readings) return null
+  const key = settlement.region_id || settlement.subregion_id
+  return sim.value.region_readings.find((r) => r.region_id === key || r.subregion_id === key) ?? null
+})
+
+const selectedSettlementPolicy = computed(() => {
+  const settlement = selectedSettlement.value
+  if (!settlement || !sim.value?.region_policies) return null
+  const key = settlement.region_id
+  return sim.value.region_policies.find((p) => p.region_id === key) ?? null
+})
+
+const selectedSettlementTurnEvents = computed(() => {
+  const settlement = selectedSettlement.value
+  if (!settlement || !sim.value) return []
+  const turn = sim.value.world.turn
+  return sim.value.events.filter(
+    (event) => event.turn === turn && (event.actor_id === settlement.id || event.target_id === settlement.id),
+  )
+})
+
+const selectedSettlementStats = computed(() => {
+  const members = selectedSettlementMembers.value
+  if (!members.length) return null
+  const n = members.length
+  return {
+    meanWealth: members.reduce((sum, agent) => sum + agent.wealth, 0) / n,
+    meanHappiness: members.reduce((sum, agent) => sum + agent.happiness, 0) / n,
+  }
+})
+
+const focusedAgent = computed(() => {
+  if (!selectedAgentId.value || !sim.value) return null
+  return sim.value.agents.find((a) => a.id === selectedAgentId.value) ?? null
+})
+
+const digestHasFocus = computed(() => Boolean(selectedSettlementId.value || selectedAgentId.value))
+
+const selectedGroupHeadline = computed(() => {
+  const settlement = selectedSettlement.value
+  if (!settlement || selectedAgentId.value) return ''
+  const kind = t(`map.polity.${polityKind(settlement.member_ids.length)}`)
+  const region = settlement.region_id ? digestRegionLabel(settlement.region_id) : ''
+  return region
+    ? t('digest.groupHeadline', { kind, n: settlement.member_ids.length, region })
+    : t('digest.groupHeadlineNoRegion', { kind, n: settlement.member_ids.length })
+})
+
+const selectedGroupBody = computed(() => {
+  const events = selectedSettlementTurnEvents.value
+  if (events.length) {
+    const event = events[0]
+    let line = actionTypeLabel(event.action)
+    if (event.target_id) line += ` → ${actorLabel(event.target_id)}`
+    return line
+  }
+  const policy = selectedSettlementPolicy.value
+  if (policy?.reason && !isRawMetricDump(policy.reason)) return policy.reason
+  const reading = selectedSettlementRegionReading.value
+  if (reading) {
+    return digestCausalSummary({
+      tension: reading.tension,
+      prosperity: reading.prosperity,
+      discontent: reading.discontent,
+      cohesion: reading.cohesion,
+      risingArchetype: reading.rising_archetype,
+      trajectory: reading.trajectory,
+      summary: reading.summary,
+    })
+  }
+  const leader = selectedSettlementLeader.value
+  if (leader) return t('digest.groupLeaderOnly', { name: leader.name })
+  return t('digest.groupQuiet')
+})
+
+const selectedAgentHeadline = computed(() => {
+  const agent = focusedAgent.value
+  if (!agent) return ''
+  const settlement = selectedSettlement.value
+  if (settlement && selectedSettlementKind.value) {
+    return t('digest.agentHeadlineWithGroup', {
+      name: agent.name,
+      kind: t(`map.polity.${selectedSettlementKind.value}`),
+      n: settlement.member_ids.length,
+    })
+  }
+  return agent.name
+})
+
+const selectedAgentBody = computed(() => {
+  const agent = focusedAgent.value
+  if (!agent) return ''
+  const reading = spotlightRegionReading.value
+  if (reading) {
+    return digestCausalSummary({
+      tension: reading.tension,
+      prosperity: reading.prosperity,
+      discontent: reading.discontent,
+      cohesion: reading.cohesion,
+      risingArchetype: reading.rising_archetype,
+      trajectory: reading.trajectory,
+      summary: reading.summary,
+    })
+  }
+  return t('digest.agentTraits', {
+    coop: pctTrait(agent.personality?.cooperation),
+    ambit: pctTrait(agent.personality?.ambition),
+  })
+})
+
+function clearMapSelection() {
+  selectedAgentId.value = null
+  selectedSettlementId.value = null
+}
+
 function pctTrait(value: number | undefined): number {
   return Math.round((Number(value) || 0) * 100)
 }
@@ -285,25 +460,107 @@ function storeExperimentSummary(summary: ExperimentSummary | undefined) {
 }
 
 const activeTemplateId = ref<ScenarioTemplateId>(defaultScenarioTemplateId())
-const digestNumbersOpen = ref(false)
+const scenarioMode = ref<ScenarioMode>('experiment')
+const showAdvancedScenarios = ref(false)
+const digestStoryOpen = ref(false)
 const regionDrafts = ref<RegionDraft[]>(buildScenarioTemplate(defaultScenarioTemplateId()).regions)
 
-const templateOptions = computed(() =>
-  SCENARIO_TEMPLATE_IDS.map((id) => ({
+const advancedTemplateOptions = computed(() =>
+  ADVANCED_SCENARIO_IDS.map((id) => ({
     label: t(`templates.${id}.name`),
     value: id,
   })),
 )
 
-const templateBlurb = computed(() => t(`templates.${selectedTemplateId.value}.blurb`))
+function setScenarioMode(mode: ScenarioMode) {
+  if (isMidrunConditionsEdit.value) return
+  scenarioMode.value = mode
+  if (mode === 'experiment') {
+    applyScenarioTemplate('controlled_experiment')
+    return
+  }
+  if (isControlledExperimentTemplate(selectedTemplateId.value)) {
+    applyScenarioTemplate('diverse_world')
+  }
+  conditionStep.value = 1
+}
 
 function applyScenarioTemplate(id: ScenarioTemplateId) {
+  if (isMidrunConditionsEdit.value) return
   selectedTemplateId.value = id
   conditionStep.value = 1
   const tpl = buildScenarioTemplate(id)
   regionDrafts.value = tpl.regions.map((region) => ({ ...region }))
   calendarEra.value = tpl.era
   calendarYear.value = tpl.startYear
+  if (id === 'controlled_experiment') {
+    scenarioMode.value = 'experiment'
+  } else {
+    scenarioMode.value = 'custom'
+  }
+}
+
+function syncRegionDraftsFromSimRegions() {
+  const regions = sim.value?.world.regions
+  if (!regions?.length) return
+  regionDrafts.value = regions.map((region) => {
+    const id = region.id as ContinentId
+    const iv = region.initial_values ?? {}
+    const existing = regionDrafts.value.find((row) => row.id === id)
+    return {
+      id,
+      subregion: region.subregion_id ?? DEFAULT_SUBREGION[id],
+      institution: region.institution ?? 'democracy',
+      taxRate: region.tax_rate ?? 0.1,
+      education: region.education_level ?? 0.5,
+      religion: region.religion ?? 'folk',
+      tradeOpenness: region.trade_openness ?? 0.5,
+      cooperation: iv.cooperation ?? existing?.cooperation ?? 0.5,
+      authorityAcceptance: iv.authority_acceptance ?? existing?.authorityAcceptance ?? 0.5,
+      ambition: iv.ambition ?? existing?.ambition ?? 0.5,
+      inequality: iv.inequality ?? existing?.inequality ?? 0.5,
+      traitRate: region.trait_rate ?? 0.1,
+      welfareRate: region.welfare_rate ?? 0,
+      population: existing?.population ?? 1000,
+    }
+  })
+}
+
+function regionConditionsPayload() {
+  return regionDrafts.value.map((region) => ({
+    id: region.id,
+    institution: region.institution,
+    tax_rate: region.taxRate,
+    education_level: region.education,
+    religion: region.religion,
+    trade_openness: region.tradeOpenness,
+    welfare_rate: region.welfareRate,
+    trait_rate: region.traitRate,
+  }))
+}
+
+function syncConditionsFromSim() {
+  if (!sim.value) return
+  conditionStep.value = 1
+  if (sim.value.controlled_experiment) {
+    scenarioMode.value = 'experiment'
+    activeExperimentVariant.value = (sim.value.experiment_variant || 'balanced') as ExperimentVariantId
+    activeTemplateId.value = 'controlled_experiment'
+  } else {
+    scenarioMode.value = 'custom'
+  }
+  syncRegionDraftsFromSimRegions()
+}
+
+function toggleConditionsModal() {
+  if (conditionsOpen.value) {
+    conditionsOpen.value = false
+    return
+  }
+  if (isMidrunConditionsEdit.value) {
+    syncConditionsFromSim()
+  }
+  conditionsOpen.value = true
 }
 
 function storyRegionsFromDrafts(): Array<{
@@ -395,6 +652,22 @@ const step2Axes = [
   { key: 'inequality' },
 ] as const
 
+const midrunPolicyAxes = [
+  { key: 'institution' },
+  { key: 'taxRate' },
+  { key: 'education' },
+  { key: 'religion' },
+  { key: 'trade' },
+  { key: 'welfare' },
+  { key: 'notable' },
+] as const
+
+function midrunPolicyAxisLabel(key: (typeof midrunPolicyAxes)[number]['key']): string {
+  if (key === 'notable') return t('wizard.notable')
+  if (key === 'welfare') return t('wizard.welfare.label')
+  return step2AxisLabel(key as (typeof step2Axes)[number]['key'])
+}
+
 function step2AxisLabel(key: (typeof step2Axes)[number]['key']): string {
   if (key === 'trade') return t('wizard.trade')
   if (key === 'taxRate') return t('taxRate')
@@ -482,18 +755,6 @@ const liveYearLabel = computed(() => formatYearLabel(currentAstroYear.value))
 const liveJapanEra = computed(() => japanEraName(currentAstroYear.value))
 const liveWorldEra = computed(() => worldEraName(currentAstroYear.value))
 
-const recentEvents = computed(() => {
-  const rows = [...(sim.value?.events ?? [])]
-  rows.sort((a, b) => {
-    if (a.turn !== b.turn) return b.turn - a.turn
-    const aLlm = a.extra?.decide === 'llm' ? 1 : 0
-    const bLlm = b.extra?.decide === 'llm' ? 1 : 0
-    if (aLlm !== bLlm) return bLlm - aLlm
-    return 0
-  })
-  return rows.slice(0, 48)
-})
-
 const aliveCount = computed(() => (sim.value?.agents ?? []).filter((a) => a.alive).length)
 const totalAgents = computed(() => sim.value?.agents.length ?? 0)
 const initialPopulation = computed(
@@ -530,24 +791,97 @@ const notableCount = computed(
   () => (sim.value?.agents ?? []).filter((a) => a.alive && (a.traits?.length ?? 0) > 0).length,
 )
 
-const statusLabel = computed(() => {
-  if (!sim.value) return ''
-  const key = `status.${sim.value.status}` as const
-  const translated = t(key)
-  return translated === key ? sim.value.status : translated
-})
-
-const turnStatusLabel = computed(() => {
-  if (!sim.value) return ''
-  return t('turnStatus', { turn: sim.value.world.turn, status: statusLabel.value })
-})
-
 const turnOnlyLabel = computed(() => {
   if (!sim.value) return ''
   return t('turnLabel', { turn: sim.value.world.turn })
 })
 
 const turnDigest = computed(() => buildTurnDigest(sim.value))
+
+const sortedRegionObservations = computed(() => {
+  const rows = turnDigest.value?.regionObservations ?? []
+  const order = new Map(CONTINENT_IDS.map((id, idx) => [id, idx]))
+  return [...rows].sort(
+    (a, b) => (order.get(a.regionId as ContinentId) ?? 99) - (order.get(b.regionId as ContinentId) ?? 99),
+  )
+})
+
+const selectedDigestRegionRow = computed(() => {
+  const rows = sortedRegionObservations.value
+  if (!rows.length) return null
+  const id = selectedDigestRegionId.value
+  return rows.find((row) => row.regionId === id) ?? rows[0]
+})
+
+const selectedDigestRegionIndex = computed(() => {
+  const rows = sortedRegionObservations.value
+  const id = selectedDigestRegionId.value ?? rows[0]?.regionId
+  const idx = rows.findIndex((row) => row.regionId === id)
+  return idx >= 0 ? idx : 0
+})
+
+const regionSlideTransition = ref('region-slide-left')
+const regionChipPickerRef = ref<HTMLElement | null>(null)
+let regionSwipeStartX: number | null = null
+
+function shiftDigestRegion(delta: -1 | 1) {
+  const rows = sortedRegionObservations.value
+  if (rows.length <= 1) return
+  const next = (selectedDigestRegionIndex.value + delta + rows.length) % rows.length
+  regionSlideTransition.value = delta > 0 ? 'region-slide-left' : 'region-slide-right'
+  selectedDigestRegionId.value = rows[next].regionId
+}
+
+function selectDigestRegion(regionId: string) {
+  const rows = sortedRegionObservations.value
+  const nextIdx = rows.findIndex((row) => row.regionId === regionId)
+  if (nextIdx < 0) return
+  const currentIdx = selectedDigestRegionIndex.value
+  if (nextIdx !== currentIdx) {
+    regionSlideTransition.value = nextIdx > currentIdx ? 'region-slide-left' : 'region-slide-right'
+  }
+  selectedDigestRegionId.value = regionId
+}
+
+function onRegionSwipeStart(event: TouchEvent) {
+  regionSwipeStartX = event.touches[0]?.clientX ?? null
+}
+
+function onRegionSwipeEnd(event: TouchEvent) {
+  if (regionSwipeStartX == null) return
+  const endX = event.changedTouches[0]?.clientX ?? regionSwipeStartX
+  const deltaX = endX - regionSwipeStartX
+  regionSwipeStartX = null
+  if (Math.abs(deltaX) < 48) return
+  shiftDigestRegion(deltaX < 0 ? 1 : -1)
+}
+
+function scrollActiveRegionChipIntoView() {
+  nextTick(() => {
+    const picker = regionChipPickerRef.value
+    if (!picker) return
+    const active = picker.querySelector('.digest-region-chip.active')
+    active?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' })
+  })
+}
+
+watch(selectedDigestRegionId, scrollActiveRegionChipIntoView)
+
+watch(
+  () => sortedRegionObservations.value.map((row) => row.regionId).join(','),
+  () => {
+    const rows = sortedRegionObservations.value
+    if (!rows.length) {
+      selectedDigestRegionId.value = null
+      return
+    }
+    const ids = rows.map((row) => row.regionId)
+    if (selectedDigestRegionId.value && ids.includes(selectedDigestRegionId.value)) return
+    const hottest = [...rows].sort((a, b) => b.tension - a.tension)[0]
+    selectedDigestRegionId.value = hottest?.regionId ?? rows[0].regionId
+  },
+  { immediate: true },
+)
 
 const openingStory = computed(() => {
   const regions = sim.value?.world.regions?.length
@@ -629,6 +963,12 @@ function digestRegionLabel(id: string): string {
   const key = `geographies.${id}`
   const label = t(key)
   return label === key ? id : label
+}
+
+function digestRegionShortLabel(id: string): string {
+  const key = `digest.regionShort.${id}`
+  const label = t(key)
+  return label === key ? digestRegionLabel(id).slice(0, 2) : label
 }
 
 function digestRegionColor(id: string): string {
@@ -736,9 +1076,22 @@ function actorLabel(actorId: string): string {
   if (sub !== subKey) return sub
   const macro = macroOf(actorId)
   if (macro) return t(`geographies.${macro}`)
-  if (actorId.startsWith('s')) return actorId
+  if (actorId.startsWith('s')) {
+    const settlement = sim.value?.settlements?.find((s) => s.id === actorId)
+    if (settlement) {
+      const kind = polityKind(settlement.member_ids.length)
+      return `${t(`map.polity.${kind}`)} · ${settlement.member_ids.length}`
+    }
+    return actorId
+  }
   const agent = sim.value?.agents.find((a) => a.id === actorId)
   return agent?.name ?? actorId
+}
+
+function actionTypeLabel(action: string): string {
+  const key = `actionTypes.${action}` as const
+  const translated = t(key)
+  return translated === key ? action : translated
 }
 
 function eventGroupId(actorId: string): string | null {
@@ -835,6 +1188,51 @@ function notableEventText(ref: { key: string; actorId: string; targetId?: string
   })
 }
 
+const feedEvents = computed(() => {
+  const events = sim.value?.events ?? []
+  if (!events.length) return [] as Array<{ turn: number; text: string; alert?: string | null }>
+  const turns = [...new Set(events.map((e) => e.turn))].sort((a, b) => b - a)
+  const picked: Array<{ turn: number; text: string; alert?: string | null }> = []
+  for (const turn of turns) {
+    if (picked.length >= 20) break
+    const turnEvents = events.filter((e) => e.turn === turn)
+    const headlines = turnEvents.filter(isHeadlineEvent)
+    if (headlines.length) {
+      headlines.sort(
+        (a, b) => (HEADLINE_RANK[inferDetailKey(b)] ?? 0) - (HEADLINE_RANK[inferDetailKey(a)] ?? 0),
+      )
+      const seen = new Set<string>()
+      for (const row of headlines.slice(0, 2)) {
+        const key = inferDetailKey(row)
+        if (seen.has(key)) continue
+        seen.add(key)
+        picked.push({ turn, text: headlineText(row), alert: row.alert })
+      }
+      continue
+    }
+    const births = turnEvents.filter((e) => e.action === 'birth').length
+    const deaths = turnEvents.filter((e) => e.action === 'death').length
+    const conflicts = turnEvents.filter((e) => e.action === 'conflict').length
+    const coops = turnEvents.filter((e) => e.action === 'cooperate').length
+    if (births + deaths + conflicts + coops > 0) {
+      picked.push({
+        turn,
+        text: t('events.turnSummary', { births, deaths, conflicts, coops }),
+      })
+    }
+  }
+  return picked
+})
+
+const experimentEmergenceLine = computed(() => {
+  const summary = sim.value?.experiment_summary
+  if (!summary?.spotlight_agent_id) return ''
+  const agent = sim.value?.agents.find((a) => a.id === summary.spotlight_agent_id)
+  const name = agent?.name || summary.spotlight_agent_id
+  const role = summary.spotlight_role ? digestArchetypeLabel(summary.spotlight_role) : t('digest.archetypes.none')
+  return t('experiment.emergenceLine', { name, role, id: summary.spotlight_agent_id })
+})
+
 function eventDetail(row: EventRow): string {
   if (row.action === 'observe') {
     return row.extra?.reason || row.detail || t('eventDetails.world_reading')
@@ -866,7 +1264,25 @@ function eventDetail(row: EventRow): string {
 
 function onSelectAgent(agentId: string) {
   selectedAgentId.value = agentId
-  digestOpen.value = true
+  const settlementId = sim.value?.agents.find((a) => a.id === agentId)?.settlement_id ?? null
+  selectedSettlementId.value = settlementId
+  focusDigestRegionFromSettlement(settlementId)
+  digestStoryOpen.value = false
+}
+
+function onSelectSettlement(settlementId: string) {
+  selectedSettlementId.value = settlementId
+  selectedAgentId.value = null
+  focusDigestRegionFromSettlement(settlementId)
+  digestStoryOpen.value = false
+}
+
+function focusDigestRegionFromSettlement(settlementId: string | null | undefined) {
+  if (!settlementId || !sim.value?.settlements) return
+  const settlement = sim.value.settlements.find((s) => s.id === settlementId)
+  const regionId = settlement?.region_id
+  if (!regionId) return
+  selectDigestRegion(macroOf(regionId) ?? regionId)
 }
 
 async function switchExperimentWorld(variant: ExperimentVariantId) {
@@ -893,6 +1309,84 @@ function formatApiError(e: unknown): string {
   return String(e)
 }
 
+function cumulativeActionCounts(): { conflicts: number; cooperations: number } {
+  const events = sim.value?.events ?? []
+  return {
+    conflicts: events.filter((e) => e.action === 'conflict').length,
+    cooperations: events.filter((e) => e.action === 'cooperate').length,
+  }
+}
+
+function findCrossedMilestoneYear(beforeTurn: number, afterTurn: number): number | null {
+  if (!sim.value) return null
+  const start = sim.value.world.start_year ?? draftAstroYear.value
+  const years = sim.value.world.years_per_turn ?? 10
+  const beforeYear = start + beforeTurn * years
+  const afterYear = start + afterTurn * years
+  let latest: number | null = null
+  for (let y = Math.ceil(beforeYear / 100) * 100; y <= afterYear; y += 100) {
+    if (y > beforeYear && y <= afterYear && y > start && y > lastAcknowledgedMilestoneYear.value) {
+      latest = y
+    }
+  }
+  return latest
+}
+
+function maybeShowMilestone(beforeTurn: number) {
+  if (!sim.value || milestoneOpen.value) return
+  const crossed = findCrossedMilestoneYear(beforeTurn, sim.value.world.turn)
+  if (crossed == null) return
+  stopAutoPlay()
+  milestoneYear.value = crossed
+  milestoneOpen.value = true
+}
+
+const milestoneSnapshot = computed((): MilestoneSnapshot | null => {
+  if (!sim.value || !milestoneOpen.value) return null
+  const summary = sim.value.experiment_summary
+  const actions = cumulativeActionCounts()
+  const metrics = sim.value.last_metrics
+  const archetypeKey = summary?.dominant_archetype
+  const astro = milestoneYear.value || currentAstroYear.value
+  return {
+    yearLabel: formatYearLabel(astro),
+    japanEra: japanEraName(astro),
+    worldEra: worldEraName(astro),
+    turn: sim.value.world.turn,
+    headline: turnStory.value?.headline || digestOneLiner.value,
+    summary: outcomeArc.value || digestWorldLine.value,
+    population: summary?.population_alive ?? aliveCount.value,
+    populationDelta: populationDelta.value,
+    settlements: settlementCount.value,
+    conflicts: summary?.conflicts_total ?? actions.conflicts,
+    cooperations: summary?.cooperations_total ?? actions.cooperations,
+    inequality: metrics?.inequality,
+    trust: metrics?.mean_trust,
+    happiness: metrics?.mean_happiness,
+    dominantArchetype:
+      archetypeKey && archetypeKey !== 'none' ? digestArchetypeLabel(archetypeKey) : undefined,
+  }
+})
+
+function resetMilestoneState() {
+  lastAcknowledgedMilestoneYear.value = 0
+  milestoneOpen.value = false
+  milestoneYear.value = 0
+}
+
+function continueFromMilestone() {
+  lastAcknowledgedMilestoneYear.value = milestoneYear.value
+  milestoneOpen.value = false
+  void startAutoPlay()
+}
+
+function changeConditionsFromMilestone() {
+  lastAcknowledgedMilestoneYear.value = milestoneYear.value
+  milestoneOpen.value = false
+  syncConditionsFromSim()
+  conditionsOpen.value = true
+}
+
 function stopAutoPlay() {
   autoPlaying.value = false
   if (autoTimer != null) {
@@ -901,12 +1395,40 @@ function stopAutoPlay() {
   }
 }
 
+async function applySimulationConditions() {
+  if (!sim.value) return
+  stopAutoPlay()
+  busy.value = true
+  error.value = ''
+  try {
+    const regions = regionConditionsPayload()
+    const body = sim.value.controlled_experiment
+      ? {
+          experiment_variant: activeExperimentVariant.value,
+          regions,
+        }
+      : { regions }
+    sim.value = await api<Simulation>(`/simulations/${sim.value.id}/conditions`, {
+      method: 'PATCH',
+      body,
+    })
+    storeExperimentSummary(sim.value.experiment_summary)
+    conditionsOpen.value = false
+  } catch (e: unknown) {
+    error.value = formatApiError(e)
+  } finally {
+    busy.value = false
+  }
+}
+
 async function createControlledWorld(variant: ExperimentVariantId) {
   stopAutoPlay()
+  resetMilestoneState()
   busy.value = true
   creating.value = true
   error.value = ''
   selectedAgentId.value = null
+  selectedSettlementId.value = null
   try {
     const result = await api<Simulation>('/simulations', {
       method: 'POST',
@@ -926,7 +1448,6 @@ async function createControlledWorld(variant: ExperimentVariantId) {
       selectedAgentId.value = result.experiment_summary.spotlight_agent_id
     }
     conditionsOpen.value = false
-    digestOpen.value = true
     await startAutoPlay()
   } catch (e: unknown) {
     error.value = formatApiError(e)
@@ -942,9 +1463,12 @@ async function createSimulation() {
     return
   }
   stopAutoPlay()
+  resetMilestoneState()
   busy.value = true
   creating.value = true
   error.value = ''
+  selectedAgentId.value = null
+  selectedSettlementId.value = null
   try {
     sim.value = await api<Simulation>('/simulations', {
       method: 'POST',
@@ -973,7 +1497,6 @@ async function createSimulation() {
     })
     activeTemplateId.value = selectedTemplateId.value
     conditionsOpen.value = false
-    digestOpen.value = true
     await startAutoPlay()
   } catch (e: unknown) {
     error.value = formatApiError(e)
@@ -995,15 +1518,14 @@ async function tick(n = 1, opts?: { silent?: boolean }) {
   // Always show progress — group LLM can take many seconds per turn.
   busy.value = true
   if (!opts?.silent) error.value = ''
+  const beforeTurn = sim.value.world.turn
   try {
     sim.value = await api<Simulation>(`/simulations/${sim.value.id}/tick`, {
       method: 'POST',
       body: { n },
     })
     storeExperimentSummary(sim.value.experiment_summary)
-    if (sim.value.experiment_summary?.spotlight_agent_id && !selectedAgentId.value) {
-      selectedAgentId.value = sim.value.experiment_summary.spotlight_agent_id
-    }
+    maybeShowMilestone(beforeTurn)
     if (turnsUntilYearCap() <= 0) stopAutoPlay()
   } catch (e: unknown) {
     const err = e as { statusCode?: number; status?: number }
@@ -1020,14 +1542,18 @@ async function tick(n = 1, opts?: { silent?: boolean }) {
   }
 }
 
+function autoTickCount(): number {
+  return autoSpeedX5.value ? 5 : 1
+}
+
 async function startAutoPlay() {
-  if (!sim.value || atYearCap.value) return
+  if (!sim.value || atYearCap.value || milestoneOpen.value) return
   autoPlaying.value = true
-  await tick(1, { silent: true })
-  if (!autoPlaying.value) return
+  await tick(autoTickCount(), { silent: true })
+  if (!autoPlaying.value || milestoneOpen.value) return
   autoTimer = setInterval(() => {
-    if (!sim.value || !autoPlaying.value) return
-    void tick(1, { silent: true })
+    if (!sim.value || !autoPlaying.value || milestoneOpen.value) return
+    void tick(autoTickCount(), { silent: true })
   }, AUTO_INTERVAL_MS)
 }
 
@@ -1071,7 +1597,7 @@ onBeforeUnmount(() => {
       <div class="header-top">
         <div class="header-left">
           <p class="eyebrow">{{ t('brand') }}</p>
-          <h1>{{ t('consoleTitle') }}</h1>
+          <h1 :title="t('consoleTitle')">{{ t('consoleTitle') }}</h1>
           <p class="llm-status" :title="llmHealth?.note || undefined">
             <span>{{ llmDecisionLabel }}</span>
             <span class="header-era-sep" aria-hidden="true">·</span>
@@ -1085,89 +1611,56 @@ onBeforeUnmount(() => {
           :title="headerHeadline?.text || undefined"
           aria-live="polite"
         >{{ headerHeadline?.text || '' }}</p>
-        <div class="header-right">
         <div class="header-controls">
           <Button
             :label="conditionsOpen ? t('layout.hideConditions') : t('layout.showConditions')"
             icon="pi pi-sliders-h"
             class="header-btn"
             :severity="conditionsOpen ? 'info' : 'secondary'"
-            @click="conditionsOpen = !conditionsOpen"
+            @click="toggleConditionsModal"
           />
           <Button
-            :label="t('events.title')"
-            icon="pi pi-comments"
-            class="header-btn"
-            :severity="eventsOpen ? 'info' : 'secondary'"
-            @click="eventsOpen = !eventsOpen"
-          />
-          <Button
-            :label="t('digest.title')"
-            icon="pi pi-book"
+            :label="t('actions.speedX5')"
+            icon="pi pi-forward"
             class="header-btn"
             :disabled="!sim"
-            :severity="digestOpen ? 'info' : 'secondary'"
-            @click="digestOpen = !digestOpen"
-          />
-          <Button
-            :label="t('actions.tick')"
-            icon="pi pi-step-forward"
-            class="header-btn"
-            :disabled="!sim || autoPlaying || atYearCap"
-            :loading="busy && !autoPlaying"
-            severity="success"
-            @click="tick(1)"
-          />
-          <Button
-            :label="t('actions.tick5')"
-            icon="pi pi-forward"
-            class="header-btn"
-            :disabled="!sim || autoPlaying || atYearCap"
-            :loading="busy && !autoPlaying"
-            severity="help"
-            @click="tick(5)"
-          />
-          <Button
-            :label="t('actions.tick10')"
-            icon="pi pi-forward"
-            class="header-btn"
-            :disabled="!sim || autoPlaying || atYearCap"
-            :loading="busy && !autoPlaying"
-            severity="help"
-            @click="tick(10)"
+            :severity="autoSpeedX5 ? 'help' : 'secondary'"
+            :aria-pressed="autoSpeedX5"
+            @click="autoSpeedX5 = !autoSpeedX5"
           />
           <Button
             :label="autoPlaying ? t('actions.autoStop') : t('actions.autoPlay')"
             :icon="autoPlaying ? 'pi pi-stop' : 'pi pi-play'"
             class="header-btn"
-            :disabled="!sim || (!autoPlaying && atYearCap)"
+            :disabled="!sim || milestoneOpen || (!autoPlaying && atYearCap)"
             :severity="autoPlaying ? 'danger' : 'secondary'"
             @click="toggleAutoPlay"
           />
         </div>
-        <div v-if="isControlledMode && sim" class="experiment-worlds" role="group" :aria-label="t('experiment.worldsTitle')">
-          <span class="experiment-worlds-label">{{ t('experiment.worldsTitle') }}</span>
-          <button
-            v-for="variant in EXPERIMENT_VARIANT_IDS"
-            :key="variant"
-            type="button"
-            class="experiment-world-btn"
-            :class="{ active: activeExperimentVariant === variant }"
-            :disabled="busy || creating"
-            @click="switchExperimentWorld(variant)"
-          >
-            {{ t(experimentWorldLabels[variant]) }}
-          </button>
-        </div>
-        <div class="header-turn-row">
-          <Tag v-if="sim" :value="turnStatusLabel" severity="info" />
-          <span
-            v-if="busy && sim && !creating"
-            class="tick-status"
-            role="status"
-            aria-live="polite"
-          >{{ t('actions.ticking') }}</span>
-        </div>
+        <div class="header-meta">
+          <div v-if="isControlledMode && sim" class="experiment-worlds" role="group" :aria-label="t('experiment.worldsTitle')">
+            <span class="experiment-worlds-label">{{ t('experiment.worldsTitle') }}</span>
+            <button
+              v-for="variant in EXPERIMENT_VARIANT_IDS"
+              :key="variant"
+              type="button"
+              class="experiment-world-btn"
+              :class="{ active: activeExperimentVariant === variant }"
+              :disabled="busy || creating"
+              @click="switchExperimentWorld(variant)"
+            >
+              {{ t(experimentWorldLabels[variant]) }}
+            </button>
+          </div>
+          <div v-if="sim && !creating" class="header-turn-row">
+            <span
+              class="tick-status"
+              :class="{ 'tick-status--hidden': !busy }"
+              role="status"
+              aria-live="polite"
+              :aria-hidden="!busy"
+            >{{ t('actions.ticking') }}</span>
+          </div>
         </div>
       </div>
       <div v-if="sim" class="header-era" aria-live="polite">
@@ -1196,7 +1689,212 @@ onBeforeUnmount(() => {
       </div>
     </header>
 
-    <div class="grid">
+    <div class="grid" :class="{ 'grid-with-digest': sim && turnDigest }">
+      <aside
+        v-if="sim && turnDigest"
+        class="digest-sidebar panel"
+        :aria-label="t('digest.title')"
+      >
+        <div class="panel-heading events-heading digest-heading">
+          <h2>{{ t('digest.title') }}</h2>
+          <Tag v-if="sim" :value="turnOnlyLabel" severity="secondary" />
+        </div>
+        <p class="digest-one-liner">{{ turnStory?.headline || digestOneLiner }}</p>
+        <div class="digest-tabs" role="tablist" :aria-label="t('digest.title')">
+          <button
+            type="button"
+            role="tab"
+            class="digest-tab"
+            :class="{ active: digestSidebarTab === 'situation' }"
+            :aria-selected="digestSidebarTab === 'situation'"
+            @click="digestSidebarTab = 'situation'"
+          >
+            {{ t('digest.tabSituation') }}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            class="digest-tab"
+            :class="{ active: digestSidebarTab === 'events' }"
+            :aria-selected="digestSidebarTab === 'events'"
+            @click="digestSidebarTab = 'events'"
+          >
+            {{ t('digest.tabEvents') }}
+            <span v-if="feedEvents.length" class="digest-tab-badge">{{ feedEvents.length }}</span>
+          </button>
+        </div>
+        <div class="digest-body">
+          <div v-show="digestSidebarTab === 'situation'" class="digest-tab-panel">
+              <p v-if="isControlledMode && experimentEmergenceLine" class="digest-emergence">{{ experimentEmergenceLine }}</p>
+
+              <section v-if="digestHasFocus" class="digest-focus-card">
+                <div class="digest-focus-head">
+                  <span class="digest-focus-label">
+                    {{ selectedAgentId ? t('digest.focusAgent') : t('digest.focusGroup') }}
+                  </span>
+                  <button type="button" class="digest-focus-clear" @click="clearMapSelection">
+                    {{ t('digest.clearFocus') }}
+                  </button>
+                </div>
+                <p v-if="selectedAgentId" class="digest-focus-title">{{ selectedAgentHeadline }}</p>
+                <p v-else class="digest-focus-title">{{ selectedGroupHeadline }}</p>
+                <p class="digest-focus-body">
+                  {{ selectedAgentId ? selectedAgentBody : selectedGroupBody }}
+                </p>
+              </section>
+
+              <p v-else-if="digestWorldLine" class="digest-notable-line digest-world-brief">{{ digestWorldLine }}</p>
+
+              <button type="button" class="digest-collapse-btn digest-story-btn" @click="digestStoryOpen = !digestStoryOpen">
+                {{ t('digest.storyToggle') }}
+                <span aria-hidden="true">{{ digestStoryOpen ? '−' : '+' }}</span>
+              </button>
+
+              <div v-if="digestStoryOpen" class="digest-story-block">
+                <section v-if="turnStory?.paragraphs.length" class="digest-section digest-section-story">
+                  <h3>{{ t('digest.storyTitle') }}</h3>
+                  <p v-for="(para, idx) in turnStory.paragraphs" :key="idx" class="digest-story-p">{{ para }}</p>
+                </section>
+                <section v-if="openingStory && turnDigest.turn <= 1" class="digest-section digest-section-opening">
+                  <h3>{{ t('digest.openingTitle') }}</h3>
+                  <p class="digest-opening-text">{{ openingStory }}</p>
+                </section>
+                <section v-if="outcomeArc && turnDigest.turn > 1" class="digest-section digest-section-outcome">
+                  <h3>{{ t('digest.outcomeTitle') }}</h3>
+                  <p class="digest-outcome-text">{{ outcomeArc }}</p>
+                </section>
+                <section v-if="turnDigest.notableEvents.length" class="digest-section digest-section-notable">
+                  <h3>{{ t('digest.notableTitle') }}</h3>
+                  <p class="digest-notable-line">
+                    {{ turnDigest.notableEvents.slice(0, 3).map((item) => notableEventText(item)).join(' · ') }}
+                  </p>
+                </section>
+              </div>
+
+              <section class="digest-section digest-section-obs">
+                <h3>
+                  {{ t('digest.societyTitle') }}
+                  <span class="digest-obs-source">{{ turnDigest.readingSource === 'llm' ? t('digest.obsLlm') : t('digest.obsHeuristic') }}</span>
+                </h3>
+                <div
+                  ref="regionChipPickerRef"
+                  class="digest-region-picker"
+                  role="tablist"
+                  :aria-label="t('digest.regionPickerLabel')"
+                >
+                  <button
+                    v-for="row in sortedRegionObservations"
+                    :key="row.regionId"
+                    type="button"
+                    role="tab"
+                    class="digest-region-chip"
+                    :class="{ active: selectedDigestRegionRow?.regionId === row.regionId }"
+                    :aria-selected="selectedDigestRegionRow?.regionId === row.regionId"
+                    :style="{ '--region-color': digestRegionColor(row.regionId) }"
+                    @click="selectDigestRegion(row.regionId)"
+                  >
+                    <span class="digest-region-chip-dot" aria-hidden="true" />
+                    <span class="digest-region-chip-text">
+                      <span class="digest-region-chip-name">{{ digestRegionShortLabel(row.regionId) }}</span>
+                      <span class="digest-region-chip-sub">{{ digestTrajectoryLabel(row.trajectory) }}</span>
+                    </span>
+                  </button>
+                </div>
+                <div v-if="selectedDigestRegionRow" class="digest-region-slider">
+                  <div class="digest-region-slider-nav">
+                    <button
+                      type="button"
+                      class="digest-region-slider-btn"
+                      :disabled="sortedRegionObservations.length <= 1"
+                      :aria-label="t('digest.regionPrev')"
+                      @click="shiftDigestRegion(-1)"
+                    >
+                      ‹
+                    </button>
+                    <span class="digest-region-slider-pos">
+                      {{ t('digest.regionPosition', {
+                        current: selectedDigestRegionIndex + 1,
+                        total: sortedRegionObservations.length,
+                      }) }}
+                    </span>
+                    <button
+                      type="button"
+                      class="digest-region-slider-btn"
+                      :disabled="sortedRegionObservations.length <= 1"
+                      :aria-label="t('digest.regionNext')"
+                      @click="shiftDigestRegion(1)"
+                    >
+                      ›
+                    </button>
+                  </div>
+                  <div
+                    class="digest-region-slider-stage"
+                    @touchstart.passive="onRegionSwipeStart"
+                    @touchend="onRegionSwipeEnd"
+                  >
+                    <Transition :name="regionSlideTransition" mode="out-in">
+                      <article
+                        :key="selectedDigestRegionRow.regionId"
+                        class="digest-region-card"
+                      >
+                        <header class="digest-region-head">
+                          <strong :style="{ color: digestRegionColor(selectedDigestRegionRow.regionId) }">{{ digestRegionLabel(selectedDigestRegionRow.regionId) }}</strong>
+                          <span class="digest-region-pop">{{ t('digest.meterPop', { n: selectedDigestRegionRow.population }) }}</span>
+                        </header>
+                        <div class="digest-flow" :aria-label="t('digest.causalTitle')">
+                          <span class="digest-flow-chip signal">{{ digestPrimarySignal(selectedDigestRegionRow) }}</span>
+                          <span class="digest-flow-arrow" aria-hidden="true">→</span>
+                          <span class="digest-flow-chip trajectory" :data-traj="selectedDigestRegionRow.trajectory">{{ digestTrajectoryLabel(selectedDigestRegionRow.trajectory) }}</span>
+                          <span class="digest-flow-arrow" aria-hidden="true">→</span>
+                          <span class="digest-flow-chip archetype">{{ digestArchetypeLabel(selectedDigestRegionRow.risingArchetype) }}</span>
+                        </div>
+                        <ul class="digest-meters">
+                          <li>
+                            <span>{{ t('digest.colTension') }}</span>
+                            <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('tension', selectedDigestRegionRow.tension)" :style="{ width: pct(selectedDigestRegionRow.tension) }" /></div>
+                            <em>{{ pct(selectedDigestRegionRow.tension) }}</em>
+                          </li>
+                          <li>
+                            <span>{{ t('digest.colProsperity') }}</span>
+                            <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('prosperity', selectedDigestRegionRow.prosperity)" :style="{ width: pct(selectedDigestRegionRow.prosperity) }" /></div>
+                            <em>{{ pct(selectedDigestRegionRow.prosperity) }}</em>
+                          </li>
+                          <li>
+                            <span>{{ t('digest.colDiscontent') }}</span>
+                            <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('discontent', selectedDigestRegionRow.discontent)" :style="{ width: pct(selectedDigestRegionRow.discontent) }" /></div>
+                            <em>{{ pct(selectedDigestRegionRow.discontent) }}</em>
+                          </li>
+                          <li>
+                            <span>{{ t('digest.colCohesion') }}</span>
+                            <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('cohesion', selectedDigestRegionRow.cohesion)" :style="{ width: pct(selectedDigestRegionRow.cohesion) }" /></div>
+                            <em>{{ pct(selectedDigestRegionRow.cohesion) }}</em>
+                          </li>
+                        </ul>
+                        <p v-if="digestCausalSummary(selectedDigestRegionRow)" class="digest-region-summary">{{ digestCausalSummary(selectedDigestRegionRow) }}</p>
+                      </article>
+                    </Transition>
+                  </div>
+                </div>
+              </section>
+          </div>
+
+          <div v-show="digestSidebarTab === 'events'" class="digest-tab-panel digest-tab-panel-events">
+            <p v-if="!feedEvents.length" class="hint">{{ t('events.empty') }}</p>
+            <ol v-else class="event-feed-simple">
+              <li
+                v-for="(item, idx) in feedEvents"
+                :key="`${item.turn}-${idx}`"
+                class="event-feed-item"
+                :class="{ 'event-alert-red': item.alert === 'red', 'event-alert-yellow': item.alert === 'yellow' }"
+              >
+                <span class="event-turn-label">{{ t('events.turnLabel', { turn: item.turn }) }}</span>
+                <span class="event-text">{{ item.text }}</span>
+              </li>
+            </ol>
+          </div>
+            </div>
+      </aside>
+
       <main class="viewport panel">
         <div class="panel-heading">
           <div class="map-heading">
@@ -1219,226 +1917,42 @@ onBeforeUnmount(() => {
         </div>
         <p class="hint map-legend">{{ t('map.legend') }} {{ t('map.zoomHintFlat') }}</p>
         <div class="map-stage">
-          <WorldMap2D :sim="sim" geography="world" :seed="mapSeed" @select-agent="onSelectAgent" />
-          <button
-            v-if="sim && turnDigest"
-            type="button"
-            class="digest-edge-btn"
-            :class="{ open: digestOpen }"
-            :aria-expanded="digestOpen"
-            :aria-label="digestOpen ? t('layout.closeDigest') : t('digest.showDetail')"
-            @click="digestOpen = !digestOpen"
-          >
-            <span>{{ t('digest.title') }}</span>
-            <span class="digest-edge-chevron" aria-hidden="true">{{ digestOpen ? '‹' : '›' }}</span>
-          </button>
-          <div
-            v-if="digestOpen"
-            class="digest-backdrop"
-            @click="digestOpen = false"
+          <WorldMap2D
+            :sim="sim"
+            geography="world"
+            :seed="mapSeed"
+            :selected-settlement-id="selectedSettlementId"
+            @select-agent="onSelectAgent"
+            @select-settlement="onSelectSettlement"
           />
-          <aside
-            v-if="digestOpen && turnDigest"
-            class="digest-modal panel"
-            role="dialog"
-            :aria-label="t('digest.title')"
-            @click.stop
-          >
-            <div class="panel-heading events-heading digest-heading">
-              <h2>{{ t('digest.title') }}</h2>
-              <div class="events-heading-actions">
-                <Tag v-if="sim" :value="turnOnlyLabel" severity="secondary" />
-                <button type="button" class="events-close" :aria-label="t('layout.closeDigest')" @click="digestOpen = false">×</button>
-              </div>
-            </div>
-            <p class="digest-one-liner">{{ turnStory?.headline || digestOneLiner }}</p>
-            <div class="digest-body">
-              <section v-if="turnStory?.paragraphs.length" class="digest-section digest-section-story">
-                <h3>{{ t('digest.storyTitle') }}</h3>
-                <p v-for="(para, idx) in turnStory.paragraphs" :key="idx" class="digest-story-p">{{ para }}</p>
-              </section>
-              <section v-if="openingStory" class="digest-section digest-section-opening">
-                <h3>{{ t('digest.openingTitle') }}</h3>
-                <p class="digest-opening-text">{{ openingStory }}</p>
-              </section>
-              <section v-if="outcomeArc && turnDigest.turn > 1" class="digest-section digest-section-outcome">
-                <h3>{{ t('digest.outcomeTitle') }}</h3>
-                <p class="digest-outcome-text">{{ outcomeArc }}</p>
-              </section>
-              <section v-if="experimentSetup" class="digest-section digest-section-setup digest-section-compact">
-                <h3>{{ t('digest.setupTitle') }}</h3>
-                <p class="digest-setup" :title="experimentSetup">{{ experimentSetup }}</p>
-              </section>
-              <section class="digest-section digest-section-numbers">
-                <button type="button" class="digest-collapse-btn" @click="digestNumbersOpen = !digestNumbersOpen">
-                  {{ t('digest.numbersTitle') }}
-                  <span aria-hidden="true">{{ digestNumbersOpen ? '−' : '+' }}</span>
-                </button>
-                <div v-if="digestNumbersOpen" class="digest-summary-grid">
-                <section class="digest-section">
-                  <h3>{{ t('digest.turnTitle') }}</h3>
-                  <ul class="digest-chips">
-                    <li>{{ t('headerStats.groups') }}{{ turnDigest.totals.groups }}</li>
-                    <li>{{ t('headerStats.cities') }}{{ turnDigest.totals.cities }}</li>
-                    <li>{{ t('headerStats.nations') }}{{ turnDigest.totals.nations }}</li>
-                    <li>{{ t('headerStats.lone') }}{{ turnDigest.totals.lone }}</li>
-                    <li>{{ t('headerStats.clashes') }}{{ turnDigest.totals.conflicts }}</li>
-                    <li>{{ t('headerStats.coops') }}{{ turnDigest.totals.cooperations }}</li>
-                    <li>{{ t('digest.colBirths') }} {{ turnDigest.totals.births }}</li>
-                    <li>{{ t('digest.colDeaths') }} {{ turnDigest.totals.deaths }}</li>
-                  </ul>
-                </section>
-                <section class="digest-section">
-                  <h3>{{ t('digest.cumulativeTitle') }}</h3>
-                  <ul class="digest-chips">
-                    <li>{{ t('headerStats.clashes') }}{{ turnDigest.cumulative.conflicts }}</li>
-                    <li>{{ t('headerStats.coops') }}{{ turnDigest.cumulative.cooperations }}</li>
-                    <li>{{ t('digest.colBirths') }} {{ turnDigest.cumulative.births }}</li>
-                    <li>{{ t('digest.colDeaths') }} {{ turnDigest.cumulative.deaths }}</li>
-                    <li>{{ t('digest.chipDisasters') }} {{ turnDigest.cumulative.disasters }}</li>
-                    <li>{{ t('digest.chipRegime') }} {{ turnDigest.cumulative.regimeShifts }}</li>
-                  </ul>
-                </section>
-                </div>
-              </section>
-              <section class="digest-section digest-section-notable">
-                <h3>{{ t('digest.notableTitle') }}</h3>
-                <p v-if="digestWorldLine" class="digest-notable-line">{{ digestWorldLine }}</p>
-                <p v-if="turnDigest.notableEvents.length" class="digest-notable-line">
-                  {{ turnDigest.notableEvents.slice(0, 3).map((item) => notableEventText(item)).join(' · ') }}
-                </p>
-                <p v-else-if="!digestWorldLine && !turnStory?.paragraphs.length" class="hint">{{ t('digest.notableEmpty') }}</p>
-              </section>
-              <section v-if="experimentComparisonRows.length" class="digest-section digest-section-experiment">
-                <h3>{{ t('experiment.compareTitle') }}</h3>
-                <p class="hint experiment-fixed">{{ t('experiment.fixedNote') }}</p>
-                <table class="experiment-compare-table">
-                  <thead>
-                    <tr>
-                      <th>{{ t('experiment.colWorld') }}</th>
-                      <th>{{ t('experiment.colPopulation') }}</th>
-                      <th>{{ t('experiment.colTrade') }}</th>
-                      <th>{{ t('experiment.colConflict') }}</th>
-                      <th>{{ t('experiment.colArchetype') }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="row in experimentComparisonRows" :key="row.id">
-                      <td>{{ t(experimentWorldLabels[row.id]) }}</td>
-                      <td>{{ row.summary?.population_delta_pct != null ? `${row.summary.population_delta_pct}%` : '—' }}</td>
-                      <td>{{ row.summary?.trade_openness_mean ?? '—' }}</td>
-                      <td>{{ row.summary?.conflicts_total ?? '—' }}</td>
-                      <td>{{ digestArchetypeLabel(row.summary?.dominant_archetype || 'none') }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <p v-if="experimentComparisonRows.length >= 2" class="experiment-unexpected">{{ t('experiment.unexpected') }}</p>
-              </section>
-              <section v-if="spotlightAgent" class="digest-section digest-section-spotlight">
-                <h3>{{ t('experiment.spotlightTitle') }}</h3>
-                <p class="hint">{{ t('experiment.spotlightHint') }}</p>
-                <p class="spotlight-name"><strong>{{ spotlightAgent.name }}</strong> <span class="spotlight-id">{{ spotlightAgent.id }}</span></p>
-                <ul class="spotlight-trait-list">
-                  <li>{{ t('experiment.traitCooperation') }} {{ pctTrait(spotlightAgent.personality?.cooperation) }}</li>
-                  <li>{{ t('experiment.traitAggression') }} {{ pctTrait(spotlightAgent.personality?.aggression) }}</li>
-                  <li>{{ t('experiment.traitAmbition') }} {{ pctTrait(spotlightAgent.personality?.ambition) }}</li>
-                  <li v-if="spotlightAgent.traits?.length">traits: {{ spotlightAgent.traits.join(', ') }}</li>
-                </ul>
-                <p v-if="spotlightSettlement" class="spotlight-supporters">
-                  {{ t('experiment.supporters', { n: spotlightSettlement.member_ids.length }) }}
-                </p>
-                <p v-if="sim?.experiment_summary?.spotlight_role" class="spotlight-role">
-                  {{ t('experiment.roleTitle') }}:
-                  {{ digestArchetypeLabel(sim.experiment_summary.spotlight_role) }}
-                </p>
-                <div v-if="spotlightRegionReading" class="digest-flow spotlight-env">
-                  <span class="digest-flow-chip signal">{{ digestPrimarySignal(spotlightRegionReading) }}</span>
-                  <span class="digest-flow-arrow" aria-hidden="true">→</span>
-                  <span class="digest-flow-chip trajectory" :data-traj="spotlightRegionReading.trajectory">
-                    {{ digestTrajectoryLabel(spotlightRegionReading.trajectory) }}
-                  </span>
-                </div>
-                <p v-if="spotlightRegionReading && digestCausalSummary({
-                  tension: spotlightRegionReading.tension,
-                  prosperity: spotlightRegionReading.prosperity,
-                  discontent: spotlightRegionReading.discontent,
-                  cohesion: spotlightRegionReading.cohesion,
-                  risingArchetype: spotlightRegionReading.rising_archetype,
-                  trajectory: spotlightRegionReading.trajectory,
-                  summary: spotlightRegionReading.summary,
-                })" class="spotlight-why">
-                  <strong>{{ t('experiment.whyTitle') }}</strong>
-                  {{ digestCausalSummary({
-                    tension: spotlightRegionReading.tension,
-                    prosperity: spotlightRegionReading.prosperity,
-                    discontent: spotlightRegionReading.discontent,
-                    cohesion: spotlightRegionReading.cohesion,
-                    risingArchetype: spotlightRegionReading.rising_archetype,
-                    trajectory: spotlightRegionReading.trajectory,
-                    summary: spotlightRegionReading.summary,
-                  }) }}
-                </p>
-              </section>
-              <section class="digest-section digest-section-obs">
-                <h3>
-                  {{ t('digest.societyTitle') }}
-                  <span class="digest-obs-source">{{ turnDigest.readingSource === 'llm' ? t('digest.obsLlm') : t('digest.obsHeuristic') }}</span>
-                </h3>
-                <div class="digest-region-grid">
-                  <article
-                    v-for="row in turnDigest.regionObservations"
-                    :key="row.regionId"
-                    class="digest-region-card"
-                  >
-                    <header class="digest-region-head">
-                      <strong :style="{ color: digestRegionColor(row.regionId) }">{{ digestRegionLabel(row.regionId) }}</strong>
-                      <span class="digest-region-pop">{{ t('digest.meterPop', { n: row.population }) }}</span>
-                    </header>
-                    <p v-if="turnStory?.regionPortraits[row.regionId]" class="digest-region-story">
-                      {{ turnStory.regionPortraits[row.regionId] }}
-                    </p>
-                    <div class="digest-flow" :aria-label="t('digest.causalTitle')">
-                      <span class="digest-flow-chip signal">{{ digestPrimarySignal(row) }}</span>
-                      <span class="digest-flow-arrow" aria-hidden="true">→</span>
-                      <span class="digest-flow-chip trajectory" :data-traj="row.trajectory">{{ digestTrajectoryLabel(row.trajectory) }}</span>
-                      <span class="digest-flow-arrow" aria-hidden="true">→</span>
-                      <span class="digest-flow-chip archetype">{{ digestArchetypeLabel(row.risingArchetype) }}</span>
-                    </div>
-                    <details class="digest-meters-details">
-                      <summary>{{ t('digest.numbersTitle') }}</summary>
-                    <ul class="digest-meters">
-                      <li>
-                        <span>{{ t('digest.colTension') }}</span>
-                        <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('tension', row.tension)" :style="{ width: pct(row.tension) }" /></div>
-                        <em>{{ pct(row.tension) }}</em>
-                      </li>
-                      <li>
-                        <span>{{ t('digest.colProsperity') }}</span>
-                        <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('prosperity', row.prosperity)" :style="{ width: pct(row.prosperity) }" /></div>
-                        <em>{{ pct(row.prosperity) }}</em>
-                      </li>
-                      <li>
-                        <span>{{ t('digest.colDiscontent') }}</span>
-                        <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('discontent', row.discontent)" :style="{ width: pct(row.discontent) }" /></div>
-                        <em>{{ pct(row.discontent) }}</em>
-                      </li>
-                      <li>
-                        <span>{{ t('digest.colCohesion') }}</span>
-                        <div class="digest-meter-track"><i class="digest-meter-fill" :class="meterTone('cohesion', row.cohesion)" :style="{ width: pct(row.cohesion) }" /></div>
-                        <em>{{ pct(row.cohesion) }}</em>
-                      </li>
-                    </ul>
-                    </details>
-                    <p v-if="digestCausalSummary(row)" class="digest-region-summary">{{ digestCausalSummary(row) }}</p>
-                    <p class="digest-region-polity">{{ t('digest.polityCounts', { bands: row.bands, cities: row.cities, nations: row.nations }) }}</p>
-                  </article>
-                </div>
-              </section>
-            </div>
-          </aside>
         </div>
       </main>
     </div>
+
+    <div v-if="conceptOpen" class="modal-backdrop" @click="conceptOpen = false" />
+    <aside
+      v-if="conceptOpen"
+      class="concept-modal panel"
+      role="dialog"
+      aria-modal="true"
+      :aria-label="t('concept.modalTitle')"
+    >
+      <div class="panel-heading events-heading">
+        <h2>{{ t('concept.modalTitle') }}</h2>
+        <button type="button" class="events-close" :aria-label="t('layout.closeConcept')" @click="conceptOpen = false">×</button>
+      </div>
+      <div class="concept-body">
+        <SimulationConceptIntro />
+      </div>
+    </aside>
+
+    <SimulationMilestoneModal
+      :open="milestoneOpen"
+      :snapshot="milestoneSnapshot"
+      :busy="busy"
+      @continue="continueFromMilestone"
+      @change-conditions="changeConditionsFromMilestone"
+    />
 
     <div v-if="conditionsOpen" class="modal-backdrop" @click="!creating && (conditionsOpen = false)" />
     <aside
@@ -1449,72 +1963,179 @@ onBeforeUnmount(() => {
       :aria-label="t('initialConditions')"
     >
       <div class="panel-heading events-heading">
-        <h2>{{ t('initialConditions') }}</h2>
+        <h2>{{ isMidrunConditionsEdit ? t('scenario.midrunTitle') : t('scenario.modalTitle') }}</h2>
         <button type="button" class="events-close" :aria-label="t('layout.closeConditions')" :disabled="creating" @click="conditionsOpen = false">×</button>
       </div>
       <div class="conditions-form">
         <div class="conditions-fields">
-          <section class="template-picker">
-            <label class="template-label" for="scenario-template">{{ t('templates.label') }}</label>
-            <Dropdown
-              input-id="scenario-template"
-              :model-value="selectedTemplateId"
-              :options="templateOptions"
-              option-label="label"
-              option-value="value"
-              class="template-select field-control"
-              :disabled="creating"
-              @update:model-value="applyScenarioTemplate($event as ScenarioTemplateId)"
-            />
-            <p class="template-blurb">{{ templateBlurb }}</p>
-            <p class="hint template-hint">{{ t('templates.hint') }}</p>
-            <p v-if="isControlledExperimentTemplate(selectedTemplateId)" class="hint experiment-fixed">
-              {{ t('experiment.fixedNote') }}
-            </p>
-          </section>
-          <nav v-if="!isControlledExperimentTemplate(selectedTemplateId)" class="step-nav" aria-label="steps">
-            <button type="button" class="step-tab" :class="{ active: conditionStep === 1 }" @click="conditionStep = 1">{{ t('wizard.step1') }}</button>
-            <button type="button" class="step-tab" :class="{ active: conditionStep === 2 }" @click="conditionStep = 2">{{ t('wizard.step2') }}</button>
-            <button type="button" class="step-tab" :class="{ active: conditionStep === 3 }" @click="conditionStep = 3">{{ t('wizard.step3') }}</button>
-          </nav>
-          <p v-if="!isControlledExperimentTemplate(selectedTemplateId)" class="conditions-lead">{{ t(`wizard.lead${conditionStep}`) }}</p>
-          <p v-else class="conditions-lead">{{ templateBlurb }}</p>
-
-          <section v-if="conditionStep === 1 && isControlledExperimentTemplate(selectedTemplateId)" class="conditions-section experiment-setup-blurb">
-            <p>{{ t('templates.controlled_experiment.opening', { year: draftAstroYear.value }) }}</p>
-            <ul class="experiment-variant-list">
-              <li v-for="variant in EXPERIMENT_VARIANT_IDS" :key="variant">{{ t(experimentWorldLabels[variant]) }}</li>
-            </ul>
-          </section>
-
-          <section v-else-if="conditionStep === 1" class="conditions-section">
-            <div class="bg-table" role="table">
-              <div class="bg-row bg-head" role="row">
-                <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-h1`" class="bg-cell col-head" role="columnheader">
-                  <span>{{ t(`geographies.${region.id}`) }}</span>
-                  <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
-                </div>
-              </div>
-              <div class="bg-row bg-form" role="row">
-                <div class="bg-stub" role="rowheader">{{ t('wizard.rows.subregion') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-sub`" class="bg-cell" role="cell">
-                  <Dropdown v-model="region.subregion" :options="subregionOptions(region.id)" option-label="label" option-value="value" class="field-control" />
-                </div>
-              </div>
-              <div class="bg-row" role="row">
-                <div class="bg-stub" role="rowheader">{{ t('wizard.rows.focus') }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-focus`" class="bg-cell bg-focus" role="cell">{{ t(`wizard.blurbs.${region.subregion}`) }}</div>
-              </div>
-              <div v-for="row in BACKGROUND_ROWS" :key="row" class="bg-row" role="row">
-                <div class="bg-stub" role="rowheader">{{ t(`wizard.rows.${row}`) }}</div>
-                <div v-for="region in regionDrafts" :key="`${region.id}-${row}`" class="bg-cell" role="cell">{{ t(`wizard.table.${region.subregion}.${row}`) }}</div>
-              </div>
+          <SimulationConceptIntro compact />
+          <p v-if="isMidrunConditionsEdit" class="conditions-midrun-lead">{{ t('scenario.midrunLead') }}</p>
+          <section v-if="!isMidrunConditionsEdit" class="scenario-mode-picker">
+            <p class="scenario-mode-lead">{{ t('scenario.pickMode') }}</p>
+            <div class="scenario-mode-cards">
+              <button
+                type="button"
+                class="scenario-mode-card"
+                :class="{ active: scenarioMode === 'experiment' }"
+                :disabled="creating"
+                @click="setScenarioMode('experiment')"
+              >
+                <strong>{{ t('scenario.modeExperiment') }}</strong>
+                <span>{{ t('scenario.modeExperimentDesc') }}</span>
+              </button>
+              <button
+                type="button"
+                class="scenario-mode-card"
+                :class="{ active: scenarioMode === 'custom' }"
+                :disabled="creating"
+                @click="setScenarioMode('custom')"
+              >
+                <strong>{{ t('scenario.modeCustom') }}</strong>
+                <span>{{ t('scenario.modeCustomDesc') }}</span>
+              </button>
             </div>
           </section>
 
-          <section v-else-if="conditionStep === 2 && !isControlledExperimentTemplate(selectedTemplateId)" class="conditions-section">
-            <DataTable :value="step2Axes" class="conditions-dt">
+          <section v-if="scenarioMode === 'experiment'" class="conditions-section scenario-worlds-section">
+            <p class="conditions-lead">{{ t('scenario.experimentPickWorld') }}</p>
+            <div class="world-card-grid">
+              <button
+                v-for="variant in EXPERIMENT_VARIANT_IDS"
+                :key="variant"
+                type="button"
+                class="world-card"
+                :class="{ active: activeExperimentVariant === variant }"
+                :disabled="creating"
+                @click="activeExperimentVariant = variant"
+              >
+                <strong>{{ t(experimentWorldLabels[variant]) }}</strong>
+                <span>{{ t(`experiment.worldDesc.${variant}`) }}</span>
+              </button>
+            </div>
+            <p class="hint scenario-fixed-hint">{{ isMidrunConditionsEdit ? t('scenario.experimentMidrunHint') : t('scenario.experimentFixed') }}</p>
+          </section>
+
+          <section v-if="isMidrunConditionsEdit" class="conditions-section conditions-midrun-policy">
+            <p class="conditions-lead">{{ t('scenario.midrunSocialLead') }}</p>
+            <DataTable :value="midrunPolicyAxes" class="conditions-dt">
+                <Column :header="t('wizard.axis')" class="dt-axis">
+                  <template #body="{ data }">
+                    <span class="axis-label">
+                      {{ midrunPolicyAxisLabel(data.key) }}
+                      <i
+                        v-if="data.key === 'institution'"
+                        v-tooltip.right="t('institutionHint')"
+                        class="pi pi-info-circle axis-info"
+                        tabindex="0"
+                      />
+                    </span>
+                  </template>
+                </Column>
+                <Column v-for="region in regionDrafts" :key="region.id">
+                  <template #header>
+                    <div class="col-head">
+                      <span>{{ t(`geographies.${region.id}`) }}</span>
+                      <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
+                    </div>
+                  </template>
+                  <template #body="{ data }">
+                    <Dropdown
+                      v-if="data.key === 'institution'"
+                      v-model="region.institution"
+                      :options="institutionOptions"
+                      option-label="label"
+                      option-value="value"
+                      class="field-control"
+                    />
+                    <LevelRating
+                      v-else-if="data.key === 'taxRate'"
+                      v-model="region.taxRate"
+                      :steps="TAX_STEPS"
+                      :labels="levelLabels"
+                    />
+                    <LevelRating
+                      v-else-if="data.key === 'education'"
+                      v-model="region.education"
+                      :steps="LEVEL_STEPS"
+                      :labels="levelLabels"
+                    />
+                    <Dropdown
+                      v-else-if="data.key === 'religion'"
+                      v-model="region.religion"
+                      :options="religionOptions"
+                      option-label="label"
+                      option-value="value"
+                      class="field-control"
+                    />
+                    <LevelRating
+                      v-else-if="data.key === 'trade'"
+                      v-model="region.tradeOpenness"
+                      :steps="LEVEL_STEPS"
+                      :labels="levelLabels"
+                    />
+                    <LevelRating
+                      v-else-if="data.key === 'welfare'"
+                      v-model="region.welfareRate"
+                      :steps="WELFARE_STEPS"
+                      :labels="welfareLabels"
+                    />
+                    <LevelRating
+                      v-else-if="data.key === 'notable'"
+                      v-model="region.traitRate"
+                      :steps="NOTABLE_STEPS"
+                      :labels="levelLabels"
+                    />
+                  </template>
+                </Column>
+              </DataTable>
+          </section>
+
+          <template v-if="!isMidrunConditionsEdit && scenarioMode !== 'experiment'">
+            <section class="custom-preset-picker">
+              <p class="conditions-lead">{{ t('scenario.customLead') }}</p>
+              <div class="custom-preset-cards">
+                <button
+                  v-for="presetId in CUSTOM_PRESET_IDS"
+                  :key="presetId"
+                  type="button"
+                  class="custom-preset-card"
+                  :class="{ active: selectedTemplateId === presetId }"
+                  :disabled="creating"
+                  @click="applyScenarioTemplate(presetId)"
+                >
+                  <strong>{{ t(`templates.${presetId}.name`) }}</strong>
+                  <span>{{ t(`templates.${presetId}.blurb`) }}</span>
+                </button>
+              </div>
+              <button
+                type="button"
+                class="advanced-toggle"
+                @click="showAdvancedScenarios = !showAdvancedScenarios"
+              >
+                {{ showAdvancedScenarios ? t('scenario.hideAdvanced') : t('scenario.showAdvanced') }}
+              </button>
+              <div v-if="showAdvancedScenarios" class="advanced-template-row">
+                <Dropdown
+                  input-id="scenario-template-advanced"
+                  :model-value="selectedTemplateId"
+                  :options="advancedTemplateOptions"
+                  option-label="label"
+                  option-value="value"
+                  class="template-select field-control"
+                  :disabled="creating"
+                  @update:model-value="applyScenarioTemplate($event as ScenarioTemplateId)"
+                />
+              </div>
+            </section>
+
+            <nav class="step-nav" aria-label="steps">
+              <button type="button" class="step-tab" :class="{ active: conditionStep === 1 }" @click="conditionStep = 1">{{ t('wizard.stepSocial') }}</button>
+              <button type="button" class="step-tab" :class="{ active: conditionStep === 2 }" @click="conditionStep = 2">{{ t('wizard.stepPop') }}</button>
+            </nav>
+            <p class="conditions-lead">{{ conditionStep === 1 ? t('wizard.leadSocial') : t('wizard.leadPop') }}</p>
+
+            <section v-if="conditionStep === 1" class="conditions-section">
+              <DataTable :value="step2Axes" class="conditions-dt">
               <Column :header="t('wizard.axis')" class="dt-axis">
                 <template #body="{ data }">
                   <span class="axis-label">
@@ -1622,10 +2243,36 @@ onBeforeUnmount(() => {
               </div>
               <p class="hint year-hint">{{ t('calendarYearHint') }}</p>
             </div>
-          </section>
+              <details class="geo-details">
+                <summary>{{ t('wizard.geoDetails') }}</summary>
+                <div class="bg-table" role="table">
+                  <div class="bg-row bg-head" role="row">
+                    <div class="bg-stub" role="columnheader">{{ t('wizard.axis') }}</div>
+                    <div v-for="region in regionDrafts" :key="`${region.id}-h1`" class="bg-cell col-head" role="columnheader">
+                      <span>{{ t(`geographies.${region.id}`) }}</span>
+                      <span class="col-sub">{{ t(`subregions.${region.subregion}`) }}</span>
+                    </div>
+                  </div>
+                  <div class="bg-row bg-form" role="row">
+                    <div class="bg-stub" role="rowheader">{{ t('wizard.rows.subregion') }}</div>
+                    <div v-for="region in regionDrafts" :key="`${region.id}-sub`" class="bg-cell" role="cell">
+                      <Dropdown v-model="region.subregion" :options="subregionOptions(region.id)" option-label="label" option-value="value" class="field-control" />
+                    </div>
+                  </div>
+                  <div class="bg-row" role="row">
+                    <div class="bg-stub" role="rowheader">{{ t('wizard.rows.focus') }}</div>
+                    <div v-for="region in regionDrafts" :key="`${region.id}-focus`" class="bg-cell bg-focus" role="cell">{{ t(`wizard.blurbs.${region.subregion}`) }}</div>
+                  </div>
+                  <div v-for="row in BACKGROUND_ROWS" :key="row" class="bg-row" role="row">
+                    <div class="bg-stub" role="rowheader">{{ t(`wizard.rows.${row}`) }}</div>
+                    <div v-for="region in regionDrafts" :key="`${region.id}-${row}`" class="bg-cell" role="cell">{{ t(`wizard.table.${region.subregion}.${row}`) }}</div>
+                  </div>
+                </div>
+              </details>
+            </section>
 
-          <section v-else class="conditions-section">
-            <DataTable :value="step3Axes" class="conditions-dt">
+            <section v-else class="conditions-section">
+              <DataTable :value="step3Axes" class="conditions-dt">
               <Column :header="t('wizard.axis')" class="dt-axis">
                 <template #body="{ data }">
                   <span class="axis-label">
@@ -1666,13 +2313,57 @@ onBeforeUnmount(() => {
                 </template>
               </Column>
             </DataTable>
-          </section>
+            </section>
+          </template>
           <p v-if="error" class="error">{{ error }}</p>
         </div>
         <div class="conditions-footer step-footer">
-          <Button v-if="conditionStep > 1 && !isControlledExperimentTemplate(selectedTemplateId)" :label="t('wizard.back')" class="action-btn" severity="secondary" :disabled="creating" @click="conditionStep -= 1" />
-          <Button v-if="conditionStep < 3 && !isControlledExperimentTemplate(selectedTemplateId)" :label="t('wizard.next')" class="action-btn" :disabled="creating" @click="conditionStep += 1" />
-          <Button v-else :label="t('actions.create')" icon="pi pi-plus" class="action-btn" :loading="busy && !autoPlaying" :disabled="creating" @click="createSimulation" />
+          <template v-if="isMidrunConditionsEdit">
+            <Button
+              :label="t('actions.applyConditions')"
+              icon="pi pi-check"
+              class="action-btn"
+              :loading="busy"
+              :disabled="creating"
+              @click="applySimulationConditions"
+            />
+          </template>
+          <template v-else-if="scenarioMode === 'experiment'">
+            <Button
+              :label="t('actions.create')"
+              icon="pi pi-plus"
+              class="action-btn"
+              :loading="busy && !autoPlaying"
+              :disabled="creating"
+              @click="createControlledWorld(activeExperimentVariant)"
+            />
+          </template>
+          <template v-else>
+            <Button
+              v-if="conditionStep > 1"
+              :label="t('wizard.back')"
+              class="action-btn"
+              severity="secondary"
+              :disabled="creating"
+              @click="conditionStep -= 1"
+            />
+            <Button
+              v-if="conditionStep < 2"
+              :label="t('wizard.next')"
+              class="action-btn"
+              :disabled="creating"
+              @click="conditionStep += 1"
+            />
+            <Button
+              v-else
+              :label="t('actions.create')"
+              icon="pi pi-plus"
+              class="action-btn"
+              :loading="busy && !autoPlaying"
+              :disabled="creating"
+              @click="createSimulation"
+            />
+          </template>
         </div>
       </div>
     </aside>
@@ -1686,27 +2377,6 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
-    <aside v-if="eventsOpen" class="events-modal panel" role="dialog" :aria-label="t('events.title')">
-      <div class="panel-heading events-heading">
-        <h2>{{ t('events.title') }}</h2>
-        <div class="events-heading-actions">
-          <Tag v-if="sim" :value="turnOnlyLabel" severity="secondary" />
-          <button type="button" class="events-close" :aria-label="t('layout.closeEvents')" @click="eventsOpen = false">×</button>
-        </div>
-      </div>
-      <p v-if="!recentEvents.length" class="hint">{{ t('events.empty') }}</p>
-      <ol v-else class="event-chat">
-        <li v-for="(row, idx) in recentEvents" :key="`${row.turn}-${row.actor_id}-${row.action}-${idx}`" class="event-bubble" :class="{ 'event-llm': row.extra?.decide === 'llm' }">
-          <div class="event-bubble-meta">
-            <span class="event-actor" :style="{ color: eventActorColor(row.actor_id) }">{{ actorLabel(row.actor_id) }}</span>
-            <span class="event-action" :style="{ color: eventActorColor(row.actor_id) }">{{ actionLabel(row.action) }}</span>
-            <span v-if="row.extra?.decide === 'llm'" class="event-llm-badge">{{ t('events.decideLlm') }}</span>
-          </div>
-          <p class="event-text">{{ eventDetail(row) }}</p>
-          <p v-if="row.extra?.reason" class="event-reason">{{ t('events.reason', { text: row.extra.reason }) }}</p>
-        </li>
-      </ol>
-    </aside>
   </div>
 </template>
 
@@ -1740,7 +2410,7 @@ onBeforeUnmount(() => {
 
 .header-top {
   display: grid;
-  grid-template-columns: minmax(7.5rem, auto) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(7.5rem, auto) minmax(0, 1fr) max-content max-content;
   align-items: center;
   gap: 0.75rem;
   min-width: 0;
@@ -1769,6 +2439,15 @@ onBeforeUnmount(() => {
 
 .header-left {
   min-width: 0;
+}
+
+.header-left h1 {
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+  font-weight: 650;
+  line-height: 1.25;
+  min-height: 0;
+  white-space: nowrap;
 }
 
 .llm-status {
@@ -1831,13 +2510,16 @@ onBeforeUnmount(() => {
   margin-right: 0.25rem;
 }
 
-.header-right {
+.header-meta {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 0.5rem;
   min-width: 0;
-  flex: 0 0 auto;
+}
+
+.header-meta .experiment-worlds {
+  margin-top: 0;
 }
 
 .header-controls {
@@ -1859,6 +2541,11 @@ onBeforeUnmount(() => {
   color: color-mix(in srgb, var(--text, #1c2430) 78%, #3a6ea5);
   background: color-mix(in srgb, #3a6ea5 12%, transparent);
   white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.tick-status--hidden {
+  visibility: hidden;
 }
 
 .header-turn-row {
@@ -1884,7 +2571,7 @@ onBeforeUnmount(() => {
   font-size: 0.85rem;
 }
 
-.header-right :deep(.p-tag) {
+.header-meta :deep(.p-tag) {
   height: var(--header-bar-h);
   max-width: 10rem;
   overflow: hidden;
@@ -2005,6 +2692,20 @@ h2 {
   overflow: hidden;
 }
 
+.grid-with-digest {
+  grid-template-columns: min(22rem, 32vw) minmax(0, 1fr);
+  gap: 0.65rem;
+}
+
+.digest-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  padding: 0.65rem 0.75rem;
+}
+
 .panel {
   background: color-mix(in srgb, var(--panel) 92%, transparent);
   border: 1px solid var(--line);
@@ -2057,6 +2758,29 @@ h2 {
   background: #3b82f6;
 }
 
+.concept-modal {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 45;
+  width: min(34rem, calc(100vw - 1.5rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0.7rem 0.85rem 0.75rem;
+  background: #1c252f;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4);
+}
+
+.concept-body {
+  overflow-y: auto;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding-right: 0.15rem;
+}
+
 .conditions-modal {
   position: fixed;
   left: 50%;
@@ -2092,6 +2816,130 @@ h2 {
   min-height: 0;
   flex: 1 1 auto;
   padding-right: 0.2rem;
+}
+
+.scenario-mode-picker {
+  margin-bottom: 0.75rem;
+}
+
+.conditions-midrun-policy {
+  margin-top: 0.35rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid var(--line);
+}
+
+.conditions-midrun-lead {
+  margin: 0 0 0.55rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, #3b82f6);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 90%, #1e3a5f);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: #c5d0dc;
+}
+
+.scenario-mode-lead {
+  margin: 0 0 0.45rem;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.scenario-mode-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.scenario-mode-card,
+.world-card,
+.custom-preset-card {
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--panel) 88%, #0b1218);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.scenario-mode-card strong,
+.world-card strong,
+.custom-preset-card strong {
+  display: block;
+  font-size: 0.78rem;
+  margin-bottom: 0.2rem;
+}
+
+.scenario-mode-card span,
+.world-card span,
+.custom-preset-card span {
+  display: block;
+  font-size: 0.66rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.scenario-mode-card.active,
+.world-card.active,
+.custom-preset-card.active {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+
+.scenario-mode-card:disabled,
+.world-card:disabled,
+.custom-preset-card:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.world-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.scenario-fixed-hint {
+  margin: 0.45rem 0 0;
+  font-size: 0.66rem;
+}
+
+.custom-preset-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  margin-bottom: 0.45rem;
+}
+
+.advanced-toggle {
+  margin: 0 0 0.35rem;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.68rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.advanced-toggle:hover {
+  text-decoration: underline;
+}
+
+.advanced-template-row {
+  margin-bottom: 0.5rem;
+}
+
+.geo-details {
+  margin-top: 0.65rem;
+}
+
+.geo-details summary {
+  cursor: pointer;
+  font-size: 0.68rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
 }
 
 .template-picker {
@@ -2144,7 +2992,7 @@ h2 {
 
 .step-nav {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.35rem;
   margin-bottom: 0.35rem;
 }
@@ -2507,76 +3355,17 @@ h2 {
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
 }
 
-.digest-backdrop {
-  position: absolute;
-  inset: 0;
-  z-index: 12;
-  background: rgba(4, 8, 14, 0.28);
-  cursor: pointer;
-}
-
-.digest-edge-btn {
-  position: absolute;
-  left: 0;
-  top: 50%;
-  z-index: 16;
-  transform: translateY(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.35rem;
-  margin: 0;
-  padding: 0.7rem 0.28rem;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
-  border-left: 0;
-  border-radius: 0 10px 10px 0;
-  background: color-mix(in srgb, var(--panel) 92%, var(--accent) 8%);
-  color: var(--text);
-  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.28);
-  cursor: pointer;
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-}
-
-.digest-edge-btn.open {
-  left: min(34rem, 78%);
-}
-
-.digest-edge-btn:hover {
-  background: color-mix(in srgb, var(--panel) 84%, var(--accent) 16%);
-}
-
-.digest-edge-chevron {
-  writing-mode: horizontal-tb;
-  font-size: 0.95rem;
-  line-height: 1;
-  color: var(--accent);
-}
-
-.digest-modal {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 14;
-  width: min(34rem, 78%);
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 0.55rem 0.65rem 0.6rem;
-  border-radius: 8px 0 0 8px;
-  background: #1c252f;
-  box-shadow: 8px 0 28px rgba(0, 0, 0, 0.35);
-  overflow: hidden;
-  min-height: 0;
-}
-
 .digest-heading {
   margin-bottom: 0.35rem;
   flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.digest-heading h2 {
+  margin: 0;
 }
 
 .digest-one-liner {
@@ -2647,9 +3436,195 @@ h2 {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
-  gap: 0.55rem;
+  gap: 0;
   padding-right: 0.15rem;
   -webkit-overflow-scrolling: touch;
+}
+
+.digest-tabs {
+  display: flex;
+  gap: 0.35rem;
+  margin: 0.45rem 0 0.5rem;
+  flex: 0 0 auto;
+}
+
+.digest-tab {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.38rem 0.5rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  background: color-mix(in srgb, var(--panel) 88%, #0b1218);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.digest-tab.active {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
+}
+
+.digest-tab-badge {
+  min-width: 1.1rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 35%, transparent);
+  color: #e8f4ff;
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.digest-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-height: 0;
+}
+
+.digest-tab-panel-events {
+  flex: 1 1 auto;
+  overflow-y: auto;
+}
+
+.digest-region-picker {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.28rem;
+  margin-bottom: 0.45rem;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 0.15rem;
+  scrollbar-width: thin;
+}
+
+.digest-region-slider {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.digest-region-slider-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+}
+
+.digest-region-slider-btn {
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent);
+  background: color-mix(in srgb, var(--panel) 90%, #0b1218);
+  color: var(--text);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.digest-region-slider-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.digest-region-slider-pos {
+  flex: 1 1 auto;
+  text-align: center;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.digest-region-slider-stage {
+  position: relative;
+  overflow: hidden;
+  touch-action: pan-y;
+}
+
+.region-slide-left-enter-active,
+.region-slide-left-leave-active,
+.region-slide-right-enter-active,
+.region-slide-right-leave-active {
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.region-slide-left-enter-from {
+  opacity: 0;
+  transform: translateX(1.25rem);
+}
+
+.region-slide-left-leave-to {
+  opacity: 0;
+  transform: translateX(-1.25rem);
+}
+
+.region-slide-right-enter-from {
+  opacity: 0;
+  transform: translateX(-1.25rem);
+}
+
+.region-slide-right-leave-to {
+  opacity: 0;
+  transform: translateX(1.25rem);
+}
+
+.digest-region-chip {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.28rem;
+  padding: 0.28rem 0.42rem;
+  min-width: 3.4rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  background: color-mix(in srgb, var(--panel) 90%, #0b1218);
+  color: var(--text);
+  font-size: 0.62rem;
+  font-weight: 650;
+  cursor: pointer;
+  line-height: 1.15;
+  flex: 0 0 auto;
+}
+
+.digest-region-chip.active {
+  border-color: color-mix(in srgb, var(--region-color, var(--accent)) 55%, var(--line));
+  background: color-mix(in srgb, var(--region-color, var(--accent)) 14%, var(--panel));
+}
+
+.digest-region-chip-dot {
+  width: 0.42rem;
+  height: 0.42rem;
+  margin-top: 0.12rem;
+  border-radius: 50%;
+  background: var(--region-color, var(--accent));
+  flex: 0 0 auto;
+}
+
+.digest-region-chip-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.08rem;
+  min-width: 0;
+}
+
+.digest-region-chip-name {
+  font-size: 0.64rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.digest-region-chip-sub {
+  font-size: 0.58rem;
+  font-weight: 600;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .digest-section {
@@ -3151,10 +4126,195 @@ label {
   line-height: 1.4;
 }
 
+.digest-section-group {
+  border: 1px solid color-mix(in srgb, var(--primary) 35%, var(--line));
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  background: color-mix(in srgb, var(--primary) 8%, var(--panel));
+}
+
+.digest-focus-card {
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+  border-radius: 8px;
+  padding: 0.55rem 0.65rem;
+  margin-bottom: 0.5rem;
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+}
+
+.digest-focus-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.25rem;
+}
+
+.digest-focus-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.digest-focus-clear {
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.65rem;
+  cursor: pointer;
+  padding: 0;
+}
+
+.digest-focus-clear:hover {
+  text-decoration: underline;
+}
+
+.digest-focus-title {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.digest-focus-body {
+  margin: 0.35rem 0 0;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.digest-world-brief {
+  margin: 0 0 0.5rem;
+}
+
+.digest-story-btn {
+  width: 100%;
+  margin: 0.35rem 0;
+}
+
+.digest-story-block {
+  margin-bottom: 0.5rem;
+}
+
+.digest-emergence,
+.scenario-emergence {
+  margin: 0 0 0.5rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.event-feed-simple {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.event-feed-item {
+  padding: 0.35rem 0.45rem;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--panel) 88%, var(--line));
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.event-feed-simple .event-bubble-meta {
+  margin-bottom: 0.15rem;
+}
+
+.event-turn-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.event-alert-red {
+  border-left: 3px solid #ff5c48;
+}
+
+.event-alert-yellow {
+  border-left: 3px solid #ffd640;
+}
+
+.digest-more-btn {
+  width: 100%;
+  margin-bottom: 0.35rem;
+}
+
+.digest-more {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.digest-region-grid-compact {
+  gap: 0.35rem;
+}
+
+.digest-region-card-compact {
+  padding: 0.4rem 0.5rem;
+}
+
+.digest-region-card-compact .digest-region-summary {
+  margin: 0.25rem 0 0;
+  font-size: 0.68rem;
+}
+
+.group-name {
+  margin: 0.25rem 0;
+  font-size: 0.82rem;
+}
+
+.group-facts {
+  margin: 0.35rem 0;
+  padding-left: 1rem;
+  font-size: 0.68rem;
+}
+
+.group-context,
+.group-policy {
+  margin: 0.35rem 0 0;
+  font-size: 0.68rem;
+  line-height: 1.45;
+}
+
+.group-events {
+  margin-top: 0.45rem;
+  font-size: 0.68rem;
+}
+
+.group-event-list {
+  margin: 0.25rem 0 0;
+  padding-left: 1rem;
+}
+
 .experiment-variant-list {
   margin: 0.5rem 0 0;
   padding-left: 1.1rem;
   font-size: 0.72rem;
+}
+
+@media (max-width: 900px) {
+  .grid-with-digest {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(220px, 1fr) min(36vh, 22rem);
+  }
+
+  .grid-with-digest .digest-sidebar {
+    order: 2;
+  }
+
+  .grid-with-digest .viewport {
+    order: 1;
+  }
 }
 
 @media (max-width: 1100px) {

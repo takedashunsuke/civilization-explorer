@@ -1,4 +1,4 @@
-"""Controlled experiment: identical agent roster × different world environments."""
+"""Controlled experiment: identical agent roster × external environment only."""
 
 from __future__ import annotations
 
@@ -20,49 +20,21 @@ from simulation.models import (
 EXPERIMENT_SEED = 42
 EXPERIMENT_POPULATION_PER_REGION = 1000
 
-WORLD_VARIANT_IDS: tuple[str, ...] = ("peace", "famine", "war", "trade")
+WORLD_VARIANT_IDS: tuple[str, ...] = ("lush", "lean", "volatile", "balanced")
 
-# Environment-only patches. Identity fields (initial_values, trait_rate, population) stay fixed.
-_ENV_PATCH: dict[str, dict[str, float | str]] = {
-    "peace": {
-        "resource_pool": 145.0,
-        "disaster_frequency": 0.07,
-        "institution": "democracy",
-        "tax_rate": 0.06,
-        "trade_openness": 0.78,
-        "welfare_rate": 0.18,
-    },
-    "famine": {
-        "resource_pool": 38.0,
-        "disaster_frequency": 0.50,
-        "institution": "autocracy",
-        "tax_rate": 0.22,
-        "trade_openness": 0.20,
-        "welfare_rate": 0.02,
-    },
-    "war": {
-        "resource_pool": 62.0,
-        "disaster_frequency": 0.38,
-        "institution": "autocracy",
-        "tax_rate": 0.26,
-        "trade_openness": 0.25,
-        "welfare_rate": 0.04,
-    },
-    "trade": {
-        "resource_pool": 128.0,
-        "disaster_frequency": 0.10,
-        "institution": "democracy",
-        "tax_rate": 0.07,
-        "trade_openness": 0.92,
-        "welfare_rate": 0.14,
-    },
+# External environment only — institutions, tax, trade, welfare start neutral and may emerge.
+_EXTERNAL_PATCH: dict[str, dict[str, float]] = {
+    "lush": {"resource_pool": 145.0, "disaster_frequency": 0.07},
+    "lean": {"resource_pool": 42.0, "disaster_frequency": 0.22},
+    "volatile": {"resource_pool": 78.0, "disaster_frequency": 0.48},
+    "balanced": {"resource_pool": 95.0, "disaster_frequency": 0.16},
 }
 
 _VARIANT_LABEL_JA: dict[str, str] = {
-    "peace": "平和・豊富",
-    "famine": "飢饉・災害",
-    "war": "戦争・緊張",
-    "trade": "交易・開放",
+    "lush": "豊かな自然",
+    "lean": "資源乏しい",
+    "volatile": "災害が多い",
+    "balanced": "標準",
 }
 
 _ROSTER_CACHE: dict[int, list[AgentState]] = {}
@@ -77,9 +49,22 @@ def baseline_identity_values() -> InitialValues:
     )
 
 
+def _neutral_social_baseline() -> dict[str, float | InstitutionType | ReligionType]:
+    """No preset society — groups, institutions, and conflict emerge in play."""
+    return {
+        "institution": InstitutionType.anarchy,
+        "tax_rate": 0.05,
+        "education_level": 0.5,
+        "religion": ReligionType.folk,
+        "trade_openness": 0.5,
+        "welfare_rate": 0.0,
+    }
+
+
 def baseline_region_params() -> list[RegionParams]:
     """Uniform identity baseline — used only to generate the shared roster."""
     identity = baseline_identity_values()
+    social = _neutral_social_baseline()
     out: list[RegionParams] = []
     for macro in CONTINENT_IDS:
         out.append(
@@ -87,25 +72,25 @@ def baseline_region_params() -> list[RegionParams]:
                 id=macro,
                 subregion_id=DEFAULT_SUBREGION[macro],
                 population=EXPERIMENT_POPULATION_PER_REGION,
-                institution=InstitutionType.democracy,
-                tax_rate=0.1,
-                education_level=0.5,
-                religion=ReligionType.folk,
-                trade_openness=0.5,
+                institution=social["institution"],  # type: ignore[arg-type]
+                tax_rate=float(social["tax_rate"]),
+                education_level=float(social["education_level"]),
+                religion=social["religion"],  # type: ignore[arg-type]
+                trade_openness=float(social["trade_openness"]),
                 initial_values=identity,
                 trait_rate=0.1,
-                welfare_rate=0.0,
+                welfare_rate=float(social["welfare_rate"]),
             )
         )
     return out
 
 
 def region_params_for_variant(variant: str) -> list[RegionParams]:
-    if variant not in _ENV_PATCH:
+    if variant not in _EXTERNAL_PATCH:
         raise ValueError(f"unknown experiment variant: {variant}")
-    patch = _ENV_PATCH[variant]
-    inst = InstitutionType(str(patch["institution"]))
+    patch = _EXTERNAL_PATCH[variant]
     identity = baseline_identity_values()
+    social = _neutral_social_baseline()
     out: list[RegionParams] = []
     for macro in CONTINENT_IDS:
         out.append(
@@ -113,14 +98,14 @@ def region_params_for_variant(variant: str) -> list[RegionParams]:
                 id=macro,
                 subregion_id=DEFAULT_SUBREGION[macro],
                 population=EXPERIMENT_POPULATION_PER_REGION,
-                institution=inst,
-                tax_rate=float(patch["tax_rate"]),
-                education_level=0.5,
-                religion=ReligionType.folk,
-                trade_openness=float(patch["trade_openness"]),
+                institution=social["institution"],  # type: ignore[arg-type]
+                tax_rate=float(social["tax_rate"]),
+                education_level=float(social["education_level"]),
+                religion=social["religion"],  # type: ignore[arg-type]
+                trade_openness=float(social["trade_openness"]),
                 initial_values=identity,
                 trait_rate=0.1,
-                welfare_rate=float(patch["welfare_rate"]),
+                welfare_rate=float(social["welfare_rate"]),
                 resource_pool=float(patch["resource_pool"]),
                 disaster_frequency=float(patch["disaster_frequency"]),
             )
@@ -148,6 +133,17 @@ def fresh_roster_copy(seed: int) -> list[AgentState]:
     return clone_roster_for_world(get_experiment_roster(seed))
 
 
+def apply_variant_to_sim(sim: SimulationState, variant: str) -> None:
+    """Update external environment on a running experiment without resetting agents."""
+    if variant not in _EXTERNAL_PATCH:
+        raise ValueError(f"unknown experiment variant: {variant}")
+    patch = _EXTERNAL_PATCH[variant]
+    for region in sim.world.regions:
+        region.resource_pool = float(patch["resource_pool"])
+        region.disaster_frequency = float(patch["disaster_frequency"])
+    sim.experiment_variant = variant
+
+
 def describe_experiment() -> dict[str, Any]:
     total = EXPERIMENT_POPULATION_PER_REGION * len(CONTINENT_IDS)
     return {
@@ -161,20 +157,23 @@ def describe_experiment() -> dict[str, Any]:
             "initial_position",
             "initial_population",
             "seed",
+            "starting_institution_anarchy",
         ],
         "varied": [
             "resource_pool",
             "disaster_frequency",
-            "institution",
-            "tax_rate",
-            "trade_openness",
-            "welfare_rate",
+        ],
+        "emerges_in_play": [
+            "settlements",
+            "institutions",
+            "conflict",
+            "leaders",
         ],
         "variants": [
             {
                 "id": vid,
                 "label_ja": _VARIANT_LABEL_JA[vid],
-                "env": _ENV_PATCH[vid],
+                "env": _EXTERNAL_PATCH[vid],
             }
             for vid in WORLD_VARIANT_IDS
         ],
@@ -194,9 +193,6 @@ def experiment_summary(sim: SimulationState) -> dict[str, Any]:
     if sim.world.regions:
         trade_open = sum(r.trade_openness for r in sim.world.regions) / len(sim.world.regions)
 
-    resource_start = sum(
-        r.resource_pool for r in sim.world.regions
-    )  # post-tick value; initial not stored per-region
     resource_now = sum(r.resource_pool for r in sim.world.regions)
 
     archetypes: list[str] = []

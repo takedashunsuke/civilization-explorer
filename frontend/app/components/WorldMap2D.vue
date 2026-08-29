@@ -27,6 +27,7 @@ type MapSettlement = {
   id: string
   position: { x: number; y: number }
   member_ids: string[]
+  shared_wealth?: number
   leader_id?: string | null
   region_id?: string | null
   subregion_id?: string | null
@@ -63,10 +64,12 @@ const props = defineProps<{
   landform?: string
   climate?: string
   seed: number
+  selectedSettlementId?: string | null
 }>()
 
 const emit = defineEmits<{
   selectAgent: [agentId: string]
+  selectSettlement: [settlementId: string]
 }>()
 
 const { t } = useI18n()
@@ -293,18 +296,25 @@ function draw() {
       ? Math.max(0, ...pts.map(([x, y]) => Math.hypot(x - center[0], y - center[1])))
       : 0
     const minR = 26 / scale
+    const radius = Math.max(extent + 8 / scale, minR)
+    const selected = settlement.id === props.selectedSettlementId
     target.beginPath()
     if (hull.length >= 3 && extent > minR * 1.15) {
       target.moveTo(hull[0][0], hull[0][1])
       for (let i = 1; i < hull.length; i++) target.lineTo(hull[i][0], hull[i][1])
       target.closePath()
     } else {
-      target.arc(center[0], center[1], Math.max(extent + 8 / scale, minR), 0, Math.PI * 2)
+      target.arc(center[0], center[1], radius, 0, Math.PI * 2)
     }
-    target.fillStyle = hexRgba(color, 0.22)
+    target.fillStyle = hexRgba(color, selected ? 0.38 : 0.22)
     target.fill()
+    if (selected) {
+      target.strokeStyle = 'rgba(255, 255, 255, 0.95)'
+      target.lineWidth = 3.4 / scale
+      target.stroke()
+    }
     target.strokeStyle = color
-    target.lineWidth = (1.6 + Math.min(3, settlement.member_ids.length / 8)) / scale
+    target.lineWidth = ((selected ? 2.6 : 1.6) + Math.min(3, settlement.member_ids.length / 8)) / scale
     target.stroke()
   }
 
@@ -460,6 +470,72 @@ function onPointerDown(ev: PointerEvent) {
   ;(ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId)
 }
 
+function pointInPolygon(x: number, y: number, poly: Array<[number, number]>): boolean {
+  let inside = false
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i]
+    const [xj, yj] = poly[j]
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
+function settlementHitGeometry(
+  settlement: MapSettlement,
+  agentsById: Map<string, MapAgent>,
+  earth: HTMLCanvasElement,
+): { center: [number, number]; hull: Array<[number, number]>; radius: number } {
+  const pts: Array<[number, number]> = []
+  for (const id of settlement.member_ids) {
+    const agent = agentsById.get(id)
+    if (!agent?.alive) continue
+    pts.push(projectAgent(agent, earth))
+  }
+  const center: [number, number] = pts.length
+    ? [
+        pts.reduce((s, p) => s + p[0], 0) / pts.length,
+        pts.reduce((s, p) => s + p[1], 0) / pts.length,
+      ]
+    : projectOnLand(
+        settlement.position.x,
+        settlement.position.y,
+        theaterFor(settlement.subregion_id || settlement.region_id),
+        earth,
+      )
+  const extent = pts.length ? Math.max(0, ...pts.map(([x, y]) => Math.hypot(x - center[0], y - center[1]))) : 0
+  const minR = 26 / scale
+  const hull = convexHull(pts)
+  const radius = Math.max(extent + 8 / scale, minR)
+  return { center, hull, radius }
+}
+
+function findSettlementAt(clientX: number, clientY: number): MapSettlement | null {
+  const canvas = canvasRef.value
+  const earth = earthCanvas
+  if (!canvas || !earth || !props.sim) return null
+  const rect = canvas.getBoundingClientRect()
+  const { dpr } = viewSize()
+  const wx = ((clientX - rect.left) * dpr - ox) / scale
+  const wy = ((clientY - rect.top) * dpr - oy) / scale
+  const agentsById = new Map((props.sim.agents ?? []).map((a) => [a.id, a]))
+  const settlements = (props.sim.settlements ?? [])
+    .filter((s) => s.member_ids.length >= 2)
+    .sort((a, b) => b.member_ids.length - a.member_ids.length)
+  for (const settlement of settlements) {
+    const { center, hull, radius } = settlementHitGeometry(settlement, agentsById, earth)
+    const minR = 26 / scale
+    const extent = hull.length
+      ? Math.max(0, ...hull.map(([x, y]) => Math.hypot(x - center[0], y - center[1])))
+      : 0
+    if (hull.length >= 3 && extent > minR * 1.15) {
+      if (pointInPolygon(wx, wy, hull)) return settlement
+    } else if (Math.hypot(wx - center[0], wy - center[1]) <= radius + 4 / scale) {
+      return settlement
+    }
+  }
+  return null
+}
+
 function findAgentAt(clientX: number, clientY: number): MapAgent | null {
   const canvas = canvasRef.value
   const earth = earthCanvas
@@ -500,8 +576,13 @@ function onPointerUp(ev: PointerEvent) {
   if (dragStart) {
     const moved = Math.hypot(ev.clientX - dragStart.x, ev.clientY - dragStart.y)
     if (moved < 8) {
-      const hit = findAgentAt(ev.clientX, ev.clientY)
-      if (hit) emit('selectAgent', hit.id)
+      const agent = findAgentAt(ev.clientX, ev.clientY)
+      if (agent) {
+        emit('selectAgent', agent.id)
+      } else {
+        const settlement = findSettlementAt(ev.clientX, ev.clientY)
+        if (settlement) emit('selectSettlement', settlement.id)
+      }
     }
   }
   panning.value = false
