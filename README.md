@@ -112,7 +112,7 @@ OLLAMA_MODEL=llama3.2:1b
 ./scripts/run-experiment.sh           # 単発（自動で result/raw/run-NNN/）
 ```
 
-実証プロトコル: **同一 5,000 人ロスター**を 4 環境に投入し、**200 年**（20 ターン）を **seed 42〜51 で 10 回**繰り返す。暦年は AD 1750→1950 とするが**表示用ラベル**（歴史・産業は未モデル化）。
+実証プロトコル: **同一 5,000 人ロスター**を 4 環境に投入し、**200 年**を **seed 42〜51 で 10 回**繰り返す（**実測完了** · 約 415 分）。解析: `./scripts/run-analysis-batch.sh --aggregate` → [analysis/summary.md](./analysis/summary.md)
 
 **ライブ発表:** [DEMO.md](./DEMO.md) のブラウザ手順で画面を見せながら操作。
 

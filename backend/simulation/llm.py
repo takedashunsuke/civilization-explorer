@@ -473,8 +473,34 @@ def decide_batch(
     return results
 
 
-def _clamp01(value: float) -> float:
-    return max(0.0, min(1.0, float(value)))
+def _clamp01(value: float | str | int | None, default: float = 0.5) -> float:
+    """Coerce LLM output to 0..1 (handles numeric strings and labels like 'high')."""
+    if value is None:
+        return default
+    if isinstance(value, (int, float)):
+        return max(0.0, min(1.0, float(value)))
+    if isinstance(value, str):
+        s = value.strip().lower()
+        if not s:
+            return default
+        word_map = {
+            "none": 0.0,
+            "very_low": 0.1,
+            "low": 0.25,
+            "medium": 0.5,
+            "mid": 0.5,
+            "moderate": 0.5,
+            "high": 0.75,
+            "very_high": 0.9,
+            "max": 1.0,
+        }
+        if s in word_map:
+            return word_map[s]
+        try:
+            return max(0.0, min(1.0, float(s)))
+        except ValueError:
+            return default
+    return default
 
 
 def build_region_factsheet(sim: SimulationState, turn_events: list[Any] | None = None) -> list[dict[str, Any]]:

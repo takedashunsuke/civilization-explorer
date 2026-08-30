@@ -1,34 +1,55 @@
 # 実行結果サマリー（解析索引）
 
-> 実行回ごとの解析は **`analysis/output/run-NNN/`** に格納（`result/raw/run-NNN/` と同じ ID）。
+> 実証 **10 run 完了**（2026-08-30 · 約 415 分）。横断: [output/cross-run-summary-2026-08-30.md](./output/cross-run-summary-2026-08-30.md)
 
 ## 実証実験プロトコル
 
 | 項目 | 値 |
 |------|-----|
 | 暦年（ラベル） | AD **1750 → 1950**（表示用。歴史・産業は未モデル化） |
-| 年数 | **200 年** |
-| 繰り返し | seed **42 … 51**（10 run） |
-| 一括実行 | `./scripts/run-experiment-batch.sh` |
+| 年数 | **200 年**（20 ターン） |
+| 繰り返し | seed **42 … 51**（**10 run**） |
+| LLM | Ollama `llama3.2:1b` |
+| 実験 | `./scripts/run-experiment-batch.sh` |
+| 解析 | `./scripts/run-analysis-batch.sh --aggregate` |
 
-各 run は 4 環境（豊か / 乏しい / 災害多 / 標準）の対照実験。開始年は表示用、**再現性は `experiment_seed`**。
+## 横断結果（10 run 平均）
 
-## 完了済み run
+| 指標 | 豊か | 乏しい | 災害多 | 標準 |
+|------|------|--------|--------|------|
+| 生存人口 | 820 | 819 | 826 | 818 |
+| 共有資源 | **990** | **440** | 556 | 717 |
+| 争い（累計） | 90 | 99 | 94 | 89 |
+| 災害（累計） | 12 | 18 | **28** | 16 |
 
-| 実行回 | 条件 | 生ログ | 解析 |
+- **資源・災害**は環境ノブどおりに安定して差が出る
+- **人口**は 4 環境とも約 84% 減
+- **争い**は run 間のばらつきが大きい（再現性の議論ポイント）
+
+詳細: [cross-run-summary-2026-08-30.md](./output/cross-run-summary-2026-08-30.md)
+
+## 実行回一覧
+
+| 実行回 | seed | 生ログ | 解析 |
 |--------|------|--------|------|
-| **test-001** | AD 1000→1100・100年・seed 42（パイロット） | [raw/test-001/](../result/raw/test-001/) | [output/test-001/](./output/test-001/summary.md) |
+| run-001 | 42 | [raw/run-001/](../result/raw/run-001/) | [summary](./output/run-001/summary.md) |
+| run-002 | 43 | [raw/run-002/](../result/raw/run-002/) | [summary](./output/run-002/summary.md) |
+| run-003 | 44 | [raw/run-003/](../result/raw/run-003/) | [summary](./output/run-003/summary.md) |
+| run-004 | 45 | [raw/run-004/](../result/raw/run-004/) | [summary](./output/run-004/summary.md) |
+| run-005 | 46 | [raw/run-005/](../result/raw/run-005/) | [summary](./output/run-005/summary.md) |
+| run-006 | 47 | [raw/run-006/](../result/raw/run-006/) | [summary](./output/run-006/summary.md) |
+| run-007 | 48 | [raw/run-007/](../result/raw/run-007/) | [summary](./output/run-007/summary.md) |
+| run-008 | 49 | [raw/run-008/](../result/raw/run-008/) | [summary](./output/run-008/summary.md) |
+| run-009 | 50 | [raw/run-009/](../result/raw/run-009/) | [summary](./output/run-009/summary.md) |
+| run-010 | 51 | [raw/run-010/](../result/raw/run-010/) | [summary](./output/run-010/summary.md) |
+| test-001 | 42 | [raw/test-001/](../result/raw/test-001/) | [summary](./output/test-001/summary.md)（パイロット・100年） |
 
-実証 run（バッチ後）: `run-001` … `run-010`（AD 1750→1950・seed 42…51）— [result/manifest.json](../result/manifest.json) の `runs[]`
-
-## 全実行回
-
-索引: [output/manifest.json](./output/manifest.json) · 生ログ: [result/manifest.json](../result/manifest.json)
+索引: [output/manifest.json](./output/manifest.json) · [result/manifest.json](../result/manifest.json)
 
 ## 手順
 
-1. `./scripts/run-experiment-batch.sh` → `result/raw/run-NNN/` × 10（`analysis/output/run-NNN/` も自動作成）
-2. [prompt.md](./prompt.md) で LLM 比較（パスに `run-NNN` を指定）
-3. 応答・要点を `analysis/output/run-NNN/` に保存
+1. `./scripts/run-experiment-batch.sh` → 生ログ
+2. `./scripts/run-analysis-batch.sh --aggregate` → 解析
+3. （任意）`--llm` で定性 · 個体深掘りは手動または別途
 
-取得手順: [DEMO.md](../DEMO.md)
+[DEMO.md](../DEMO.md)

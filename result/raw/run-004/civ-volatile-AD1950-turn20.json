@@ -1,0 +1,63 @@
+{
+  "format": "civ-experiment-result-v1",
+  "run_id": "run-004",
+  "variant": "volatile",
+  "variant_label_ja": "災害が多い",
+  "experiment_seed": 45,
+  "start_year": 1750,
+  "years_per_turn": 10,
+  "milestone_turn": 20,
+  "milestone_years": 200,
+  "simulation_id": "2295f1ca-95e6-4ebc-b925-886716cc9139",
+  "turn": 20,
+  "calendar_year": 1950,
+  "llm": {
+    "provider": "ollama",
+    "ollama_model": "llama3.2:1b",
+    "openai_model": "gpt-4o-mini",
+    "wired": true,
+    "mode": "group",
+    "max_agents_per_turn": 4,
+    "group_sample_per_region": 12,
+    "timeout_sec": 8.0,
+    "note": "Group/institution LLM stance (≤12 actors/region); masses follow bulk rules."
+  },
+  "experiment_summary": {
+    "variant": "volatile",
+    "variant_label_ja": "災害が多い",
+    "seed": 45,
+    "turn": 20,
+    "calendar_year": 1950,
+    "population_alive": 837,
+    "population_delta_pct": -83.3,
+    "resource_pool": 566.1,
+    "trade_openness_mean": 0.5,
+    "conflicts_total": 104,
+    "cooperations_total": 6,
+    "regime_shifts": 1,
+    "disasters": 25,
+    "dominant_archetype": "warlord",
+    "archetypes": [
+      "reformer",
+      "warlord",
+      "merchant",
+      "warlord"
+    ],
+    "trajectories": [
+      "war",
+      "exodus",
+      "exodus",
+      "exodus"
+    ],
+    "institutions": [
+      "anarchy",
+      "democracy",
+      "anarchy",
+      "anarchy",
+      "anarchy"
+    ],
+    "spotlight_agent_id": "a6067",
+    "spotlight_role": "leader"
+  },
+  "report_txt": "result/raw/run-004/civ-volatile-AD1950-turn20.txt"
+}

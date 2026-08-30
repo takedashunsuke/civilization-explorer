@@ -1,0 +1,65 @@
+{
+  "format": "civ-experiment-result-v1",
+  "run_id": "run-004",
+  "variant": "balanced",
+  "variant_label_ja": "標準",
+  "experiment_seed": 45,
+  "start_year": 1750,
+  "years_per_turn": 10,
+  "milestone_turn": 20,
+  "milestone_years": 200,
+  "simulation_id": "8427672c-d41f-48a7-a973-2a1a578dbd0d",
+  "turn": 20,
+  "calendar_year": 1950,
+  "llm": {
+    "provider": "ollama",
+    "ollama_model": "llama3.2:1b",
+    "openai_model": "gpt-4o-mini",
+    "wired": true,
+    "mode": "group",
+    "max_agents_per_turn": 4,
+    "group_sample_per_region": 12,
+    "timeout_sec": 8.0,
+    "note": "Group/institution LLM stance (≤12 actors/region); masses follow bulk rules."
+  },
+  "experiment_summary": {
+    "variant": "balanced",
+    "variant_label_ja": "標準",
+    "seed": 45,
+    "turn": 20,
+    "calendar_year": 1950,
+    "population_alive": 818,
+    "population_delta_pct": -83.6,
+    "resource_pool": 743.0,
+    "trade_openness_mean": 0.5,
+    "conflicts_total": 73,
+    "cooperations_total": 0,
+    "regime_shifts": 1,
+    "disasters": 18,
+    "dominant_archetype": "warlord",
+    "archetypes": [
+      "merchant",
+      "warlord",
+      "merchant",
+      "warlord",
+      "warlord"
+    ],
+    "trajectories": [
+      "industry",
+      "war",
+      "industry",
+      "exodus",
+      "reform"
+    ],
+    "institutions": [
+      "anarchy",
+      "democracy",
+      "anarchy",
+      "anarchy",
+      "anarchy"
+    ],
+    "spotlight_agent_id": "a5929",
+    "spotlight_role": "warlord"
+  },
+  "report_txt": "result/raw/run-004/civ-balanced-AD1950-turn20.txt"
+}

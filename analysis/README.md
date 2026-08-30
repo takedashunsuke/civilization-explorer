@@ -20,10 +20,10 @@ analysis/
 
 ## 手順
 
-1. `./scripts/run-experiment.sh` → `result/raw/run-NNN/` + `analysis/output/run-NNN/` 作成
-2. `prompt.md` を LLM に渡す（入力: その run の 4 本 `.json`）
-3. 応答を `analysis/output/run-NNN/llm-response-*.md` に保存
-4. 要点を `analysis/output/run-NNN/summary.md` に整理
+1. `./scripts/run-experiment-batch.sh` → `result/raw/run-NNN/`（実験）
+2. **一括解析（推奨）:** `./scripts/run-analysis-batch.sh` → 各 run に `comparison-*.md` + `summary.md`
+3. 定性が必要なら `./scripts/run-analysis-batch.sh --llm`（Ollama・時間がかかる）
+4. 手動の場合: [prompt.md](./prompt.md) を LLM に渡し、`analysis/output/run-NNN/` に保存
 
 ## 数値の正
 

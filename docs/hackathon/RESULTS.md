@@ -9,7 +9,7 @@
 > | 解析プロンプト | [analysis/prompt.md](../../analysis/prompt.md) |
 > | 解析索引 | [analysis/summary.md](../../analysis/summary.md) → `output/run-NNN/` |
 
-デモ後は `./scripts/run-experiment-batch.sh`（AD 1750→1950・200年×10 seed）で生ログを揃え、要点を `analysis/output/run-NNN/summary.md` に記入してください。  
+デモ後は `./scripts/run-experiment-batch.sh` で生ログを揃え、`./scripts/run-analysis-batch.sh --aggregate` で解析。要点は [analysis/summary.md](../../analysis/summary.md) と [cross-run-summary](../../analysis/output/cross-run-summary-2026-08-30.md)。  
 設計: [demo-v3.md](./demo-v3.md)
 
 ---

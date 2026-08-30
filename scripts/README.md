@@ -15,9 +15,24 @@ chmod +x scripts/*.sh   # 初回のみ
 | 暦年 | AD **1750 → 1950**（表示用ラベル・200 年） |
 | 繰り返し | **10 回**（seed 42 … 51） |
 | 出力 | `result/raw/run-NNN/`（自動採番）+ `analysis/output/run-NNN/` |
-| 目安時間 | **約 4〜5 時間**（Ollama `llama3.2:1b`） |
+| 目安時間 | **約 415 分**（実測・10 run 完了） |
 
 `--dry-run` で実行コマンドのみ表示。
+
+## 一括解析（実験完了後）
+
+```bash
+./scripts/run-analysis-batch.sh              # 定量 comparison + summary（全完了 run）
+./scripts/run-analysis-batch.sh --aggregate  # 上記 + 横断サマリー
+./scripts/run-analysis-batch.sh --llm        # Ollama で定性も生成（任意・遅い）
+./scripts/run-analysis-batch.sh --from-run 3 # run-003 以降だけ
+```
+
+| モード | 出力 |
+|--------|------|
+| 既定 | `analysis/output/run-NNN/comparison-*.md` + `summary.md` |
+| `--llm` | 上記 + `llm-response-*.md` |
+| `--aggregate` | `analysis/output/cross-run-summary-*.md` |
 
 ## 単発実行
 

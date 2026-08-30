@@ -1,0 +1,64 @@
+{
+  "format": "civ-experiment-result-v1",
+  "run_id": "run-001",
+  "variant": "lush",
+  "variant_label_ja": "豊かな自然",
+  "experiment_seed": 42,
+  "start_year": 1750,
+  "years_per_turn": 10,
+  "milestone_turn": 20,
+  "milestone_years": 200,
+  "simulation_id": "0f9af3c7-cf77-490a-9201-c29a8816214c",
+  "turn": 20,
+  "calendar_year": 1950,
+  "llm": {
+    "provider": "ollama",
+    "ollama_model": "llama3.2:1b",
+    "openai_model": "gpt-4o-mini",
+    "wired": true,
+    "mode": "group",
+    "max_agents_per_turn": 4,
+    "group_sample_per_region": 12,
+    "timeout_sec": 8.0,
+    "note": "Group/institution LLM stance (≤12 actors/region); masses follow bulk rules."
+  },
+  "experiment_summary": {
+    "variant": "lush",
+    "variant_label_ja": "豊かな自然",
+    "seed": 42,
+    "turn": 20,
+    "calendar_year": 1950,
+    "population_alive": 807,
+    "population_delta_pct": -83.9,
+    "resource_pool": 964.3,
+    "trade_openness_mean": 0.5,
+    "conflicts_total": 78,
+    "cooperations_total": 24,
+    "regime_shifts": 2,
+    "disasters": 12,
+    "dominant_archetype": "warlord",
+    "archetypes": [
+      "warlord",
+      "merchant",
+      "warlord",
+      "warlord"
+    ],
+    "trajectories": [
+      "exodus",
+      "industry",
+      "exodus",
+      "faith",
+      "exodus"
+    ],
+    "institutions": [
+      "anarchy",
+      "democracy",
+      "anarchy",
+      "democracy",
+      "anarchy"
+    ],
+    "spotlight_agent_id": "a6261",
+    "spotlight_role": "warlord"
+  },
+  "report_txt": "result/raw/run-001/civ-lush-AD1950-turn20.txt"
+}

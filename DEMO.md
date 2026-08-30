@@ -11,12 +11,16 @@
 | シミュレーション年数 | **200 年**（20 ターン） |
 | 繰り返し | **10 回**（`experiment_seed` 42 … 51） |
 | 各 run | 4 環境 × `.json` + `.txt` → `result/raw/run-NNN/` |
+| **実測（2026-08-30）** | **10 run 完了**（合計 **約 415 分**） |
+| 解析 | `./scripts/run-analysis-batch.sh --aggregate` |
+| 横断サマリー | [analysis/output/cross-run-summary-2026-08-30.md](./analysis/output/cross-run-summary-2026-08-30.md) |
 
 開始年はレポートとファイル名の**暦年ラベル**のみ。産業革命・戦争・時代制度などの歴史背景はシミュレーションに含まれない（力学は `experiment_seed` と環境パターンで決まる）。
 
 ```bash
 ./scripts/setup.sh                  # 初回のみ
-./scripts/run-experiment-batch.sh   # 上記 10 run を一括（目安 約 4〜5 時間・Ollama）
+./scripts/run-experiment-batch.sh   # 10 run 一括（実測: 約 415 分）
+./scripts/run-analysis-batch.sh --aggregate   # 解析（定量 + 横断表）
 ```
 
 出力例: `civ-lush-AD1950-turn20.json`（各 run フォルダに 4 本 × 2 形式）
@@ -157,4 +161,4 @@ Backend / Frontend を起動:
 | 実行スクリプト | [scripts/](./scripts/) |
 | 生ログ | [result/raw/](./result/raw/) |
 | LLM プロンプト | [analysis/prompt.md](./analysis/prompt.md) |
-| 解析索引 / サマリー | [analysis/summary.md](./analysis/summary.md) · [analysis/output/run-NNN/](./analysis/output/) |
+| 解析索引 / 横断 | [analysis/summary.md](./analysis/summary.md) · [cross-run-summary](./analysis/output/cross-run-summary-2026-08-30.md) |

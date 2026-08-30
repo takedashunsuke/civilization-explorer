@@ -13,9 +13,17 @@ SEED_START=42
 REPS=10
 
 DRY_RUN=0
-if [[ "${1:-}" == "--dry-run" ]]; then
-  DRY_RUN=1
-  shift
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --from-seed) SEED_START="$2"; shift 2 ;;
+    *) echo "Unknown option: $1" >&2; exit 1 ;;
+  esac
+done
+
+# Remaining reps when resuming mid-batch
+if [[ "$SEED_START" -gt 42 ]]; then
+  REPS=$((51 - SEED_START + 1))
 fi
 
 END_YEAR=$((START_YEAR + YEARS))
@@ -59,4 +67,4 @@ total_elapsed=$(( $(date +%s) - batch_start ))
 echo "=== 完了 ==="
 echo "  合計: $((total_elapsed / 60)) 分 $((total_elapsed % 60)) 秒"
 echo "  生ログ: $ROOT/result/raw/（manifest: result/manifest.json）"
-echo "  次: analysis/prompt.md で各 run を比較 → analysis/output/run-NNN/"
+echo "  次: ./scripts/run-analysis-batch.sh --aggregate"
