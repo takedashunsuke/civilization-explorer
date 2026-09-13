@@ -1,6 +1,7 @@
 # 概要（ハッカソン用）
 
-> 30 秒ピッチ用。デモ設計の詳細は [demo-v3.md](./demo-v3.md)、経緯は [review.md](./review.md)。
+> 30 秒ピッチ用。デモ設計の詳細は [demo-v3.md](./demo-v3.md)、経緯は [review.md](./review.md)。  
+> 入賞講評と次の方向（レジリエンス）: [post-award.md](./post-award.md)。
 
 ## 一言ピッチ
 

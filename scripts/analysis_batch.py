@@ -18,6 +18,14 @@ VARIANT_LABEL_JA = {
     "balanced": "標準",
 }
 
+RESILIENCE_VARIANT_ORDER = ("civic", "autocrat", "commune", "fracture")
+RESILIENCE_VARIANT_LABEL_JA = {
+    "civic": "民主・協調",
+    "autocrat": "専制・秩序",
+    "commune": "高福祉・共同",
+    "fracture": "無政府・分断",
+}
+
 SUMMARY_ROWS: list[tuple[str, str, str]] = [
     ("population_alive", "生存人口", "d"),
     ("population_delta_pct", "人口変化 %", "pct"),
@@ -28,6 +36,19 @@ SUMMARY_ROWS: list[tuple[str, str, str]] = [
     ("regime_shifts", "体制転換（累計）", "d"),
     ("disasters", "災害（累計）", "d"),
     ("dominant_archetype", "台頭タイプ（代表）", "s"),
+]
+
+# Phase B resilience rows (shown under a dedicated section)
+RESILIENCE_ROWS: list[tuple[str, str, str]] = [
+    ("shock_count", "ショック数", "d"),
+    ("disaster_deaths", "災害死", "d"),
+    ("pop_trough", "人口最下点", "d"),
+    ("pop_recovery_ratio", "人口回復率", "f1"),
+    ("pop_retention_ratio", "人口保持率", "f1"),
+    ("resource_recovery_halftime", "資源半減回復ターン", "d"),
+    ("regime_break", "制度破綻", "s"),
+    ("coop_vs_conflict_post_shock", "ショック後 協力比", "f1"),
+    ("resilience_label", "レジリエンスラベル", "s"),
 ]
 
 
@@ -52,6 +73,16 @@ def complete_run_entries(manifest: dict[str, Any]) -> list[dict[str, Any]]:
     return sorted(out, key=lambda r: r.get("id", ""))
 
 
+def resolve_variant_layout(payloads: dict[str, dict[str, Any]]) -> tuple[tuple[str, ...], dict[str, str], list[str]]:
+    """Pick environment vs resilience column set from available payloads."""
+    keys = set(payloads)
+    if keys >= set(RESILIENCE_VARIANT_ORDER):
+        headers = [RESILIENCE_VARIANT_LABEL_JA[v] for v in RESILIENCE_VARIANT_ORDER]
+        return RESILIENCE_VARIANT_ORDER, RESILIENCE_VARIANT_LABEL_JA, headers
+    headers = [VARIANT_LABEL_JA[v] for v in VARIANT_ORDER]
+    return VARIANT_ORDER, VARIANT_LABEL_JA, headers
+
+
 def run_json_paths(repo_root: Path, run: dict[str, Any]) -> dict[str, Path]:
     by_variant: dict[str, Path] = {}
     for entry in run.get("files", []):
@@ -61,18 +92,21 @@ def run_json_paths(repo_root: Path, run: dict[str, Any]) -> dict[str, Path]:
         vid = entry.get("variant")
         if jp and vid:
             by_variant[vid] = repo_root / jp
-    missing = [v for v in VARIANT_ORDER if v not in by_variant]
+    if set(by_variant) >= set(RESILIENCE_VARIANT_ORDER):
+        order = RESILIENCE_VARIANT_ORDER
+    else:
+        order = VARIANT_ORDER
+    missing = [v for v in order if v not in by_variant]
     if missing:
         raise FileNotFoundError(f"{run.get('id')}: missing variants {missing}")
-    return by_variant
+    return {vid: by_variant[vid] for vid in order}
 
 
 def load_run_payloads(repo_root: Path, run: dict[str, Any]) -> dict[str, dict[str, Any]]:
     paths = run_json_paths(repo_root, run)
     payloads: dict[str, dict[str, Any]] = {}
-    for vid in VARIANT_ORDER:
-        data = load_json(paths[vid])
-        payloads[vid] = data
+    for vid, path in paths.items():
+        payloads[vid] = load_json(path)
     return payloads
 
 
@@ -117,35 +151,63 @@ def build_comparison_markdown(
     analysis_date: str,
     llm_note: str | None = None,
 ) -> str:
-    summaries = {vid: payloads[vid]["experiment_summary"] for vid in VARIANT_ORDER}
-    meta = payloads[VARIANT_ORDER[0]]
-    seed = meta.get("experiment_seed") or summaries["lush"].get("seed")
+    order, _labels, headers = resolve_variant_layout(payloads)
+    summaries = {vid: payloads[vid]["experiment_summary"] for vid in order}
+    meta = payloads[order[0]]
+    seed = meta.get("experiment_seed") or summaries[order[0]].get("seed")
     start_year = meta.get("start_year")
     end_year = meta.get("calendar_year")
     years = meta.get("milestone_years")
     llm = meta.get("llm") or {}
+    protocol = meta.get("protocol") or summaries[order[0]].get("protocol") or "environment"
     result_path = run.get("path", f"result/raw/{run_id}")
+
+    header_row = "| 指標 | " + " | ".join(headers) + " |"
+    sep_row = "|------|" + "|".join(["------"] * len(headers)) + "|"
 
     lines = [
         f"# 4 世界比較 — {analysis_date}",
         "",
         f"根拠: `{result_path}/civ-*-AD{end_year}-turn*.json` の `experiment_summary`",
-        f"（seed {seed}・{years} 年・AD {start_year}→{end_year}"
-        + (f"・{llm.get('provider')}" if llm.get("provider") else "")
+        f"（protocol={protocol} · seed {seed}·{years} 年・AD {start_year}→{end_year}"
+        + (f"·{llm.get('provider')}" if llm.get("provider") else "")
         + "）",
         "",
     ]
     if llm_note:
         lines.extend([f"> {llm_note}", ""])
 
-    lines.extend(["## 1. 定量比較表", "", "| 指標 | 豊か | 乏しい | 災害多 | 標準 |", "|------|------|--------|--------|------|"])
+    lines.extend(["## 1. 定量比較表", "", header_row, sep_row])
 
     for key, label, kind in SUMMARY_ROWS:
-        cells = [_fmt_cell(summaries[vid].get(key), kind) for vid in VARIANT_ORDER]
+        cells = [_fmt_cell(summaries[vid].get(key), kind) for vid in order]
         cells = _bold_extremes(cells, kind)
         lines.append("| " + " | ".join([label, *cells]) + " |")
 
     lines.extend([
+        "",
+        "## 1b. レジリエンス（回復／崩壊）",
+        "",
+        header_row,
+        sep_row,
+    ])
+    for key, label, kind in RESILIENCE_ROWS:
+        raw = []
+        for vid in order:
+            val = summaries[vid].get(key)
+            if isinstance(val, bool):
+                val = "yes" if val else "no"
+            raw.append(_fmt_cell(val, kind))
+        if kind != "s":
+            raw = _bold_extremes(raw, kind)
+        lines.append("| " + " | ".join([label, *raw]) + " |")
+
+    lines.extend([
+        "",
+        "読み方: `pop_recovery_ratio` はショック前→最下点の落差に対する期末の戻り率。"
+        " 単調減少では 0 になりやすいので、併せて `pop_retention_ratio`（期末/ショック前）を見る。"
+        " `resource_recovery_halftime` はショック前資源の 50% を一度割ったあと戻るまでのターン（割っていなければ —）。"
+        " `resilience_label` は recovered / stressed / collapsed の簡易ラベル。",
         "",
         "## 2. 以降（定性）",
         "",
@@ -165,13 +227,17 @@ def build_summary_markdown(
     comparison_name: str,
     analysis_date: str,
 ) -> str:
-    meta = payloads[VARIANT_ORDER[0]]
+    order, _labels, headers = resolve_variant_layout(payloads)
+    meta = payloads[order[0]]
     seed = meta.get("experiment_seed")
     start_year = meta.get("start_year")
     end_year = meta.get("calendar_year")
     years = meta.get("milestone_years")
+    protocol = meta.get("protocol") or payloads[order[0]]["experiment_summary"].get("protocol") or "environment"
     result_path = run.get("path", f"result/raw/{run_id}")
     llm = meta.get("llm") or {}
+    header_row = "| 指標 | " + " | ".join(headers) + " |"
+    sep_row = "|------|" + "|".join(["------"] * len(headers)) + "|"
 
     lines = [
         f"# 実行結果サマリー — {run_id}",
@@ -187,6 +253,7 @@ def build_summary_markdown(
         "",
         "| 項目 | 値 |",
         "|------|-----|",
+        f"| protocol | {protocol} |",
         f"| experiment_seed | {seed} |",
         f"| 年数 | {years} 年（暦年ラベル AD {start_year}→{end_year}） |",
         f"| LLM（実験時） | {llm.get('provider', '—')}"
@@ -197,13 +264,13 @@ def build_summary_markdown(
         "",
         "記入元: `experiment_summary`（詳細は comparison を参照）",
         "",
-        "| 指標 | 豊か | 乏しい | 災害多 | 標準 |",
-        "|------|------|--------|--------|------|",
+        header_row,
+        sep_row,
     ]
 
-    summaries = {vid: payloads[vid]["experiment_summary"] for vid in VARIANT_ORDER}
+    summaries = {vid: payloads[vid]["experiment_summary"] for vid in order}
     for key, label, kind in SUMMARY_ROWS[:6]:
-        cells = [_fmt_cell(summaries[vid].get(key), kind) for vid in VARIANT_ORDER]
+        cells = [_fmt_cell(summaries[vid].get(key), kind) for vid in order]
         lines.append("| " + " | ".join([label, *cells]) + " |")
 
     lines.extend([
@@ -226,15 +293,16 @@ def extract_prompt_template(repo_root: Path) -> str:
 
 def build_llm_user_message(repo_root: Path, run: dict[str, Any], payloads: dict[str, dict[str, Any]]) -> str:
     template = extract_prompt_template(repo_root)
+    order, labels, _headers = resolve_variant_layout(payloads)
     compact = {
         vid: {
-            "variant_label_ja": VARIANT_LABEL_JA[vid],
+            "variant_label_ja": labels.get(vid, vid),
             "experiment_summary": payloads[vid]["experiment_summary"],
             "start_year": payloads[vid].get("start_year"),
             "calendar_year": payloads[vid].get("calendar_year"),
             "milestone_years": payloads[vid].get("milestone_years"),
         }
-        for vid in VARIANT_ORDER
+        for vid in order
     }
     return (
         f"{template}\n\n"
@@ -314,13 +382,15 @@ def build_cross_run_markdown(
         "",
         f"対象: {len(runs)} run（`result/manifest.json` の完了分）",
         "",
-        "## 争い（累計）— 災害多 − 乏しい",
+        "## 争い（累計）— 災害多 − 乏しい（environment protocol）",
         "",
         "| run | seed | 豊か | 乏しい | 災害多 | 標準 | Δ(災害多−乏しい) |",
         "|-----|------|------|--------|--------|------|------------------|",
     ]
     for run in runs:
         payloads = load_run_payloads(repo_root, run)
+        if "lush" not in payloads:
+            continue
         seed = payloads["lush"].get("experiment_seed")
         vals = {
             vid: int(payloads[vid]["experiment_summary"]["conflicts_total"])

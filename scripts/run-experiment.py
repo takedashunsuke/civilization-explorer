@@ -34,11 +34,16 @@ from experiment_runs import (  # noqa: E402
 
 from simulation import create_simulation, tick  # noqa: E402
 from simulation.experiment import (  # noqa: E402
+    ALL_VARIANT_IDS,
     EXPERIMENT_SEED,
-    WORLD_VARIANT_IDS,
-    _VARIANT_LABEL_JA,
+    PROTOCOL_ENVIRONMENT,
+    PROTOCOL_RESILIENCE,
     experiment_summary,
     fresh_roster_copy,
+    prepare_experiment_sim,
+    protocol_for_variant,
+    variant_ids_for_protocol,
+    variant_label_ja,
     world_params_for_variant,
 )
 from config import get_settings  # noqa: E402
@@ -93,7 +98,10 @@ def build_report(sim: SimulationState, summary: dict, *, run_id: str | None = No
     lines.append(_line("シミュレーション ID", sim.id))
     lines.append(_line("シード", sim.world.seed))
     lines.append(_line("対照実験", "yes"))
-    lines.append(_line("環境パターン", _VARIANT_LABEL_JA.get(sim.experiment_variant or "", sim.experiment_variant)))
+    lines.append(_line("環境パターン", variant_label_ja(sim.experiment_variant or "")))
+    lines.append(_line("プロトコル", sim.experiment_protocol or "—"))
+    if sim.shock_pulse_turns:
+        lines.append(_line("強制ショック turn", ",".join(str(t) for t in sim.shock_pulse_turns)))
     lines.append(_line("実験シード", sim.experiment_seed))
     if run_id:
         lines.append(_line("実行回", run_id))
@@ -217,9 +225,15 @@ def update_manifest(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run controlled experiment without browser")
     parser.add_argument(
+        "--protocol",
+        choices=[PROTOCOL_ENVIRONMENT, PROTOCOL_RESILIENCE],
+        default=PROTOCOL_ENVIRONMENT,
+        help="environment=資源・災害ノブ / resilience=同一ショック×社会構造 (Phase C)",
+    )
+    parser.add_argument(
         "--variant",
-        choices=list(WORLD_VARIANT_IDS),
-        help="Run a single variant (default: all four)",
+        choices=list(ALL_VARIANT_IDS),
+        help="Run a single variant (default: all variants for the protocol)",
     )
     duration = parser.add_mutually_exclusive_group()
     duration.add_argument(
@@ -264,7 +278,15 @@ def main() -> int:
     if turns <= 0:
         parser.error("--turns must be positive")
 
-    variants = [args.variant] if args.variant else list(WORLD_VARIANT_IDS)
+    if args.variant:
+        variants = [args.variant]
+        try:
+            protocol = protocol_for_variant(args.variant)
+        except ValueError:
+            protocol = args.protocol
+    else:
+        protocol = args.protocol
+        variants = list(variant_ids_for_protocol(protocol))
     raw_root = ROOT / "result" / "raw"
     if args.out_dir is not None:
         out_dir = args.out_dir
@@ -277,7 +299,7 @@ def main() -> int:
     milestone_years = turns * years_per_turn
     end_year = args.start_year + milestone_years
     print(
-        f"Controlled experiment — seed={args.seed}, "
+        f"Controlled experiment [{protocol}] — seed={args.seed}, "
         f"AD {args.start_year} → AD {end_year} ({milestone_years} years, {turns} turns), "
         f"LLM={llm.get('provider')} (wired={llm.get('wired')})",
     )
@@ -288,15 +310,12 @@ def main() -> int:
     records: list[dict] = []
 
     for variant in variants:
-        print(f"  → {variant} ({_VARIANT_LABEL_JA.get(variant, variant)}) ...", flush=True)
+        print(f"  → {variant} ({variant_label_ja(variant)}) ...", flush=True)
         params = world_params_for_variant(variant, args.seed, args.start_year)
         roster = fresh_roster_copy(args.seed)
         sim_id = str(uuid.uuid4())
         sim = create_simulation(sim_id, params, agent_roster=roster)
-        sim.controlled_experiment = True
-        sim.experiment_variant = variant
-        sim.experiment_seed = args.seed
-        sim.status = "running"
+        prepare_experiment_sim(sim, variant=variant, seed=args.seed, total_turns=turns)
         tick(sim, n=turns)
         summary = experiment_summary(sim)
         report = build_report(sim, summary, run_id=run_id)
@@ -308,8 +327,9 @@ def main() -> int:
         json_payload = {
             "format": "civ-experiment-result-v1",
             "run_id": run_id,
+            "protocol": protocol,
             "variant": variant,
-            "variant_label_ja": _VARIANT_LABEL_JA.get(variant, variant),
+            "variant_label_ja": variant_label_ja(variant),
             "experiment_seed": args.seed,
             "start_year": args.start_year,
             "years_per_turn": years_per_turn,
@@ -318,6 +338,7 @@ def main() -> int:
             "simulation_id": sim_id,
             "turn": sim.world.turn,
             "calendar_year": _calendar_year(sim),
+            "shock_pulse_turns": list(sim.shock_pulse_turns or []),
             "llm": llm,
             "experiment_summary": summary,
             "report_txt": f"{run_rel}/{filename}",

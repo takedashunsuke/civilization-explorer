@@ -157,6 +157,8 @@ class AgentState(BaseModel):
     age: int = 20
     region_id: str | None = None
     subregion_id: str | None = None
+    # Recent disaster / shock pressure (0–1). Raises mortality until it decays.
+    shock_stress: float = Field(default=0.0, ge=0, le=1)
 
 
 class RelationshipState(BaseModel):
@@ -207,6 +209,7 @@ class WorldState(BaseModel):
     seed: int
     initial_population: int = 8
     initial_total_wealth: float = 0.0
+    initial_resource_pool: float = 0.0
     population_cap: int
     resource_pool: float
     education_level: float
@@ -298,6 +301,11 @@ class HistoryRecord(BaseModel):
     turn: int
     summary: str
     metrics: MetricsSnapshot
+    # Phase B resilience series (optional for older payloads)
+    population_alive: int | None = None
+    resource_pool: float | None = None
+    mean_authority: float | None = None
+    disaster_events: int = 0
 
 
 class ChosenAction(BaseModel):
@@ -315,6 +323,10 @@ class SimulationState(BaseModel):
     controlled_experiment: bool = False
     experiment_variant: str | None = None
     experiment_seed: int | None = None
+    # environment = resource/disaster knobs; resilience = same shock × social structure
+    experiment_protocol: str | None = None
+    # Forced crisis turns (identical across resilience variants)
+    shock_pulse_turns: list[int] = Field(default_factory=list)
     world: WorldState
     agents: list[AgentState]
     relationships: list[RelationshipState]
