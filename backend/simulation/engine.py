@@ -1843,6 +1843,74 @@ def apply_disasters(sim: SimulationState, rng: random.Random, skip_quake: set[st
     return events
 
 
+def apply_pulse_shock(sim: SimulationState, rng: random.Random) -> list[EventRecord]:
+    """Forced multi-region crisis used by the resilience protocol (identical schedule)."""
+    events: list[EventRecord] = []
+    targets = sim.world.regions or []
+    for region in targets:
+        hit = agents_in_region(sim, region)
+        if not hit:
+            continue
+        if len(hit) > 4:
+            hit = rng.sample(hit, max(4, len(hit) // 2))
+        killed = 0
+        living_count = len(agents_in_region(sim, region))
+        stress_bump = 0.45
+        kill_rate = 0.08
+        loss = 0.0
+        for agent in hit:
+            if not agent.alive:
+                continue
+            agent.wealth = max(0.0, agent.wealth - 2.4)
+            agent.energy = clamp(agent.energy - 0.14)
+            agent.happiness = clamp(agent.happiness - 0.1)
+            agent.shock_stress = clamp(agent.shock_stress + stress_bump)
+            loss += 2.4
+            if living_count <= MIN_ALIVE_PER_REGION:
+                continue
+            if rng.random() < kill_rate:
+                living_here = [a for a in agents_in_region(sim, region) if a.alive]
+                heir = _pick_heir(agent, living_here)
+                agent.alive = False
+                agent.energy = 0.0
+                sim.relationships = [
+                    rel for rel in sim.relationships if rel.a_id != agent.id and rel.b_id != agent.id
+                ]
+                events.append(
+                    EventRecord(
+                        turn=sim.world.turn,
+                        actor_id=agent.id,
+                        action=ActionType.death,
+                        target_id=heir.id if heir else None,
+                        success=False,
+                        detail_key="death_disaster",
+                        detail=f"{agent.id} died in crisis pulse",
+                        deltas={"age": float(agent.age)},
+                    )
+                )
+                killed += 1
+                living_count -= 1
+        region.resource_pool = max(0.0, region.resource_pool - 18.0)
+        sid = region.subregion_id or region.id.value
+        lon, lat = SUBREGION_CENTERS.get(sid, (0.0, 0.0))
+        events.append(
+            EventRecord(
+                turn=sim.world.turn,
+                actor_id=sid,
+                action=ActionType.disaster,
+                detail_key="disaster_pulse",
+                detail=f"crisis pulse hit {len(hit)} agents in {sid}"
+                + (f" ({killed} killed)" if killed else ""),
+                deltas={"n": float(len(hit)), "loss": loss, "killed": float(killed)},
+                lon=lon,
+                lat=lat,
+                alert="red",
+                extra={"kind": "pulse"},
+            )
+        )
+    return events
+
+
 def apply_regime_drift(sim: SimulationState, rng: random.Random) -> list[EventRecord]:
     events: list[EventRecord] = []
     for region in sim.world.regions:
@@ -1919,11 +1987,16 @@ def end_of_turn(
         if event.extra.get("decide") == "llm" and event.action != ActionType.wait
     ]
     grouped = summarize_group_events(sim, micro_events or [], specials, snapshot)
+    # Shock stream is independent of action RNG so social variants share the same crisis schedule.
+    shock_rng = random.Random((sim.world.seed * 100003 + sim.world.turn * 9176 + 42) % (2**32))
     historic = apply_historic_quakes(sim)
-    epidemics = apply_epidemics(sim, rng)
-    weather = apply_weather_shocks(sim, rng)
+    epidemics = apply_epidemics(sim, shock_rng)
+    weather = apply_weather_shocks(sim, shock_rng)
     skip_quake = {e.actor_id for e in historic}
-    disasters = apply_disasters(sim, rng, skip_quake)
+    disasters = apply_disasters(sim, shock_rng, skip_quake)
+    pulse: list[EventRecord] = []
+    if sim.world.turn in set(sim.shock_pulse_turns or []):
+        pulse = apply_pulse_shock(sim, shock_rng)
     regimes = apply_regime_drift(sim, rng)
     if sim.world.regions:
         for region in sim.world.regions:
@@ -1979,7 +2052,7 @@ def end_of_turn(
         sim.world.institution_runtime.authority = clamp(sim.world.institution_runtime.authority)
     apply_welfare(sim)
     metrics = compute_metrics(sim, cooperate_successes, action_count, micro_events or [])
-    observe_input = (micro_events or []) + historic + epidemics + weather + disasters + regimes + specials
+    observe_input = (micro_events or []) + historic + epidemics + weather + disasters + pulse + regimes + specials
     # One LLM pass per region: semantic reading + next-turn group/institution stance.
     readings, policies, world_summary = observe_and_steer_regions(sim, observe_input)
     metrics = apply_region_readings_to_metrics(metrics, readings, world_summary)
@@ -2000,6 +2073,7 @@ def end_of_turn(
         + epidemics
         + weather
         + disasters
+        + pulse
         + regimes
     )
     turn = sim.world.turn

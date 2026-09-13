@@ -1,4 +1,4 @@
-"""Controlled experiment: identical agent roster; vary shared resource pool and disasters only."""
+"""Controlled experiments: environment knobs (Phase A/B) and resilience protocol (Phase C)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,12 @@ from simulation.models import (
 EXPERIMENT_SEED = 42
 EXPERIMENT_POPULATION_PER_REGION = 1000
 
+PROTOCOL_ENVIRONMENT = "environment"
+PROTOCOL_RESILIENCE = "resilience"
+
 WORLD_VARIANT_IDS: tuple[str, ...] = ("lush", "lean", "volatile", "balanced")
+RESILIENCE_VARIANT_IDS: tuple[str, ...] = ("civic", "autocrat", "commune", "fracture")
+ALL_VARIANT_IDS: tuple[str, ...] = WORLD_VARIANT_IDS + RESILIENCE_VARIANT_IDS
 
 # External environment only — institutions, tax, trade, welfare start neutral and may emerge.
 _EXTERNAL_PATCH: dict[str, dict[str, float]] = {
@@ -30,14 +35,115 @@ _EXTERNAL_PATCH: dict[str, dict[str, float]] = {
     "balanced": {"resource_pool": 95.0, "disaster_frequency": 0.16},
 }
 
+# Shared crisis environment for resilience protocol (same shock column across social variants).
+_RESILIENCE_ENV: dict[str, float] = {
+    "resource_pool": 85.0,
+    "disaster_frequency": 0.35,
+}
+
 _VARIANT_LABEL_JA: dict[str, str] = {
     "lush": "豊かな自然",
     "lean": "資源乏しい",
     "volatile": "災害が多い",
     "balanced": "標準",
+    "civic": "民主・協調",
+    "autocrat": "専制・秩序",
+    "commune": "高福祉・共同",
+    "fracture": "無政府・分断",
+}
+
+# Social structure knobs for Phase C (environment fixed to _RESILIENCE_ENV).
+_RESILIENCE_SOCIAL: dict[str, dict[str, Any]] = {
+    "civic": {
+        "institution": InstitutionType.democracy,
+        "tax_rate": 0.12,
+        "education_level": 0.55,
+        "religion": ReligionType.secular,
+        "trade_openness": 0.55,
+        "welfare_rate": 0.16,
+        "initial_values": InitialValues(
+            cooperation=0.72,
+            authority_acceptance=0.58,
+            ambition=0.45,
+            inequality=0.32,
+        ),
+    },
+    "autocrat": {
+        "institution": InstitutionType.autocracy,
+        "tax_rate": 0.18,
+        "education_level": 0.5,
+        "religion": ReligionType.organized,
+        "trade_openness": 0.4,
+        "welfare_rate": 0.06,
+        "initial_values": InitialValues(
+            cooperation=0.38,
+            authority_acceptance=0.82,
+            ambition=0.55,
+            inequality=0.55,
+        ),
+    },
+    "commune": {
+        "institution": InstitutionType.democracy,
+        "tax_rate": 0.22,
+        "education_level": 0.52,
+        "religion": ReligionType.folk,
+        "trade_openness": 0.45,
+        "welfare_rate": 0.28,
+        "initial_values": InitialValues(
+            cooperation=0.8,
+            authority_acceptance=0.5,
+            ambition=0.4,
+            inequality=0.22,
+        ),
+    },
+    "fracture": {
+        "institution": InstitutionType.anarchy,
+        "tax_rate": 0.02,
+        "education_level": 0.45,
+        "religion": ReligionType.folk,
+        "trade_openness": 0.35,
+        "welfare_rate": 0.0,
+        "initial_values": InitialValues(
+            cooperation=0.25,
+            authority_acceptance=0.22,
+            ambition=0.72,
+            inequality=0.7,
+        ),
+    },
 }
 
 _ROSTER_CACHE: dict[int, list[AgentState]] = {}
+
+
+def variant_label_ja(variant: str) -> str:
+    return _VARIANT_LABEL_JA.get(variant, variant)
+
+
+def protocol_for_variant(variant: str) -> str:
+    if variant in RESILIENCE_VARIANT_IDS:
+        return PROTOCOL_RESILIENCE
+    if variant in WORLD_VARIANT_IDS:
+        return PROTOCOL_ENVIRONMENT
+    raise ValueError(f"unknown experiment variant: {variant}")
+
+
+def variant_ids_for_protocol(protocol: str) -> tuple[str, ...]:
+    p = (protocol or PROTOCOL_ENVIRONMENT).strip().lower()
+    if p == PROTOCOL_RESILIENCE:
+        return RESILIENCE_VARIANT_IDS
+    if p == PROTOCOL_ENVIRONMENT:
+        return WORLD_VARIANT_IDS
+    raise ValueError(f"unknown protocol: {protocol}")
+
+
+def resilience_pulse_turns(total_turns: int) -> list[int]:
+    """Identical forced-crisis turns for the resilience protocol."""
+    n = max(1, int(total_turns))
+    if n <= 10:
+        pulses = (2, 5, 8)
+    else:
+        pulses = (max(1, int(n * 0.2)), max(2, int(n * 0.5)), max(3, int(n * 0.8)))
+    return sorted({t for t in pulses if 0 <= t < n})
 
 
 def baseline_identity_values() -> InitialValues:
@@ -59,6 +165,22 @@ def _neutral_social_baseline() -> dict[str, float | InstitutionType | ReligionTy
         "trade_openness": 0.5,
         "welfare_rate": 0.0,
     }
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, float(value)))
+
+
+def bias_roster_to_identity(agents: list[AgentState], identity: InitialValues) -> None:
+    """Shift personalities toward a social bias while keeping relative differences."""
+    for agent in agents:
+        if not agent.alive:
+            continue
+        dc = identity.cooperation - 0.5
+        da = identity.ambition - 0.5
+        agent.personality.cooperation = _clamp01(agent.personality.cooperation + dc)
+        agent.personality.ambition = _clamp01(agent.personality.ambition + da)
+        agent.personality.aggression = _clamp01(agent.personality.aggression - dc * 0.45)
 
 
 def baseline_region_params() -> list[RegionParams]:
@@ -86,31 +208,57 @@ def baseline_region_params() -> list[RegionParams]:
 
 
 def region_params_for_variant(variant: str) -> list[RegionParams]:
-    if variant not in _EXTERNAL_PATCH:
-        raise ValueError(f"unknown experiment variant: {variant}")
-    patch = _EXTERNAL_PATCH[variant]
-    identity = baseline_identity_values()
-    social = _neutral_social_baseline()
-    out: list[RegionParams] = []
-    for macro in CONTINENT_IDS:
-        out.append(
-            RegionParams(
-                id=macro,
-                subregion_id=DEFAULT_SUBREGION[macro],
-                population=EXPERIMENT_POPULATION_PER_REGION,
-                institution=social["institution"],  # type: ignore[arg-type]
-                tax_rate=float(social["tax_rate"]),
-                education_level=float(social["education_level"]),
-                religion=social["religion"],  # type: ignore[arg-type]
-                trade_openness=float(social["trade_openness"]),
-                initial_values=identity,
-                trait_rate=0.1,
-                welfare_rate=float(social["welfare_rate"]),
-                resource_pool=float(patch["resource_pool"]),
-                disaster_frequency=float(patch["disaster_frequency"]),
+    if variant in _EXTERNAL_PATCH:
+        patch = _EXTERNAL_PATCH[variant]
+        identity = baseline_identity_values()
+        social = _neutral_social_baseline()
+        out: list[RegionParams] = []
+        for macro in CONTINENT_IDS:
+            out.append(
+                RegionParams(
+                    id=macro,
+                    subregion_id=DEFAULT_SUBREGION[macro],
+                    population=EXPERIMENT_POPULATION_PER_REGION,
+                    institution=social["institution"],  # type: ignore[arg-type]
+                    tax_rate=float(social["tax_rate"]),
+                    education_level=float(social["education_level"]),
+                    religion=social["religion"],  # type: ignore[arg-type]
+                    trade_openness=float(social["trade_openness"]),
+                    initial_values=identity,
+                    trait_rate=0.1,
+                    welfare_rate=float(social["welfare_rate"]),
+                    resource_pool=float(patch["resource_pool"]),
+                    disaster_frequency=float(patch["disaster_frequency"]),
+                )
             )
-        )
-    return out
+        return out
+
+    if variant in _RESILIENCE_SOCIAL:
+        social = _RESILIENCE_SOCIAL[variant]
+        identity = social["initial_values"]
+        assert isinstance(identity, InitialValues)
+        out = []
+        for macro in CONTINENT_IDS:
+            out.append(
+                RegionParams(
+                    id=macro,
+                    subregion_id=DEFAULT_SUBREGION[macro],
+                    population=EXPERIMENT_POPULATION_PER_REGION,
+                    institution=social["institution"],
+                    tax_rate=float(social["tax_rate"]),
+                    education_level=float(social["education_level"]),
+                    religion=social["religion"],
+                    trade_openness=float(social["trade_openness"]),
+                    initial_values=identity,
+                    trait_rate=0.1,
+                    welfare_rate=float(social["welfare_rate"]),
+                    resource_pool=float(_RESILIENCE_ENV["resource_pool"]),
+                    disaster_frequency=float(_RESILIENCE_ENV["disaster_frequency"]),
+                )
+            )
+        return out
+
+    raise ValueError(f"unknown experiment variant: {variant}")
 
 
 def world_params_for_variant(variant: str, seed: int, start_year: int = 1000) -> WorldParams:
@@ -133,15 +281,39 @@ def fresh_roster_copy(seed: int) -> list[AgentState]:
     return clone_roster_for_world(get_experiment_roster(seed))
 
 
+def prepare_experiment_sim(
+    sim: SimulationState,
+    *,
+    variant: str,
+    seed: int,
+    total_turns: int,
+) -> None:
+    """Mark protocol metadata and apply resilience-only setup (pulse schedule + bias)."""
+    protocol = protocol_for_variant(variant)
+    sim.controlled_experiment = True
+    sim.experiment_variant = variant
+    sim.experiment_seed = seed
+    sim.experiment_protocol = protocol
+    sim.status = "running"
+    if protocol == PROTOCOL_RESILIENCE:
+        sim.shock_pulse_turns = resilience_pulse_turns(total_turns)
+        identity = _RESILIENCE_SOCIAL[variant]["initial_values"]
+        assert isinstance(identity, InitialValues)
+        bias_roster_to_identity(sim.agents, identity)
+    else:
+        sim.shock_pulse_turns = []
+
+
 def apply_variant_to_sim(sim: SimulationState, variant: str) -> None:
-    """Update external environment on a running experiment without resetting agents."""
+    """Update external environment on a running environment-protocol experiment."""
     if variant not in _EXTERNAL_PATCH:
-        raise ValueError(f"unknown experiment variant: {variant}")
+        raise ValueError(f"unknown environment variant: {variant}")
     patch = _EXTERNAL_PATCH[variant]
     for region in sim.world.regions:
         region.resource_pool = float(patch["resource_pool"])
         region.disaster_frequency = float(patch["disaster_frequency"])
     sim.experiment_variant = variant
+    sim.experiment_protocol = PROTOCOL_ENVIRONMENT
 
 
 def describe_experiment() -> dict[str, Any]:
@@ -150,6 +322,58 @@ def describe_experiment() -> dict[str, Any]:
         "seed": EXPERIMENT_SEED,
         "population_per_region": EXPERIMENT_POPULATION_PER_REGION,
         "total_agents": total,
+        "protocols": {
+            PROTOCOL_ENVIRONMENT: {
+                "label_ja": "環境ノブ（同一人間 × 資源・災害）",
+                "fixed": [
+                    "agent_id",
+                    "personality",
+                    "traits",
+                    "initial_position",
+                    "initial_population",
+                    "seed",
+                    "starting_institution_anarchy",
+                ],
+                "varied": ["resource_pool", "disaster_frequency"],
+                "variants": [
+                    {"id": vid, "label_ja": _VARIANT_LABEL_JA[vid], "env": _EXTERNAL_PATCH[vid]}
+                    for vid in WORLD_VARIANT_IDS
+                ],
+            },
+            PROTOCOL_RESILIENCE: {
+                "label_ja": "レジリエンス（同一ショック × 社会構造）",
+                "fixed": [
+                    "agent_id",
+                    "traits",
+                    "initial_position",
+                    "seed",
+                    "resource_pool",
+                    "disaster_frequency",
+                    "shock_pulse_turns",
+                ],
+                "varied": [
+                    "institution",
+                    "tax_rate",
+                    "welfare_rate",
+                    "cooperation_bias",
+                    "authority_acceptance",
+                ],
+                "shared_env": _RESILIENCE_ENV,
+                "variants": [
+                    {
+                        "id": vid,
+                        "label_ja": _VARIANT_LABEL_JA[vid],
+                        "social": {
+                            "institution": _RESILIENCE_SOCIAL[vid]["institution"].value,
+                            "tax_rate": _RESILIENCE_SOCIAL[vid]["tax_rate"],
+                            "welfare_rate": _RESILIENCE_SOCIAL[vid]["welfare_rate"],
+                            "cooperation": _RESILIENCE_SOCIAL[vid]["initial_values"].cooperation,
+                        },
+                    }
+                    for vid in RESILIENCE_VARIANT_IDS
+                ],
+            },
+        },
         "fixed": [
             "agent_id",
             "personality",
@@ -183,7 +407,7 @@ def describe_experiment() -> dict[str, Any]:
                 "id": "knobs",
                 "label_ja": "② 実験ノブ",
                 "fields": ["resource_pool", "disaster_frequency"],
-                "experiment": "varied_across_worlds",
+                "experiment": "varied_across_worlds_environment_protocol",
             },
             {
                 "id": "roster",
@@ -195,7 +419,7 @@ def describe_experiment() -> dict[str, Any]:
                 "id": "social_initial",
                 "label_ja": "③′ 社会の初期値",
                 "fields": ["institution", "tax_rate", "education_level", "religion", "trade_openness", "welfare_rate"],
-                "experiment": "neutral_same_start",
+                "experiment": "neutral_or_varied_by_protocol",
             },
             {
                 "id": "emergent",
@@ -205,6 +429,7 @@ def describe_experiment() -> dict[str, Any]:
             },
         ],
         "docs": "docs/hackathon/world-model.md",
+        "docs_post_award": "docs/hackathon/post-award.md",
         "emerges_in_play": [
             "settlements",
             "institutions",
@@ -216,8 +441,18 @@ def describe_experiment() -> dict[str, Any]:
                 "id": vid,
                 "label_ja": _VARIANT_LABEL_JA[vid],
                 "env": _EXTERNAL_PATCH[vid],
+                "protocol": PROTOCOL_ENVIRONMENT,
             }
             for vid in WORLD_VARIANT_IDS
+        ]
+        + [
+            {
+                "id": vid,
+                "label_ja": _VARIANT_LABEL_JA[vid],
+                "env": _RESILIENCE_ENV,
+                "protocol": PROTOCOL_RESILIENCE,
+            }
+            for vid in RESILIENCE_VARIANT_IDS
         ],
     }
 
@@ -433,9 +668,18 @@ def experiment_summary(sim: SimulationState) -> dict[str, Any]:
     spotlight = _pick_spotlight_agent(sim, leaders)
     resilience = compute_resilience_metrics(sim)
 
+    protocol = sim.experiment_protocol
+    if not protocol and sim.experiment_variant:
+        try:
+            protocol = protocol_for_variant(sim.experiment_variant)
+        except ValueError:
+            protocol = None
+
     return {
         "variant": sim.experiment_variant,
-        "variant_label_ja": _VARIANT_LABEL_JA.get(sim.experiment_variant or "", ""),
+        "variant_label_ja": variant_label_ja(sim.experiment_variant or ""),
+        "protocol": protocol,
+        "shock_pulse_turns": list(sim.shock_pulse_turns or []),
         "seed": sim.experiment_seed or sim.world.seed,
         "turn": sim.world.turn,
         "calendar_year": sim.world.start_year + sim.world.turn * sim.world.years_per_turn,

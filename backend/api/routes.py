@@ -8,10 +8,12 @@ from pydantic import BaseModel, Field
 
 from simulation import apply_conditions_update, create_simulation, tick
 from simulation.experiment import (
+    ALL_VARIANT_IDS,
     EXPERIMENT_SEED,
     describe_experiment,
     experiment_summary,
     fresh_roster_copy,
+    prepare_experiment_sim,
     world_params_for_variant,
     WORLD_VARIANT_IDS,
 )
@@ -106,16 +108,15 @@ def experiment_design() -> dict[str, Any]:
 def create_sim(body: CreateSimulationRequest) -> dict[str, Any]:
     if body.controlled_experiment:
         variant = (body.experiment_variant or "balanced").strip().lower()
-        if variant not in WORLD_VARIANT_IDS:
+        if variant not in ALL_VARIANT_IDS:
             raise HTTPException(status_code=400, detail=f"invalid experiment_variant: {variant}")
         seed = body.experiment_seed if body.experiment_seed is not None else EXPERIMENT_SEED
         params = world_params_for_variant(variant, seed, body.start_year)
         roster = fresh_roster_copy(seed)
         sim_id = str(uuid.uuid4())
         sim = create_simulation(sim_id, params, agent_roster=roster)
-        sim.controlled_experiment = True
-        sim.experiment_variant = variant
-        sim.experiment_seed = seed
+        # Default pulse schedule assumes a 20-turn (200y) demo horizon; CLI overrides via prepare.
+        prepare_experiment_sim(sim, variant=variant, seed=seed, total_turns=20)
         _STORE[sim_id] = sim
         payload = _to_public(sim)
         payload["experiment_summary"] = experiment_summary(sim)
@@ -293,7 +294,11 @@ def update_conditions(sim_id: str, body: UpdateConditionsRequest) -> dict[str, A
     if variant is not None:
         variant = variant.strip().lower()
         if variant not in WORLD_VARIANT_IDS:
-            raise HTTPException(status_code=400, detail=f"invalid experiment_variant: {variant}")
+            raise HTTPException(
+                status_code=400,
+                detail="hot-swap experiment_variant is only supported for environment protocol "
+                f"({', '.join(WORLD_VARIANT_IDS)})",
+            )
         if not sim.controlled_experiment:
             raise HTTPException(status_code=400, detail="not a controlled experiment simulation")
 

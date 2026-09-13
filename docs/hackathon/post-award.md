@@ -99,9 +99,9 @@
 
 ### P2 — 対照実験の軸を「環境ノブ」から「危機応答」へ拡張
 
-- [ ] 同一ロスター × **同一ショック列** × **異なる初期制度／協力バイアス**の第2プロトコルを設計（§5.3）
-- [ ] CLI バッチに `resilience` モード（または別スクリプト）を追加
-- [ ] 既存の lush/lean/volatile/balanced は「環境感度のベースライン」として残す
+- [x] 同一ロスター × **同一ショック列** × **異なる初期制度／協力バイアス**の第2プロトコルを設計（§5.3）
+- [x] CLI に `--protocol resilience` を追加（`scripts/run-experiment.py` / `pilot_phase_c.py`）
+- [x] 既存の lush/lean/volatile/balanced は「環境感度のベースライン」として残す
 
 ### P3 — LLM を住民意思決定に引き上げ
 
@@ -170,18 +170,32 @@
 - 比較表セクション 1b（`scripts/analysis_batch.py`）
 - パイロット表示（`scripts/pilot_phase_a.py`）
 
-### 5.3 Phase C — 実験プロトコルの進化
+### 5.3 Phase C — 実験プロトコルの進化 — **実装済（2026-09）**
 
-**現行（残す）:** 同一人間 × 環境ノブ差  
+**現行（残す）:** 同一人間 × 環境ノブ差（`--protocol environment`）  
 → 「環境は効くか」のベースライン。
 
-**追加（講評対応の主プロトコル）:**
+**追加（講評対応の主プロトコル）:** `--protocol resilience`
 
 ```text
-固定: 同一 5,000 人ロスター、同一シード、同一ショック列（災害スケジュール）
-変動: 初期制度 / 税率・福祉 / 協力バイアス /（将来）LLM 意思決定の有無
-観測: 回復軌跡・崩壊フラグ・指導者の台頭条件
+固定: 同一 5,000 人ロスター、同一シード、同一危機環境（resource=85, disaster_freq=0.35）
+      + 独立した shock RNG + 強制パルス（例: turn 2/5/8）
+変動: civic / autocrat / commune / fracture（制度・税率・福祉・協力バイアス）
+観測: pop_retention_ratio・災害死・coop比・resilience_label
 ```
+
+| variant | 意味 |
+|---------|------|
+| `civic` | 民主・協調 |
+| `autocrat` | 専制・秩序 |
+| `commune` | 高福祉・共同 |
+| `fracture` | 無政府・分断 |
+
+実装:
+- `prepare_experiment_sim` / `bias_roster_to_identity`（`experiment.py`）
+- `apply_pulse_shock` + shock 専用 RNG（`engine.py`）
+- CLI: `python scripts/run-experiment.py --protocol resilience`
+- パイロット: `scripts/pilot_phase_c.py`
 
 問いの言い換え:
 

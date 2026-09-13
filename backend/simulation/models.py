@@ -323,6 +323,10 @@ class SimulationState(BaseModel):
     controlled_experiment: bool = False
     experiment_variant: str | None = None
     experiment_seed: int | None = None
+    # environment = resource/disaster knobs; resilience = same shock × social structure
+    experiment_protocol: str | None = None
+    # Forced crisis turns (identical across resilience variants)
+    shock_pulse_turns: list[int] = Field(default_factory=list)
     world: WorldState
     agents: list[AgentState]
     relationships: list[RelationshipState]
