@@ -23,6 +23,7 @@
 | [slides.md](./slides.md) | スライド原稿 |
 | [RESULTS.md](./RESULTS.md) | → ルート `analysis/summary.md` への索引 |
 | [checklist.md](./checklist.md) | 障害時・事前確認 |
+| [post-award.md](./post-award.md) | 入賞講評・次の実装方針 |
 
 設計の正: [../design/FeatureSpec.md](../design/FeatureSpec.md)
 

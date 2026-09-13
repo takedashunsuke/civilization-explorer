@@ -157,6 +157,8 @@ class AgentState(BaseModel):
     age: int = 20
     region_id: str | None = None
     subregion_id: str | None = None
+    # Recent disaster / shock pressure (0–1). Raises mortality until it decays.
+    shock_stress: float = Field(default=0.0, ge=0, le=1)
 
 
 class RelationshipState(BaseModel):

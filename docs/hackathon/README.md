@@ -25,6 +25,7 @@
 | [gap.md](./gap.md) | 方針と実装の AS-IS / ギャップ / TODO |
 | [world-model.md](./world-model.md) | **固定・変動・創発**の四層モデル（概念の正） |
 | [review.md](./review.md) | テーマ根拠・経緯 |
+| [post-award.md](./post-award.md) | **入賞講評・ネクストアクション・実装方針** |
 | [faq.md](./faq.md) | 想定 Q&A |
 | [submission.md](./submission.md) | 提出物一覧（ルート + docs） |
 
@@ -42,6 +43,7 @@
 ## 関連方針（短く）
 
 * テーマ: AI 文明を実験場にし、人間社会の問いを探索する（[review.md](./review.md)）
+* 入賞後: レジリエンス（回復／崩壊）を次の中心に（[post-award.md](./post-award.md)）
 * デモは **ローカル実演＋録画**（[ADR 0001](../decisions/0001-local-runtime-and-supabase.md)）
 * 可視化は **2D マップ**（[ADR 0002](../decisions/0002-2d-visualization.md)）
 * やらない: 支援チャット、正解導出 AI、業務効率化ツールとしての見せ方

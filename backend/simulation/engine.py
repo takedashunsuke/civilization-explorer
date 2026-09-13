@@ -60,6 +60,10 @@ BIRTH_AGE_MIN = 16
 BIRTH_AGE_MAX = 55
 TRAIT_GAIN_CHANCE = 0.018
 TRAIT_LOSE_CHANCE = 0.03
+# Phase A (resilience): environment → population pathways
+RESOURCE_COMFORT = 100.0  # ~balanced starting pool; below this = scarcity
+SHOCK_STRESS_DECAY = 0.72  # per turn residual after aging
+MIN_ALIVE_PER_REGION = 2
 ACTION_PRIORITY = {
     ActionType.resist: 0,
     ActionType.obey: 0,
@@ -254,6 +258,7 @@ def clone_roster_for_world(roster: list[AgentState]) -> list[AgentState]:
         copy.alive = True
         copy.memory = []
         copy.goal = "survive and grow"
+        copy.shock_stress = 0.0
         out.append(copy)
     return out
 
@@ -920,6 +925,13 @@ def apply_births(sim: SimulationState, rng: random.Random) -> None:
             return
         if len(members) >= POPULATION_MAX:
             continue
+        region = agent_region(sim, members[0]) if members else None
+        scarcity = _resource_scarcity(region.resource_pool if region else RESOURCE_COMFORT)
+        # Scarcity and shock suppress births (environment → demography).
+        birth_scale = max(0.12, 1.0 - 0.78 * scarcity)
+        if region is not None:
+            mean_stress = sum(a.shock_stress for a in members) / len(members)
+            birth_scale *= max(0.2, 1.0 - 0.55 * mean_stress)
         eligible = [
             a
             for a in members
@@ -931,7 +943,7 @@ def apply_births(sim: SimulationState, rng: random.Random) -> None:
         if not eligible:
             continue
         mean_h = sum(a.happiness for a in members) / len(members)
-        parent_p = 0.32 + 0.22 * mean_h + 0.08 * sim.world.education_level
+        parent_p = (0.32 + 0.22 * mean_h + 0.08 * sim.world.education_level) * birth_scale
         born = 0
         rng.shuffle(eligible)
         for parent in eligible:
@@ -1041,9 +1053,20 @@ def apply_aging(sim: SimulationState) -> None:
     for agent in sim.agents:
         if agent.alive:
             agent.age += years
+            agent.shock_stress = clamp(agent.shock_stress * SHOCK_STRESS_DECAY)
 
 
-def _yearly_death_chance(agent: AgentState) -> float:
+def _resource_scarcity(pool: float) -> float:
+    """0 when pool >= comfort; approaches 1 as the shared pool empties."""
+    return clamp(1.0 - float(pool) / RESOURCE_COMFORT)
+
+
+def _yearly_death_chance(
+    agent: AgentState,
+    region: RegionState | None = None,
+    *,
+    region_alive: int = 0,
+) -> float:
     age = agent.age
     if age < 45:
         chance = 0.002
@@ -1059,12 +1082,77 @@ def _yearly_death_chance(agent: AgentState) -> float:
         chance += 0.01
     if agent.happiness < 0.25:
         chance += 0.008
-    return min(0.18, chance)
+    # Environment pathways (Phase A): scarcity and recent shock raise mortality.
+    if region is not None:
+        scarcity = _resource_scarcity(region.resource_pool)
+        chance += 0.014 * scarcity
+        if region_alive > 0:
+            per_capita = region.resource_pool / float(region_alive)
+            if per_capita < 0.08:
+                chance += 0.01
+            elif per_capita < 0.15:
+                chance += 0.005
+    chance += 0.025 * float(agent.shock_stress)
+    return min(0.22, chance)
 
 
-def _death_chance(agent: AgentState, years: int = 10) -> float:
-    yearly = _yearly_death_chance(agent)
-    return min(0.32, 1.0 - (1.0 - yearly) ** max(1, years))
+def _death_chance(
+    agent: AgentState,
+    years: int = 10,
+    region: RegionState | None = None,
+    *,
+    region_alive: int = 0,
+) -> float:
+    yearly = _yearly_death_chance(agent, region, region_alive=region_alive)
+    return min(0.38, 1.0 - (1.0 - yearly) ** max(1, years))
+
+
+def _emit_death(
+    sim: SimulationState,
+    agent: AgentState,
+    *,
+    heir: AgentState | None,
+    detail_key: str,
+    detail: str,
+    deltas: dict[str, float] | None = None,
+) -> None:
+    agent.alive = False
+    agent.energy = 0.0
+    sim.relationships = [rel for rel in sim.relationships if rel.a_id != agent.id and rel.b_id != agent.id]
+    payload = {"age": float(agent.age)}
+    if deltas:
+        payload.update(deltas)
+    sim.events.append(
+        EventRecord(
+            turn=sim.world.turn,
+            actor_id=agent.id,
+            action=ActionType.death,
+            target_id=heir.id if heir else None,
+            success=False,
+            detail_key=detail_key,
+            detail=detail,
+            deltas=payload,
+        )
+    )
+
+
+def _pick_heir(agent: AgentState, living: list[AgentState]) -> AgentState | None:
+    heirs = [
+        a
+        for a in living
+        if a.id != agent.id and a.settlement_id and a.settlement_id == agent.settlement_id
+    ]
+    if not heirs:
+        others = [a for a in living if a.id != agent.id]
+        if others:
+            heirs = [min(others, key=lambda o: distance(agent.position, o.position))]
+    if not heirs:
+        return None
+    if agent.wealth > 0:
+        share = agent.wealth / len(heirs)
+        for h in heirs:
+            h.wealth += share
+    return heirs[0]
 
 
 def apply_deaths(sim: SimulationState, rng: random.Random) -> None:
@@ -1074,44 +1162,23 @@ def apply_deaths(sim: SimulationState, rng: random.Random) -> None:
         if agent.alive:
             by_region[_region_key(agent)].append(agent)
     for members in by_region.values():
-        if len(members) <= 2:
+        if len(members) <= MIN_ALIVE_PER_REGION:
             continue
+        region = agent_region(sim, members[0]) if members else None
+        region_alive = len(members)
         for agent in list(members):
             living = [a for a in members if a.alive]
-            if len(living) <= 2:
+            if len(living) <= MIN_ALIVE_PER_REGION:
                 break
-            if rng.random() >= _death_chance(agent, years):
+            if rng.random() >= _death_chance(agent, years, region, region_alive=region_alive):
                 continue
-            heirs = [
-                a
-                for a in living
-                if a.id != agent.id and a.settlement_id and a.settlement_id == agent.settlement_id
-            ]
-            if not heirs:
-                others = [a for a in living if a.id != agent.id]
-                if others:
-                    heirs = [min(others, key=lambda o: distance(agent.position, o.position))]
-            heir = heirs[0] if heirs else None
-            if heirs and agent.wealth > 0:
-                share = agent.wealth / len(heirs)
-                for h in heirs:
-                    h.wealth += share
-            agent.alive = False
-            agent.energy = 0.0
-            sim.relationships = [
-                rel for rel in sim.relationships if rel.a_id != agent.id and rel.b_id != agent.id
-            ]
-            sim.events.append(
-                EventRecord(
-                    turn=sim.world.turn,
-                    actor_id=agent.id,
-                    action=ActionType.death,
-                    target_id=heir.id if heir else None,
-                    success=False,
-                    detail_key="death",
-                    detail=f"{agent.id} died at {agent.age}",
-                    deltas={"age": float(agent.age)},
-                )
+            heir = _pick_heir(agent, living)
+            _emit_death(
+                sim,
+                agent,
+                heir=heir,
+                detail_key="death",
+                detail=f"{agent.id} died at {agent.age}",
             )
 
 
@@ -1698,7 +1765,17 @@ def apply_disasters(sim: SimulationState, rng: random.Random, skip_quake: set[st
         if kind in ("typhoon", "earthquake") and len(hit) > 2:
             hit = rng.sample(hit, max(2, len(hit) // 2))
         loss = 0.0
+        killed = 0
+        # Severe shocks can kill; rate scales with disaster_frequency (Phase A).
+        severe = kind in ("earthquake", "typhoon", "flood")
+        kill_rate = (0.018 + 0.07 * freq) * (1.45 if severe else 0.85)
+        stress_bump = 0.18 + 0.4 * freq + (0.12 if severe else 0.0)
+        living_count = len([a for a in agents_in_region(sim, region) if a.alive]) if sim.world.regions else len(
+            [a for a in sim.agents if a.alive]
+        )
         for agent in hit:
+            if not agent.alive:
+                continue
             if kind == "heatwave":
                 agent.energy = clamp(agent.energy - 0.12)
                 agent.happiness = clamp(agent.happiness - 0.04)
@@ -1718,19 +1795,45 @@ def apply_disasters(sim: SimulationState, rng: random.Random, skip_quake: set[st
                 agent.wealth = max(0.0, agent.wealth - 2.0)
                 agent.happiness = clamp(agent.happiness - 0.06)
                 loss += 2.0
+            agent.shock_stress = clamp(agent.shock_stress + stress_bump)
+            if living_count <= MIN_ALIVE_PER_REGION:
+                continue
+            if rng.random() < kill_rate:
+                living_here = [a for a in (agents_in_region(sim, region) if sim.world.regions else sim.agents) if a.alive]
+                heir = _pick_heir(agent, living_here)
+                agent.alive = False
+                agent.energy = 0.0
+                sim.relationships = [
+                    rel for rel in sim.relationships if rel.a_id != agent.id and rel.b_id != agent.id
+                ]
+                events.append(
+                    EventRecord(
+                        turn=sim.world.turn,
+                        actor_id=agent.id,
+                        action=ActionType.death,
+                        target_id=heir.id if heir else None,
+                        success=False,
+                        detail_key="death_disaster",
+                        detail=f"{agent.id} died in {kind}",
+                        deltas={"age": float(agent.age)},
+                    )
+                )
+                killed += 1
+                living_count -= 1
         food_hit = 4.0 + 10.0 * freq
         if kind in ("flood", "frost", "heatwave"):
             region.resource_pool = max(0.0, region.resource_pool - food_hit)
         lon, lat = SUBREGION_CENTERS.get(sid, (0.0, 0.0))
-        alert = "red" if kind in ("earthquake", "typhoon") else "yellow"
+        alert = "red" if kind in ("earthquake", "typhoon") or killed > 0 else "yellow"
         events.append(
             EventRecord(
                 turn=sim.world.turn,
                 actor_id=sid,
                 action=ActionType.disaster,
                 detail_key=f"disaster_{kind}",
-                detail=f"{kind} hit {len(hit)} agents in {sid}",
-                deltas={"n": float(len(hit)), "loss": loss},
+                detail=f"{kind} hit {len(hit)} agents in {sid}"
+                + (f" ({killed} killed)" if killed else ""),
+                deltas={"n": float(len(hit)), "loss": loss, "killed": float(killed)},
                 lon=lon,
                 lat=lat,
                 alert=alert,
@@ -1823,6 +1926,10 @@ def end_of_turn(
     regimes = apply_regime_drift(sim, rng)
     if sim.world.regions:
         for region in sim.world.regions:
+            members = agents_in_region(sim, region)
+            alive_n = len(members)
+            mean_h = (sum(a.happiness for a in members) / alive_n) if alive_n else 0.45
+            scarcity = _resource_scarcity(region.resource_pool)
             regen = 2.0 + 3.0 * region.education_level
             regen *= 0.65 + 0.7 * getattr(region, "trade_openness", 0.5)
             if region.climate == ClimateType.arid:
@@ -1831,8 +1938,17 @@ def end_of_turn(
                 regen *= 1.15
             elif region.climate == ClimateType.cold:
                 regen *= 0.7
-                for agent in agents_in_region(sim, region):
+                for agent in members:
                     agent.energy = clamp(agent.energy - 0.03)
+            # Phase A: depleted pools and stressed/unhappy populations recover poorly.
+            regen *= max(0.2, 1.0 - 0.6 * scarcity)
+            regen *= 0.65 + 0.45 * mean_h
+            # Thin population slows recovery (labor / institutions).
+            regen *= clamp(0.4 + alive_n / 900.0, 0.4, 1.15)
+            if region.institution == InstitutionType.anarchy:
+                regen *= 0.88
+            elif region.institution == InstitutionType.democracy:
+                regen *= 1.05
             region.resource_pool += regen
             region.institution_runtime.authority = clamp(region.institution_runtime.authority)
         sim.world.resource_pool = sum(r.resource_pool for r in sim.world.regions)
@@ -1850,6 +1966,14 @@ def end_of_turn(
             for agent in sim.agents:
                 if agent.alive:
                     agent.energy = clamp(agent.energy - 0.03)
+        scarcity = _resource_scarcity(sim.world.resource_pool)
+        alive_n = sum(1 for a in sim.agents if a.alive)
+        mean_h = (
+            sum(a.happiness for a in sim.agents if a.alive) / alive_n if alive_n else 0.45
+        )
+        regen *= max(0.2, 1.0 - 0.6 * scarcity)
+        regen *= 0.65 + 0.45 * mean_h
+        regen *= clamp(0.4 + alive_n / 900.0, 0.4, 1.15)
         sim.world.resource_pool += regen
         sim.world.institution_runtime.authority = clamp(sim.world.institution_runtime.authority)
     apply_welfare(sim)
