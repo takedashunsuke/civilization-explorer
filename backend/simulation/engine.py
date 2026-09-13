@@ -298,6 +298,7 @@ def create_simulation(
         seed=params.seed,
         initial_population=len(agents),
         initial_total_wealth=sum(a.wealth for a in agents),
+        initial_resource_pool=sum(r.resource_pool for r in regions),
         population_cap=min(
             max(len(regions), 1) * POPULATION_MAX,
             max(len(agents), int(len(agents) * 1.4)),
@@ -2008,6 +2009,12 @@ def end_of_turn(
     coops = sum(1 for e in turn_events if e.action == ActionType.cooperate)
     births = sum(1 for e in turn_events if e.action == ActionType.birth)
     deaths = sum(1 for e in turn_events if e.action == ActionType.death)
+    disaster_n = sum(1 for e in turn_events if e.action == ActionType.disaster)
+    resource_now = (
+        sum(r.resource_pool for r in sim.world.regions)
+        if sim.world.regions
+        else float(sim.world.resource_pool)
+    )
     sim.history.append(
         HistoryRecord(
             turn=turn,
@@ -2017,6 +2024,10 @@ def end_of_turn(
                 + (f" | {world_summary}" if world_summary else "")
             ),
             metrics=metrics,
+            population_alive=alive,
+            resource_pool=round(resource_now, 1),
+            mean_authority=round(float(metrics.authority), 3),
+            disaster_events=disaster_n,
         )
     )
     sim.status = "running"

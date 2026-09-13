@@ -93,9 +93,9 @@
 ### P1 — ルール層で人口・ショックが分岐する（LLM なしでも差が出る）
 
 - [x] 災害・資源不足が死亡・出生に効く経路を追加（§5.1）— 2026-09 実装
-- [ ] ショック後の回復軌跡を `experiment_summary` に載せる（§5.2）
+- [x] ショック後の回復軌跡を `experiment_summary` に載せる（§5.2）— Phase B
 - [x] パイロット: 4 variant × 短い年数 × 少数 seed で人口が分かれることを確認（`scripts/pilot_phase_a.py`）
-- [ ] 横断サマリーの「読み方」をレジリエンス指標中心に更新
+- [x] 横断サマリーの「読み方」をレジリエンス指標中心に更新（`analysis_batch.py` の比較表に 1b 節）
 
 ### P2 — 対照実験の軸を「環境ノブ」から「危機応答」へ拡張
 
@@ -148,22 +148,27 @@
 **注意:** 差を出すためにノブを極端にしすぎると「環境ノブの写像」批判が再発する。  
 差の**経路**（死・出生・回復失敗）をログに残し、「なぜ分かれたか」を説明できること。
 
-### 5.2 Phase B — レジリエンス指標
+### 5.2 Phase B — レジリエンス指標 — **実装済（2026-09）**
 
 **目的:** 「回復か崩壊か」を数値で語れるようにする。
 
-提案メトリクス（`experiment_summary` / 横断サマリーへ追加）:
+| 指標 | 定義 | 状態 |
+|------|------|------|
+| `shock_count` | 災害イベント数 | ✅ |
+| `disaster_deaths` | `death_disaster` 件数 | ✅ |
+| `pop_trough` | ショック以降の人口最下点 | ✅ |
+| `pop_recovery_ratio` | `(期末 − 最下点) / (ショック前 − 最下点)`（単調減少では 0 付近） | ✅ |
+| `pop_retention_ratio` | `期末 / ショック前`（慢性減少時の主指標） | ✅ |
+| `resource_recovery_halftime` | 50% を割ったあと戻るターン（割っていなければ null） | ✅ |
+| `regime_break` | 権威が閾値割れ／大幅低下、または anarchy への転換 | ✅ |
+| `coop_vs_conflict_post_shock` | ショック後の協力 / (協力+争い) | ✅ |
+| `resilience_label` | `recovered` / `stressed` / `collapsed` | ✅ |
 
-| 指標 | 定義案 |
-|------|--------|
-| `shock_count` | 対象期間の災害イベント数（既存に近い） |
-| `pop_trough` | ショック後の人口最下点 |
-| `pop_recovery_ratio` | 最下点から期末までの戻り率 |
-| `resource_recovery_halftime` | 資源がショック前の半分まで戻るまでのターン（戻らなければ null） |
-| `regime_break` | ショック後に制度が anarchy へ落ちたか／権威が閾値割れしたか |
-| `coop_vs_conflict_post_shock` | ショック後ウィンドウの協力／争い比 |
-
-実装は解析スクリプト側（`scripts/analysis_batch.py`）から始め、後でエンジンが毎ターンスナップショットしてもよい。
+実装:
+- 毎ターン `HistoryRecord` に人口・資源・権威を記録（`engine.py`）
+- `compute_resilience_metrics` → `experiment_summary`（`experiment.py`）
+- 比較表セクション 1b（`scripts/analysis_batch.py`）
+- パイロット表示（`scripts/pilot_phase_a.py`）
 
 ### 5.3 Phase C — 実験プロトコルの進化
 

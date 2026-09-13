@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""Phase A pilot: same roster × 4 variants; check population / resource divergence.
+"""Phase A/B pilot: population divergence + resilience metrics.
 
 Usage (from repo root, stub LLM):
-  cd backend && .venv/Scripts/python.exe ../scripts/pilot_phase_a.py
-  # or
-  ./scripts/pilot_phase_a.sh
+  backend\\.venv\\Scripts\\python.exe scripts\\pilot_phase_a.py
 """
 
 from __future__ import annotations
@@ -17,7 +15,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "backend"))
 
-# Force heuristic path — Phase A must diverge without LLM.
 os.environ["LLM_PROVIDER"] = "stub"
 
 from simulation import create_simulation, tick  # noqa: E402
@@ -30,11 +27,11 @@ from simulation.experiment import (  # noqa: E402
 )
 
 SEED = 42
-TURNS = 10  # 100 years at 10y/turn — enough to see demography split
+TURNS = 10
 
 
 def main() -> int:
-    print(f"Phase A pilot | seed={SEED} | turns={TURNS} | LLM=stub")
+    print(f"Phase A/B pilot | seed={SEED} | turns={TURNS} | LLM=stub")
     rows: list[dict] = []
     t0 = time.time()
     for variant in WORLD_VARIANT_IDS:
@@ -43,51 +40,46 @@ def main() -> int:
         sim.experiment_variant = variant
         tick(sim, n=TURNS)
         summary = experiment_summary(sim)
-        alive = sum(1 for a in sim.agents if a.alive)
-        disaster_deaths = sum(
-            1 for e in sim.events if e.action.value == "death" and e.detail_key == "death_disaster"
-        )
-        rows.append(
-            {
-                "variant": variant,
-                "label": _VARIANT_LABEL_JA[variant],
-                "alive": alive,
-                "pop_delta_pct": summary.get("population_delta_pct"),
-                "resource": summary.get("resource_pool"),
-                "disasters": summary.get("disasters"),
-                "disaster_deaths": disaster_deaths,
-            }
-        )
+        rows.append({"variant": variant, **summary})
         print(
-            f"  {variant:9} alive={alive:4}  Δpop%={summary.get('population_delta_pct')}  "
-            f"resource={summary.get('resource_pool')}  disasters={summary.get('disasters')}  "
-            f"disaster_deaths={disaster_deaths}"
+            f"  {variant:9} alive={summary['population_alive']:4}  "
+            f"trough={summary['pop_trough']}  retain={summary['pop_retention_ratio']}  "
+            f"recovery={summary['pop_recovery_ratio']}  "
+            f"res={summary['resource_pool']}  half_t={summary['resource_recovery_halftime']}  "
+            f"shocks={summary['shock_count']}  deaths_d={summary['disaster_deaths']}  "
+            f"break={summary['regime_break']}  label={summary['resilience_label']}"
         )
 
     by_id = {r["variant"]: r for r in rows}
-    lush = by_id["lush"]["alive"]
-    lean = by_id["lean"]["alive"]
-    volatile = by_id["volatile"]["alive"]
-    balanced = by_id["balanced"]["alive"]
+    lush = by_id["lush"]["population_alive"]
+    lean = by_id["lean"]["population_alive"]
+    volatile = by_id["volatile"]["population_alive"]
+    balanced = by_id["balanced"]["population_alive"]
 
     print(f"\nelapsed={time.time() - t0:.1f}s")
-    print("Acceptance (soft):")
+    print("Acceptance:")
     ok_vol = volatile < lush
-    ok_lean_res = (by_id["lean"]["resource"] or 0) < (by_id["lush"]["resource"] or 0)
-    spread = max(r["alive"] for r in rows) - min(r["alive"] for r in rows)
+    ok_lean_res = (by_id["lean"]["resource_pool"] or 0) < (by_id["lush"]["resource_pool"] or 0)
+    spread = max(r["population_alive"] for r in rows) - min(r["population_alive"] for r in rows)
     ok_spread = spread >= 30
-    print(f"  volatile alive < lush: {volatile} < {lush} → {'PASS' if ok_vol else 'FAIL'}")
+    ok_metrics = all(
+        r.get("pop_trough") is not None and r.get("pop_recovery_ratio") is not None for r in rows
+    )
+    labels = {r["variant"]: r["resilience_label"] for r in rows}
+    print(f"  volatile alive < lush: {volatile} < {lush} -> {'PASS' if ok_vol else 'FAIL'}")
     print(
-        f"  lean resource < lush: {by_id['lean']['resource']} < {by_id['lush']['resource']} → "
+        f"  lean resource < lush: {by_id['lean']['resource_pool']} < {by_id['lush']['resource_pool']} -> "
         f"{'PASS' if ok_lean_res else 'FAIL'}"
     )
-    print(f"  alive spread ≥ 30: {spread} → {'PASS' if ok_spread else 'FAIL'}")
+    print(f"  alive spread >= 30: {spread} -> {'PASS' if ok_spread else 'FAIL'}")
+    print(f"  resilience metrics present: {'PASS' if ok_metrics else 'FAIL'}")
+    print(f"  labels: {labels}")
     print(f"  balanced alive={balanced} lean alive={lean}")
 
-    if ok_vol and ok_lean_res and ok_spread:
-        print("\nPhase A pilot: OK")
+    if ok_vol and ok_lean_res and ok_spread and ok_metrics:
+        print("\nPhase A/B pilot: OK")
         return 0
-    print("\nPhase A pilot: needs tuning")
+    print("\nPhase A/B pilot: needs tuning")
     return 1
 
 

@@ -30,6 +30,19 @@ SUMMARY_ROWS: list[tuple[str, str, str]] = [
     ("dominant_archetype", "台頭タイプ（代表）", "s"),
 ]
 
+# Phase B resilience rows (shown under a dedicated section)
+RESILIENCE_ROWS: list[tuple[str, str, str]] = [
+    ("shock_count", "ショック数", "d"),
+    ("disaster_deaths", "災害死", "d"),
+    ("pop_trough", "人口最下点", "d"),
+    ("pop_recovery_ratio", "人口回復率", "f1"),
+    ("pop_retention_ratio", "人口保持率", "f1"),
+    ("resource_recovery_halftime", "資源半減回復ターン", "d"),
+    ("regime_break", "制度破綻", "s"),
+    ("coop_vs_conflict_post_shock", "ショック後 協力比", "f1"),
+    ("resilience_label", "レジリエンスラベル", "s"),
+]
+
 
 def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
@@ -146,6 +159,29 @@ def build_comparison_markdown(
         lines.append("| " + " | ".join([label, *cells]) + " |")
 
     lines.extend([
+        "",
+        "## 1b. レジリエンス（回復／崩壊）",
+        "",
+        "| 指標 | 豊か | 乏しい | 災害多 | 標準 |",
+        "|------|------|--------|--------|------|",
+    ])
+    for key, label, kind in RESILIENCE_ROWS:
+        raw = []
+        for vid in VARIANT_ORDER:
+            val = summaries[vid].get(key)
+            if isinstance(val, bool):
+                val = "yes" if val else "no"
+            raw.append(_fmt_cell(val, kind))
+        if kind != "s":
+            raw = _bold_extremes(raw, kind)
+        lines.append("| " + " | ".join([label, *raw]) + " |")
+
+    lines.extend([
+        "",
+        "読み方: `pop_recovery_ratio` はショック前→最下点の落差に対する期末の戻り率。"
+        " 単調減少では 0 になりやすいので、併せて `pop_retention_ratio`（期末/ショック前）を見る。"
+        " `resource_recovery_halftime` はショック前資源の 50% を一度割ったあと戻るまでのターン（割っていなければ —）。"
+        " `resilience_label` は recovered / stressed / collapsed の簡易ラベル。",
         "",
         "## 2. 以降（定性）",
         "",

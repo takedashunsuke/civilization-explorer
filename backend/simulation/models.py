@@ -209,6 +209,7 @@ class WorldState(BaseModel):
     seed: int
     initial_population: int = 8
     initial_total_wealth: float = 0.0
+    initial_resource_pool: float = 0.0
     population_cap: int
     resource_pool: float
     education_level: float
@@ -300,6 +301,11 @@ class HistoryRecord(BaseModel):
     turn: int
     summary: str
     metrics: MetricsSnapshot
+    # Phase B resilience series (optional for older payloads)
+    population_alive: int | None = None
+    resource_pool: float | None = None
+    mean_authority: float | None = None
+    disaster_events: int = 0
 
 
 class ChosenAction(BaseModel):

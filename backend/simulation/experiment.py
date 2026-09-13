@@ -222,6 +222,181 @@ def describe_experiment() -> dict[str, Any]:
     }
 
 
+AUTHORITY_BREAK_THRESHOLD = 0.35
+
+
+def compute_resilience_metrics(sim: SimulationState) -> dict[str, Any]:
+    """Phase B: recovery-vs-collapse metrics from history + events."""
+    alive_now = sum(1 for a in sim.agents if a.alive)
+    resource_now = (
+        sum(r.resource_pool for r in sim.world.regions)
+        if sim.world.regions
+        else float(sim.world.resource_pool)
+    )
+    shock_count = sum(1 for e in sim.events if e.action.value == "disaster")
+    disaster_deaths = sum(
+        1 for e in sim.events if e.action.value == "death" and e.detail_key == "death_disaster"
+    )
+
+    history = list(sim.history)
+    # Build per-turn series (fallback-parse older history without numeric fields).
+    series: list[dict[str, Any]] = []
+    for row in history:
+        pop = row.population_alive
+        if pop is None:
+            # "turn=N pop=X ..."
+            pop = alive_now
+            parts = row.summary.split()
+            for part in parts:
+                if part.startswith("pop="):
+                    try:
+                        pop = int(part.split("=", 1)[1])
+                    except ValueError:
+                        pass
+                    break
+        res = row.resource_pool
+        if res is None:
+            res = resource_now
+        auth = row.mean_authority
+        if auth is None:
+            auth = float(row.metrics.authority) if row.metrics else 0.5
+        series.append(
+            {
+                "turn": row.turn,
+                "population_alive": int(pop),
+                "resource_pool": float(res),
+                "mean_authority": float(auth),
+                "disaster_events": int(row.disaster_events or 0),
+            }
+        )
+
+    first_shock_turn: int | None = None
+    for e in sim.events:
+        if e.action.value == "disaster":
+            first_shock_turn = int(e.turn)
+            break
+    if first_shock_turn is None:
+        for row in series:
+            if row["disaster_events"] > 0:
+                first_shock_turn = int(row["turn"])
+                break
+
+    initial_pop = int(sim.world.initial_population or len(sim.agents))
+    initial_res = float(getattr(sim.world, "initial_resource_pool", 0.0) or 0.0)
+    if initial_res <= 0 and series:
+        initial_res = float(series[0]["resource_pool"])
+
+    def _pop_before(turn: int) -> int:
+        prior = [s for s in series if s["turn"] < turn]
+        if prior:
+            return int(prior[-1]["population_alive"])
+        return initial_pop
+
+    def _res_before(turn: int) -> float:
+        prior = [s for s in series if s["turn"] < turn]
+        if prior:
+            return float(prior[-1]["resource_pool"])
+        return initial_res
+
+    if first_shock_turn is None:
+        window = series
+        pop_pre = initial_pop
+        res_pre = initial_res
+    else:
+        window = [s for s in series if s["turn"] >= first_shock_turn] or series
+        pop_pre = _pop_before(first_shock_turn)
+        res_pre = _res_before(first_shock_turn)
+
+    pops = [int(s["population_alive"]) for s in window] or [alive_now]
+    pop_trough = min(pops)
+    pop_end = alive_now
+    drop = max(pop_pre - pop_trough, 0)
+    if drop <= 0:
+        pop_recovery_ratio = 1.0 if pop_end >= pop_pre else 0.0
+    else:
+        pop_recovery_ratio = round((pop_end - pop_trough) / drop, 3)
+        pop_recovery_ratio = max(0.0, min(1.5, pop_recovery_ratio))
+    pop_retention_ratio = round(pop_end / max(pop_pre, 1), 3)
+
+    # Resource halftime: only defined if pool fell below 50% of pre-shock after the shock.
+    resource_recovery_halftime: int | None = None
+    resource_breached_half = False
+    if first_shock_turn is not None and res_pre > 0:
+        target = res_pre * 0.5
+        after = [s for s in series if s["turn"] >= first_shock_turn]
+        if after:
+            min_after = min(float(s["resource_pool"]) for s in after)
+            resource_breached_half = min_after < target
+            if resource_breached_half:
+                for s in after:
+                    if float(s["resource_pool"]) >= target:
+                        resource_recovery_halftime = int(s["turn"] - first_shock_turn)
+                        break
+
+    # Regime break: authority collapses after shock (start is often anarchy in CE).
+    auth_vals = [float(s["mean_authority"]) for s in window] or [0.5]
+    auth_trough = min(auth_vals)
+    auth_pre = 0.5
+    if first_shock_turn is not None:
+        prior_auth = [s for s in series if s["turn"] < first_shock_turn]
+        if prior_auth:
+            auth_pre = float(prior_auth[-1]["mean_authority"])
+        elif series:
+            auth_pre = float(series[0]["mean_authority"])
+    elif series:
+        auth_pre = float(series[0]["mean_authority"])
+    regime_to_anarchy = any(
+        e.action.value == "regime" and "anarchy" in (e.detail or "").lower()
+        for e in sim.events
+        if first_shock_turn is None or e.turn >= first_shock_turn
+    )
+    regime_break = bool(
+        auth_trough < AUTHORITY_BREAK_THRESHOLD
+        or (auth_pre - auth_trough) >= 0.2
+        or regime_to_anarchy
+    )
+
+    post_events = [
+        e
+        for e in sim.events
+        if first_shock_turn is None or e.turn >= first_shock_turn
+    ]
+    post_coop = sum(1 for e in post_events if e.action.value == "cooperate")
+    post_conflict = sum(1 for e in post_events if e.action.value == "conflict")
+    denom = post_coop + post_conflict
+    coop_vs_conflict_post_shock = round(post_coop / denom, 3) if denom else None
+
+    # Label: prefer bounce-back when present; else use retention under chronic decline.
+    bounced = pop_end > pop_trough * 1.02 and drop > 0
+    if bounced and pop_recovery_ratio >= 0.6 and not regime_break:
+        resilience_label = "recovered"
+    elif pop_retention_ratio >= 0.55 and not regime_break:
+        resilience_label = "recovered"
+    elif pop_retention_ratio < 0.35 or (pop_recovery_ratio < 0.15 and pop_retention_ratio < 0.45):
+        resilience_label = "collapsed"
+    else:
+        resilience_label = "stressed"
+
+    return {
+        "shock_count": shock_count,
+        "disaster_deaths": disaster_deaths,
+        "first_shock_turn": first_shock_turn,
+        "pop_pre_shock": pop_pre,
+        "pop_trough": pop_trough,
+        "pop_end": pop_end,
+        "pop_recovery_ratio": pop_recovery_ratio,
+        "pop_retention_ratio": pop_retention_ratio,
+        "resource_pre_shock": round(res_pre, 1),
+        "resource_end": round(resource_now, 1),
+        "resource_breached_half": resource_breached_half,
+        "resource_recovery_halftime": resource_recovery_halftime,
+        "authority_trough": round(auth_trough, 3),
+        "regime_break": regime_break,
+        "coop_vs_conflict_post_shock": coop_vs_conflict_post_shock,
+        "resilience_label": resilience_label,
+    }
+
+
 def experiment_summary(sim: SimulationState) -> dict[str, Any]:
     alive = [a for a in sim.agents if a.alive]
     initial = sim.world.initial_population or len(sim.agents)
@@ -256,6 +431,7 @@ def experiment_summary(sim: SimulationState) -> dict[str, Any]:
 
     leaders = {s.leader_id for s in sim.settlements if s.leader_id}
     spotlight = _pick_spotlight_agent(sim, leaders)
+    resilience = compute_resilience_metrics(sim)
 
     return {
         "variant": sim.experiment_variant,
@@ -277,6 +453,18 @@ def experiment_summary(sim: SimulationState) -> dict[str, Any]:
         "institutions": institutions,
         "spotlight_agent_id": spotlight.id if spotlight else None,
         "spotlight_role": _agent_role_label(sim, spotlight) if spotlight else None,
+        # Phase B resilience (flat keys for analysis tables)
+        "shock_count": resilience["shock_count"],
+        "disaster_deaths": resilience["disaster_deaths"],
+        "first_shock_turn": resilience["first_shock_turn"],
+        "pop_trough": resilience["pop_trough"],
+        "pop_recovery_ratio": resilience["pop_recovery_ratio"],
+        "pop_retention_ratio": resilience["pop_retention_ratio"],
+        "resource_recovery_halftime": resilience["resource_recovery_halftime"],
+        "regime_break": resilience["regime_break"],
+        "coop_vs_conflict_post_shock": resilience["coop_vs_conflict_post_shock"],
+        "resilience_label": resilience["resilience_label"],
+        "resilience": resilience,
     }
 
 
