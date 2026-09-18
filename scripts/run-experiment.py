@@ -129,6 +129,13 @@ def build_report(sim: SimulationState, summary: dict, *, run_id: str | None = No
         ("regime_shifts", "体制転換"),
         ("disasters", "災害"),
         ("dominant_archetype", "台頭タイプ"),
+        ("pop_trough", "人口最下点"),
+        ("pop_recovery_ratio", "人口回復率"),
+        ("pop_retention_ratio", "人口保持率"),
+        ("disaster_deaths", "災害死"),
+        ("regime_break", "制度破綻"),
+        ("coop_vs_conflict_post_shock", "ショック後協力比"),
+        ("resilience_label", "レジリエンスラベル"),
     ]:
         lines.append(_line(label, summary.get(key)))
     if summary.get("spotlight_agent_id"):
@@ -204,6 +211,7 @@ def update_manifest(
     start_year: int,
     years_per_turn: int,
     milestone_turn: int,
+    protocol: str,
 ) -> None:
     settings = get_settings()
     upsert_run_manifest(
@@ -219,6 +227,7 @@ def update_manifest(
         start_year=start_year,
         years_per_turn=years_per_turn,
         experiment_seed=experiment_seed,
+        protocol=protocol,
     )
 
 
@@ -366,6 +375,7 @@ def main() -> int:
             start_year=args.start_year,
             years_per_turn=years_per_turn,
             milestone_turn=turns,
+            protocol=protocol,
         )
         analysis_dir = analysis_run_dir(ROOT, run_id)
         print(f"\nDone. {len(records)} report(s) in {out_dir}")

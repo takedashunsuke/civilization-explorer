@@ -3,6 +3,9 @@
 対照実験 **同一 5,000 人 × 4 環境** を、審査員がローカルで再現するための手順です。  
 設計の背景は開発用ドキュメント [docs/hackathon/demo-v3.md](./docs/hackathon/demo-v3.md) を参照してください。
 
+> **講評後の次実験**は environment ではなく `--protocol resilience`（stub 試験が先）。手順は [docs/hackathon/post-award.md](./docs/hackathon/post-award.md) §11 と [scripts/README.md](./scripts/README.md)。  
+> `./scripts/run-experiment-batch.sh` の既定は第2回提出と同じ **environment** のままです。
+
 ## 実証実験プロトコル（提出）
 
 | 項目 | 値 |

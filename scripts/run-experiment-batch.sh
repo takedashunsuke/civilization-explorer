@@ -1,39 +1,117 @@
 #!/usr/bin/env bash
-# 提出用・実証実験の一括実行
-# 暦年ラベル AD 1750→1950（表示用）・200 年 × seed 10 本 → result/raw/run-NNN/
+# 実証実験の一括実行
+# 暦年ラベル AD 1750→1950（表示用）・既定 200 年 × seed 10 本 → result/raw/run-NNN/
+#
+# 第2回提出（environment）:
+#   ./scripts/run-experiment-batch.sh
+# 講評対応（resilience・stub 試験）:
+#   ./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RUNNER="$ROOT/scripts/run-experiment.sh"
 
-# 実証プロトコル（提出ドキュメントと同期）
+PROTOCOL="environment"
 START_YEAR=1750
 YEARS=200
 SEED_START=42
 REPS=10
-
+REPS_SET=0
 DRY_RUN=0
+STUB=0
+
+usage() {
+  cat <<'EOF'
+Usage: ./scripts/run-experiment-batch.sh [options]
+
+  --protocol environment|resilience
+      environment: lush/lean/volatile/balanced（第2回提出・既定）
+      resilience: civic/autocrat/commune/fracture（講評対応の主プロトコル）
+  --stub          LLM_PROVIDER=stub で実行（ヒューリスティックのみ）
+  --reps N        seed 本数（既定: 10。--from-seed 未指定時）
+  --years N       シミュレーション年数（既定: 200。10 の倍数）
+  --from-seed N   再開用の開始 seed（既定: 42）
+  --dry-run       実行コマンドのみ表示
+  -h, --help      このヘルプ
+EOF
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    --protocol)
+      PROTOCOL="${2:-}"
+      if [[ "$PROTOCOL" != "environment" && "$PROTOCOL" != "resilience" ]]; then
+        echo "Unknown protocol: ${PROTOCOL:-} (environment|resilience)" >&2
+        exit 1
+      fi
+      shift 2
+      ;;
+    --stub) STUB=1; shift ;;
+    --reps)
+      REPS="${2:-}"
+      REPS_SET=1
+      shift 2
+      ;;
+    --years)
+      YEARS="${2:-}"
+      shift 2
+      ;;
+    --from-seed)
+      SEED_START="${2:-}"
+      shift 2
+      ;;
     --dry-run) DRY_RUN=1; shift ;;
-    --from-seed) SEED_START="$2"; shift 2 ;;
-    *) echo "Unknown option: $1" >&2; exit 1 ;;
+    -h|--help) usage; exit 0 ;;
+    *) echo "Unknown option: $1" >&2; usage >&2; exit 1 ;;
   esac
 done
 
-# Remaining reps when resuming mid-batch
-if [[ "$SEED_START" -gt 42 ]]; then
+if ! [[ "$YEARS" =~ ^[0-9]+$ ]] || (( YEARS <= 0 || YEARS % 10 != 0 )); then
+  echo "--years must be a positive multiple of 10" >&2
+  exit 1
+fi
+if ! [[ "$REPS" =~ ^[0-9]+$ ]] || (( REPS <= 0 )); then
+  echo "--reps must be a positive integer" >&2
+  exit 1
+fi
+if ! [[ "$SEED_START" =~ ^[0-9]+$ ]]; then
+  echo "--from-seed must be an integer" >&2
+  exit 1
+fi
+
+# Remaining reps when resuming the original 10-seed batch (42…51)
+if [[ "$REPS_SET" -eq 0 && "$SEED_START" -gt 42 ]]; then
   REPS=$((51 - SEED_START + 1))
+  if (( REPS <= 0 )); then
+    echo "--from-seed $SEED_START is past the default batch (42…51); pass --reps" >&2
+    exit 1
+  fi
 fi
 
 END_YEAR=$((START_YEAR + YEARS))
 TURNS=$((YEARS / 10))
+SEED_END=$((SEED_START + REPS - 1))
+
+if [[ "$PROTOCOL" == "resilience" ]]; then
+  VARIANT_NOTE="4 社会構造（civic / autocrat / commune / fracture）"
+else
+  VARIANT_NOTE="4 環境（lush / lean / volatile / balanced）"
+fi
+if [[ "$STUB" -eq 1 ]]; then
+  LLM_NOTE="stub（ヒューリスティック）"
+  MINUTES_PER_RUN=4
+else
+  LLM_NOTE="backend/.env の LLM_PROVIDER"
+  MINUTES_PER_RUN=26
+fi
 
 echo "=== Civilization Explorer — 実証実験バッチ ==="
+echo "  プロトコル: ${PROTOCOL}"
+echo "  各 run: ${VARIANT_NOTE} × 2 ファイル（.json + .txt）"
 echo "  期間: AD ${START_YEAR} → AD ${END_YEAR}（${YEARS} 年 / ${TURNS} ターン・暦年は表示用ラベル）"
-echo "  繰り返し: ${REPS} 回（seed ${SEED_START} … $((SEED_START + REPS - 1))）"
-echo "  各 run: 4 環境 × 2 ファイル（.json + .txt）"
-echo "  目安時間: 約 $((REPS * 26)) 分（Ollama llama3.2:1b・1 run ≈ 26 分）"
+echo "  繰り返し: ${REPS} 回（seed ${SEED_START} … ${SEED_END}）"
+echo "  LLM: ${LLM_NOTE}"
+echo "  目安時間: 約 $((REPS * MINUTES_PER_RUN)) 分"
 echo ""
 
 if [[ ! -x "$RUNNER" ]]; then
@@ -41,18 +119,22 @@ if [[ ! -x "$RUNNER" ]]; then
   exit 1
 fi
 
+if [[ "$STUB" -eq 1 ]]; then
+  export LLM_PROVIDER=stub
+fi
+
 batch_start=$(date +%s)
 
 for i in $(seq 0 $((REPS - 1))); do
   seed=$((SEED_START + i))
   n=$((i + 1))
-  echo "--- [$n/${REPS}] seed=${seed} AD ${START_YEAR}→${END_YEAR} ---"
+  echo "--- [$n/${REPS}] protocol=${PROTOCOL} seed=${seed} AD ${START_YEAR}→${END_YEAR} ---"
   if [[ "$DRY_RUN" -eq 1 ]]; then
-    echo "$RUNNER --seed $seed --start-year $START_YEAR --years $YEARS"
+    echo "$RUNNER --protocol $PROTOCOL --seed $seed --start-year $START_YEAR --years $YEARS"
     continue
   fi
   run_start=$(date +%s)
-  "$RUNNER" --seed "$seed" --start-year "$START_YEAR" --years "$YEARS"
+  "$RUNNER" --protocol "$PROTOCOL" --seed "$seed" --start-year "$START_YEAR" --years "$YEARS"
   run_elapsed=$(( $(date +%s) - run_start ))
   echo "    done in ${run_elapsed}s"
   echo ""

@@ -25,7 +25,7 @@
 | [gap.md](./gap.md) | 方針と実装の AS-IS / ギャップ / TODO |
 | [world-model.md](./world-model.md) | **固定・変動・創発**の四層モデル（概念の正） |
 | [review.md](./review.md) | テーマ根拠・経緯 |
-| [post-award.md](./post-award.md) | **入賞講評・ネクストアクション・実装方針**（Phase A–C） |
+| [post-award.md](./post-award.md) | **入賞講評・ネクストアクション・実装方針**（Phase A–C・2026-09-18 コード確認） |
 | [faq.md](./faq.md) | 想定 Q&A |
 | [submission.md](./submission.md) | 提出物一覧（ルート + docs） |
 

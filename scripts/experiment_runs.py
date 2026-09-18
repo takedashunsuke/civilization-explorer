@@ -41,22 +41,40 @@ def relative_repo_path(path: Path, root: Path) -> str:
     return str(path.relative_to(root)).replace("\\", "/")
 
 
-def default_file_entries() -> list[dict[str, str]]:
-    labels = {
-        "lush": "豊か",
-        "lean": "乏しい",
-        "volatile": "災害多",
-        "balanced": "標準",
-    }
+ENVIRONMENT_VARIANT_IDS: tuple[str, ...] = ("lush", "lean", "volatile", "balanced")
+RESILIENCE_VARIANT_IDS: tuple[str, ...] = ("civic", "autocrat", "commune", "fracture")
+VARIANT_LABEL_JA: dict[str, str] = {
+    "lush": "豊か",
+    "lean": "乏しい",
+    "volatile": "災害多",
+    "balanced": "標準",
+    "civic": "民主・協調",
+    "autocrat": "専制・秩序",
+    "commune": "高福祉・共同",
+    "fracture": "無政府・分断",
+}
+
+
+def infer_protocol(records: list[dict[str, Any]], protocol: str | None = None) -> str:
+    if protocol in {"environment", "resilience"}:
+        return protocol
+    present = {str(r.get("variant") or "") for r in records}
+    if present & set(RESILIENCE_VARIANT_IDS):
+        return "resilience"
+    return "environment"
+
+
+def default_file_entries(protocol: str = "environment") -> list[dict[str, str]]:
+    ids = RESILIENCE_VARIANT_IDS if protocol == "resilience" else ENVIRONMENT_VARIANT_IDS
     return [
         {
             "variant": vid,
-            "label_ja": labels[vid],
+            "label_ja": VARIANT_LABEL_JA[vid],
             "path": "",
             "json_path": "",
             "status": "pending",
         }
-        for vid in ("lush", "lean", "volatile", "balanced")
+        for vid in ids
     ]
 
 
@@ -90,14 +108,16 @@ def upsert_run_manifest(
     start_year: int,
     years_per_turn: int,
     experiment_seed: int,
+    protocol: str | None = None,
 ) -> None:
     data = load_manifest(manifest_path)
     run_rel = relative_repo_path(run_dir, repo_root)
     recorded_at = datetime.now(timezone.utc).isoformat()
+    resolved_protocol = infer_protocol(records, protocol)
 
     by_variant = {r["variant"]: r for r in records}
     files: list[dict[str, Any]] = []
-    for entry in default_file_entries():
+    for entry in default_file_entries(resolved_protocol):
         vid = entry["variant"]
         if vid in by_variant:
             rec = by_variant[vid]
@@ -115,6 +135,7 @@ def upsert_run_manifest(
         "id": run_id,
         "path": run_rel,
         "recorded_at": recorded_at,
+        "protocol": resolved_protocol,
         "experiment_seed": experiment_seed,
         "start_year": start_year,
         "years_per_turn": years_per_turn,
@@ -147,6 +168,7 @@ def upsert_run_manifest(
     data["start_year"] = start_year
     data["years_per_turn"] = years_per_turn
     data["experiment_seed"] = experiment_seed
+    data["protocol"] = resolved_protocol
     if ollama_model:
         data["ollama_model"] = ollama_model
 
@@ -155,6 +177,7 @@ def upsert_run_manifest(
     run_meta = {
         "id": run_id,
         "recorded_at": recorded_at,
+        "protocol": resolved_protocol,
         "experiment_seed": experiment_seed,
         "start_year": start_year,
         "years_per_turn": years_per_turn,

@@ -382,15 +382,24 @@ def build_cross_run_markdown(
         "",
         f"対象: {len(runs)} run（`result/manifest.json` の完了分）",
         "",
+        "environment と resilience が混在していても、それぞれの表に振り分ける。",
+        "",
         "## 争い（累計）— 災害多 − 乏しい（environment protocol）",
         "",
         "| run | seed | 豊か | 乏しい | 災害多 | 標準 | Δ(災害多−乏しい) |",
         "|-----|------|------|--------|--------|------|------------------|",
     ]
+    env_rows = 0
+    res_payloads: list[tuple[str, Any, dict[str, dict[str, Any]]]] = []
     for run in runs:
         payloads = load_run_payloads(repo_root, run)
+        if set(payloads) >= set(RESILIENCE_VARIANT_ORDER):
+            seed = payloads["civic"].get("experiment_seed")
+            res_payloads.append((run["id"], seed, payloads))
+            continue
         if "lush" not in payloads:
             continue
+        env_rows += 1
         seed = payloads["lush"].get("experiment_seed")
         vals = {
             vid: int(payloads[vid]["experiment_summary"]["conflicts_total"])
@@ -401,6 +410,50 @@ def build_cross_run_markdown(
             f"| {run['id']} | {seed} | {vals['lush']} | {vals['lean']} | "
             f"{vals['volatile']} | {vals['balanced']} | {delta:+d} |"
         )
+    if env_rows == 0:
+        lines.append("| — | — | — | — | — | — | 対象 run なし |")
+    lines.extend([
+        "",
+        "## 人口保持率 — civic / autocrat / commune / fracture（resilience protocol）",
+        "",
+        "| run | seed | 民主・協調 | 専制・秩序 | 高福祉・共同 | 無政府・分断 |",
+        "|-----|------|------------|------------|--------------|--------------|",
+    ])
+    if not res_payloads:
+        lines.append("| — | — | — | — | — | — |")
+    else:
+        for run_id, seed, payloads in res_payloads:
+            cells = [
+                _fmt_cell(payloads[vid]["experiment_summary"].get("pop_retention_ratio"), "f1")
+                for vid in RESILIENCE_VARIANT_ORDER
+            ]
+            lines.append(f"| {run_id} | {seed} | " + " | ".join(cells) + " |")
+        lines.extend([
+            "",
+            "## 災害死 — resilience protocol",
+            "",
+            "| run | seed | 民主・協調 | 専制・秩序 | 高福祉・共同 | 無政府・分断 |",
+            "|-----|------|------------|------------|--------------|--------------|",
+        ])
+        for run_id, seed, payloads in res_payloads:
+            cells = [
+                _fmt_cell(payloads[vid]["experiment_summary"].get("disaster_deaths"), "d")
+                for vid in RESILIENCE_VARIANT_ORDER
+            ]
+            lines.append(f"| {run_id} | {seed} | " + " | ".join(cells) + " |")
+        lines.extend([
+            "",
+            "## レジリエンスラベル — resilience protocol",
+            "",
+            "| run | seed | 民主・協調 | 専制・秩序 | 高福祉・共同 | 無政府・分断 |",
+            "|-----|------|------------|------------|--------------|--------------|",
+        ])
+        for run_id, seed, payloads in res_payloads:
+            cells = [
+                str(payloads[vid]["experiment_summary"].get("resilience_label") or "—")
+                for vid in RESILIENCE_VARIANT_ORDER
+            ]
+            lines.append(f"| {run_id} | {seed} | " + " | ".join(cells) + " |")
     lines.append("")
     return "\n".join(lines)
 

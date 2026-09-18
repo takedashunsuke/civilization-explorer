@@ -1,6 +1,6 @@
 # 第2回ハッカソン講評と次の実装方針
 
-> ステータス: 入賞後の引継ぎ（2026-09）  
+> ステータス: 入賞後の引継ぎ（2026-09）／コード確認 2026-09-18  
 > 用途: 講評の記録、ネクストアクション、レジリエンス方向の実装判断  
 > 関連: [overview.md](./overview.md) · [gap.md](./gap.md) · [review.md](./review.md) · [world-model.md](./world-model.md) · [analysis/output/cross-run-summary-2026-08-30.md](../../analysis/output/cross-run-summary-2026-08-30.md)
 
@@ -83,12 +83,51 @@
 
 ## 4. ネクストアクション（優先度）
 
-### P0 — 問いと計測の再定義（実装前に固定）
+Phase A–C のコードは `3fba352` 以降に入っている。**次は stub で動かして差の経路を確認する。** 詳細な未対応は §9–10。
 
-- [ ] 中心の問いを文書化する: **「同じショックに対し、社会は回復するか崩壊するか」**
-- [ ] 成功条件を決める（例: ショック後 N ターンで人口・資源・制度権威が閾値以上に戻る＝回復）
+### いま回す — stub 試験（LLM なし）
+
+`backend/.env` は `LLM_PROVIDER=stub` が正。Ollama を繋いだままにしない。
+
+1. **受け入れパイロット（短い）**
+   - `backend/.venv/bin/python scripts/pilot_phase_a.py` — 環境ノブで人口が分かれるか
+   - `backend/.venv/bin/python scripts/pilot_phase_c.py` — 同一危機 × 社会構造で指標が出るか
+2. **resilience 単発（200 年・1 seed）**
+   - `./scripts/run-experiment.sh --protocol resilience --start-year 1750 --years 200 --seed 42`
+   - またはバッチ 1 本: `./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1`
+3. **読む指標**（`resilience_label` は参考。年齢死で collapsed に寄りやすい）
+   - `pop_retention_ratio` / `disaster_deaths` / `coop_vs_conflict_post_shock` / `regime_break`
+4. **経路が見えたら seed を増やす**
+   - `./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 10`
+   - 解析: `./scripts/run-analysis-batch.sh --aggregate`
+
+操作的な合格（stub）:
+
+| 段階 | 合格の目安 |
+|------|------------|
+| Phase C パイロット | pulse が `[2,5,8]`、生存または保持率に差、ショック数が近い、指標が null でない |
+| 200 年 1 seed | 4 variant の `pop_retention_ratio` が完全一致しない。差を災害死・協力比・制度で説明できる |
+| ラベル | recovered 必須ではない。単調減少なら保持率を主指標にする |
+
+### まだ対応できていない課題（要約）
+
+実装済みに見せかけて、解釈や次の語りを崩すもの。詳細は §10。
+
+| 優先 | 課題 | 状態 |
+|------|------|------|
+| 高 | 「同一ショック列」は近似（疫病が `trade_openness` に依存し、生存人数で RNG がずれる） | 未修正 |
+| 高 | 年齢死が強く、ラベルが collapsed に寄る | 既知。保持率で読む |
+| 中 | `inequality` が初期富に乗らない。社会差は協力バイアスと再生補正が主 | 未修正 |
+| 中 | メタ安全保障の一文が README / overview に無い | 未 |
+| 中 | UI は lush 系のみ。回復曲線なし | 未 |
+| 低 | Phase D（中〜大モデルで住民意思決定） | 未。stub で差が出てから |
+
+### P0 — 問いと計測の再定義
+
+- [x] 中心の問いを文書化する: **「同じショックに対し、社会は回復するか崩壊するか」**
+- [x] stub 試験用の成功条件を置く（上表。ラベル閾値の再調整は残件）
 - [ ] 「メタ安全保障」との一文接続を README / overview に書く（後述 §6）
-- [ ] 本ファイルと [gap.md](./gap.md) の TODO を同期する
+- [x] 本ファイルと [gap.md](./gap.md) の TODO を同期する（2026-09-18）
 
 ### P1 — ルール層で人口・ショックが分岐する（LLM なしでも差が出る）
 
@@ -96,15 +135,19 @@
 - [x] ショック後の回復軌跡を `experiment_summary` に載せる（§5.2）— Phase B
 - [x] パイロット: 4 variant × 短い年数 × 少数 seed で人口が分かれることを確認（`scripts/pilot_phase_a.py`）
 - [x] 横断サマリーの「読み方」をレジリエンス指標中心に更新（`analysis_batch.py` の比較表に 1b 節）
+- [x] **stub で Phase A/C パイロットを再走し、200 年 1 seed の実測を残す**（`result/raw/run-011/`）
 
 ### P2 — 対照実験の軸を「環境ノブ」から「危機応答」へ拡張
 
-- [x] 同一ロスター × **同一ショック列** × **異なる初期制度／協力バイアス**の第2プロトコルを設計（§5.3）
+- [x] 同一ロスター × **同一ショック予定** × **異なる初期制度／協力バイアス**の第2プロトコルを設計（§5.3）
 - [x] CLI に `--protocol resilience` を追加（`scripts/run-experiment.py` / `pilot_phase_c.py`）
+- [x] バッチシェルが `--protocol` / `--stub` / `--reps` を受け付ける（`scripts/run-experiment-batch.sh`）
 - [x] 既存の lush/lean/volatile/balanced は「環境感度のベースライン」として残す
+- [ ] ショック列を seed から事前生成し、全 variant に同じイベントを載せる（近似の解消）
 
 ### P3 — LLM を住民意思決定に引き上げ
 
+- [ ] stub 試験でルール層だけの差を確認してから着手
 - [ ] 1b 観測専用から、中〜大規模モデルで集団／サンプル住民の行動決定へ（§5.4）
 - [ ] stub ヒューリスティックでも P1 の差が出ることを維持（LLM は増幅層）
 - [ ] コスト上限: 地域サンプル数・ターンあたり呼び出し数を設定で制御（既存 `llm_group_sample_per_region` を拡張）
@@ -112,7 +155,7 @@
 ### P4 — 観測・語り（厚み）
 
 - [ ] 同一 ID のクロスワールド生死・台頭比較をサマリーに固定枠で出す
-- [ ] UI: ショック後の回復曲線（人口・資源）の最小表示
+- [ ] UI: ショック後の回復曲線（人口・資源）の最小表示。civic 等の variant 切替
 - [ ] 争いの再現性は「主指標にしない／条件付きで見る」方針を維持
 
 ### やらない（当面）
@@ -120,6 +163,7 @@
 * 全 5,000 人を毎ターン個別 LLM で動かす
 * 石油・食料など資源種類の本格マルチコモディティ化
 * 「メタ安全保障」を別プロダクトとして実装し直す（接続は語りと指標で先に）
+* stub 確認前に Ollama 1b で 10 seed フルバッチを回す（入賞時の environment 再実行は必要なら明示する）
 
 ---
 
@@ -184,6 +228,8 @@
 観測: pop_retention_ratio・災害死・coop比・resilience_label
 ```
 
+**注意（2026-09-18 確認）:** 「同一ショック列」は **同じ seed・同じ災害頻度・同じパルス turn** まで。疫病発生が `trade_openness` に依存し、生存人数で `shock_rng` の消費がずれるため、イベント列そのものは variant 間で完全一致しない。講評向けの語りでは「同一危機環境＋同一パルス予定」と書く。厳密な同一列は P2 の残件。
+
 | variant | 意味 |
 |---------|------|
 | `civic` | 民主・協調 |
@@ -195,6 +241,7 @@
 - `prepare_experiment_sim` / `bias_roster_to_identity`（`experiment.py`）
 - `apply_pulse_shock` + shock 専用 RNG（`engine.py`）
 - CLI: `python scripts/run-experiment.py --protocol resilience`
+- バッチ: `./scripts/run-experiment-batch.sh --protocol resilience --stub`
 - パイロット: `scripts/pilot_phase_c.py`
 
 問いの言い換え:
@@ -219,12 +266,12 @@
 
 ### 5.5 推奨実装順（短期スプリント）
 
-1. **死亡・災害致死・出生の資源連動**（小さく、テスト付き）  
-2. **レジリエンス指標を summary に追加**  
-3. **パイロットバッチ（短縮年数）で人口分岐を確認**  
-4. **第2プロトコル（同一ショック × 制度差）の設計メモ → CLI**  
-5. **LLM モデルサイズ引き上げ + 集団決定の比重増**  
-6. **overview / README にメタ安全保障の一文接続**
+1. ~~死亡・災害致死・出生の資源連動~~（Phase A 済）  
+2. ~~レジリエンス指標を summary に追加~~（Phase B 済）  
+3. **stub でパイロット → resilience 1 seed**（いまここ）  
+4. 差の経路が説明できるなら stub 10 seed。必要なら同一ショック列の固定  
+5. overview / README にメタ安全保障の一文接続  
+6. LLM モデルサイズ引き上げ + 集団決定の比重増（stub で差が出てから）
 
 ---
 
@@ -256,6 +303,136 @@
 | 人口・災害・tick | `backend/simulation/engine.py` |
 | ショック | `backend/simulation/shocks.py` |
 | LLM | `backend/simulation/llm.py` · `backend/config.py` |
-| バッチ | `scripts/run-experiment-batch.sh` · `scripts/analysis_batch.py` |
+| バッチ | `scripts/run-experiment-batch.sh` · `scripts/analysis_batch.py` · `scripts/pilot_phase_a.py` · `scripts/pilot_phase_c.py` |
 | 概念 | [world-model.md](./world-model.md) |
 | 現状ギャップ | [gap.md](./gap.md) |
+
+---
+
+## 9. コード確認メモ（2026-09-18）
+
+対象: `3fba352`（Phase A・講評文書化）から 3 コミット。
+
+| コミット | 内容 |
+|----------|------|
+| `43ee625` Phase B | 毎ターンの人口・資源・権威を記録し、回復／崩壊指標を `experiment_summary` に載せた |
+| `ba97f31` Phase C | 同一危機環境 × civic / autocrat / commune / fracture の第2プロトコル |
+| `8b9ef7d` | 上記を `main` にマージ |
+
+講評の「人口が同一」「差は環境ノブの写像」への返しとして、方向は合っている。実行は可能。ただし次を知ったうえで回す。
+
+**よくできている点**
+
+* 問いの分離: environment は「環境は効くか」、resilience は「同じ危機で社会が折れるか」
+* 指標が `compute_resilience_metrics` にまとまり、比較表 1b まで繋がる
+* 行動 RNG とショック RNG を分け、パルス turn を variant 間で揃えている
+* ロスターは共通 ID のまま、性格だけ社会バイアスを足す
+
+**解釈をずらす点（§10 に残件化）**
+
+* 「同一ショック」は完全同一ではない
+* バッチ既定は environment のまま（`--protocol resilience` が必要）。2026-09-18 にシェルへフラグを追加済み
+* ラベルは collapsed に寄りやすい。保持率・災害死・協力比で読む
+* 社会ノブの効きにムラ（`inequality` ほぼ未使用、疫病が交易開放に漏れる）
+* フロントは lush 系のみ
+
+---
+
+## 10. まだ対応できていない課題
+
+Phase A–C で「コードはある」が、講評の次の問いに耐えるには不足が残る。
+
+### 10.1 実験設計（高）
+
+| 課題 | いま起きること | 望ましい形 |
+|------|----------------|------------|
+| 同一ショック列が近似 | `apply_epidemics` が `trade_openness` に依存。生存人数で `shock_rng` の消費がずれ、パルスの当りも変わる | seed から危機列（turn・地域・種類・強度）を先に作り、全 variant に同じイベントを適用。社会は応答だけ変える |
+| 回復ラベルが潰れる | 年齢死の単調減少で `pop_recovery_ratio ≈ 0`、`resilience_label=collapsed` になりやすい | 保持率を主指標にするか、年齢死を分離した「ショック帰属死」を測る。閾値の再調整は実測後 |
+| 社会ノブの写像リスク | 差が出ても協力バイアスと regen 補正（民主主義 1.05 / 無政府 0.88）の写像に見えやすい | 経路ログ（災害死・出生抑制・資源回復）をサマリーの定位置にする。ノブを極端にしない |
+
+### 10.2 計測・出力（中）
+
+| 課題 | 詳細 |
+|------|------|
+| 比較表の小数 | `pop_recovery_ratio` 等が 1 桁（0.55 → 0.6） |
+| `.txt` と JSON | レジリエンス指標は JSON が正。txt には 2026-09-18 から主要キーを追加 |
+| 横断集計 | 以前は environment の争い Δ のみ。resilience の保持率・災害死・ラベル表を追加済み。旧 run と混在しても振り分ける |
+| API パルス | `POST /simulations` は常に 20 turn 前提。UI で 10 turn しか回さないとパルス 4 だけ発火 |
+| `pilot_phase_a.py` | `prepare_experiment_sim` を呼んでいない（environment では実害小） |
+
+### 10.3 社会ノブの穴（中）
+
+| ノブ | 効くか |
+|------|--------|
+| 性格バイアス（協力・野心・攻撃） | 効く。協力／争いへ |
+| 制度 | 資源再生の係数。体制ドリフト |
+| 福祉 | 再分配・幸福・権威 |
+| 税率 | 服従時の支払い。0.2 超で幸福減 |
+| `authority_acceptance` | 初期権威のみ。エージェント性格には乗らない |
+| `inequality` | ロスター生成は 0.5 固定。初期富の再配置なし。3 人以上では富の分散で上書き |
+
+### 10.4 語り・UI・LLM（中〜低）
+
+| 課題 | 詳細 |
+|------|------|
+| メタ安全保障 | §6 の一文が README / overview に未掲載 |
+| UI | `experimentWorlds.ts` は lush 系のみ。回復曲線なし |
+| Phase D | 1b 観測のまま。stub で差が出てから中〜大モデルへ |
+| 同一 ID 比較 | サマリーの固定枠なし |
+
+---
+
+## 11. stub 試験の手順
+
+LLM は増幅層。**ルール層だけで差が出ることを先に確認する。** いまの `backend/.env` は `LLM_PROVIDER=stub`。
+
+### 11.1 パイロット（数分）
+
+リポジトリルートから:
+
+```bash
+backend/.venv/bin/python scripts/pilot_phase_a.py
+backend/.venv/bin/python scripts/pilot_phase_c.py
+```
+
+Phase C が `needs tuning` なら、200 年バッチの前にパルス・社会差・ショック数を見る。
+
+### 11.2 resilience 1 seed（stub）
+
+```bash
+./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1 --dry-run
+./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1
+```
+
+同等の単発:
+
+```bash
+LLM_PROVIDER=stub ./scripts/run-experiment.sh \
+  --protocol resilience --start-year 1750 --years 200 --seed 42
+```
+
+出力: `result/raw/run-NNN/civ-{civic,autocrat,commune,fracture}-AD1950-turn20.{json,txt}`
+
+見る場所: 各 JSON の `experiment_summary`（保持率・災害死・協力比・制度破綻・ラベル）。
+
+### 11.3 解析
+
+```bash
+./scripts/run-analysis-batch.sh --from-run <今回の run 番号>
+# 2 本以上そろったら
+./scripts/run-analysis-batch.sh --aggregate
+```
+
+### 11.4 伸ばす条件
+
+* 1 seed で 4 世界の保持率が分かれ、災害死か協力比で「なぜ」が言える → `--reps 10`（stub）
+* 差がノブの写像にしか見えない → 同一ショック列の固定（§10.1）を先にする
+* stub で差が出た → そのあと Ollama（1b は観測デモ。意思決定はより大きいモデル）
+
+environment の再実行（入賞時と同じ lush 系）が必要なときだけ:
+
+```bash
+./scripts/run-experiment-batch.sh --protocol environment --stub --reps 1
+```
+
+既定の `./scripts/run-experiment-batch.sh` は **environment** のまま（提出手順を壊さない）。講評対応の主実験は **必ず `--protocol resilience`**。
