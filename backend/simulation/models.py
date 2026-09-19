@@ -308,6 +308,16 @@ class HistoryRecord(BaseModel):
     disaster_events: int = 0
 
 
+class PlannedShock(BaseModel):
+    """Pre-generated crisis cell: identical across resilience variants."""
+
+    turn: int
+    region_id: str
+    subregion_id: str | None = None
+    kind: str
+    intensity: float = 1.0
+
+
 class ChosenAction(BaseModel):
     agent_id: str
     action: ActionType
@@ -327,6 +337,8 @@ class SimulationState(BaseModel):
     experiment_protocol: str | None = None
     # Forced crisis turns (identical across resilience variants)
     shock_pulse_turns: list[int] = Field(default_factory=list)
+    # Pre-generated shock column (resilience protocol). Empty = stochastic path.
+    shock_plan: list[PlannedShock] = Field(default_factory=list)
     world: WorldState
     agents: list[AgentState]
     relationships: list[RelationshipState]

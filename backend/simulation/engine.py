@@ -7,7 +7,15 @@ from collections import defaultdict
 from simulation.continents import CONTINENT_PRESETS, SUBREGION_CENTERS, resolve_preset, resolve_subregion
 from simulation.llm import observe_and_steer_regions
 from config import get_settings
-from simulation.shocks import apply_epidemics, apply_historic_quakes, apply_weather_shocks
+from simulation.shocks import (
+    apply_epidemic_to_region,
+    apply_epidemics,
+    apply_historic_quakes,
+    apply_weather_shocks,
+    apply_weather_to_region,
+    event_rng,
+    pick_disaster_kind,
+)
 from simulation.models import (
     ActionType,
     AgentState,
@@ -25,6 +33,7 @@ from simulation.models import (
     RegionPolicy,
     RegionReading,
     Personality,
+    PlannedShock,
     Position,
     RegionParams,
     RegionState,
@@ -1694,22 +1703,7 @@ def summarize_group_events(
 
 
 def _pick_disaster(region: RegionState, rng: random.Random) -> str:
-    weights: dict[str, float] = {
-        "earthquake": 0.18,
-        "typhoon": 0.18 if region.landform == LandformType.island else 0.08,
-        "flood": 0.22 if region.climate == ClimateType.wetland else 0.1,
-        "heatwave": 0.22 if region.climate == ClimateType.arid else 0.08,
-        "frost": 0.22 if region.climate == ClimateType.cold else 0.06,
-    }
-    kinds = list(weights)
-    total = sum(weights.values())
-    pick = rng.random() * total
-    acc = 0.0
-    for kind in kinds:
-        acc += weights[kind]
-        if pick <= acc:
-            return kind
-    return kinds[-1]
+    return pick_disaster_kind(region, rng)
 
 
 def apply_welfare(sim: SimulationState) -> None:
@@ -1843,71 +1837,205 @@ def apply_disasters(sim: SimulationState, rng: random.Random, skip_quake: set[st
     return events
 
 
+def _region_for_spec(sim: SimulationState, spec: PlannedShock) -> RegionState | None:
+    for region in sim.world.regions:
+        rid = region.id.value if hasattr(region.id, "value") else str(region.id)
+        if spec.subregion_id and region.subregion_id == spec.subregion_id:
+            return region
+        if not spec.subregion_id and rid == spec.region_id:
+            return region
+    return None
+
+
+def apply_disaster_kind_to_region(
+    sim: SimulationState,
+    region: RegionState,
+    rng: random.Random,
+    kind: str,
+    skip_quake: set[str],
+) -> list[EventRecord]:
+    events: list[EventRecord] = []
+    freq = region.disaster_frequency
+    sid = region.subregion_id or region.id.value
+    if kind == "earthquake" and sid in skip_quake:
+        return events
+    hit = agents_in_region(sim, region)
+    if kind in ("typhoon", "earthquake") and len(hit) > 2:
+        hit = rng.sample(hit, max(2, len(hit) // 2))
+    loss = 0.0
+    killed = 0
+    severe = kind in ("earthquake", "typhoon", "flood")
+    kill_rate = (0.018 + 0.07 * freq) * (1.45 if severe else 0.85)
+    stress_bump = 0.18 + 0.4 * freq + (0.12 if severe else 0.0)
+    living_count = len(agents_in_region(sim, region))
+    for agent in hit:
+        if not agent.alive:
+            continue
+        if kind == "heatwave":
+            agent.energy = clamp(agent.energy - 0.12)
+            agent.happiness = clamp(agent.happiness - 0.04)
+        elif kind == "frost":
+            agent.energy = clamp(agent.energy - 0.1)
+            agent.wealth = max(0.0, agent.wealth - 1.2)
+            loss += 1.2
+        elif kind == "flood":
+            agent.wealth = max(0.0, agent.wealth - 1.6)
+            agent.happiness = clamp(agent.happiness - 0.05)
+            loss += 1.6
+        elif kind == "typhoon":
+            agent.energy = clamp(agent.energy - 0.08)
+            agent.wealth = max(0.0, agent.wealth - 1.4)
+            loss += 1.4
+        else:
+            agent.wealth = max(0.0, agent.wealth - 2.0)
+            agent.happiness = clamp(agent.happiness - 0.06)
+            loss += 2.0
+        agent.shock_stress = clamp(agent.shock_stress + stress_bump)
+        if living_count <= MIN_ALIVE_PER_REGION:
+            continue
+        if rng.random() < kill_rate:
+            living_here = [a for a in agents_in_region(sim, region) if a.alive]
+            heir = _pick_heir(agent, living_here)
+            agent.alive = False
+            agent.energy = 0.0
+            sim.relationships = [
+                rel for rel in sim.relationships if rel.a_id != agent.id and rel.b_id != agent.id
+            ]
+            events.append(
+                EventRecord(
+                    turn=sim.world.turn,
+                    actor_id=agent.id,
+                    action=ActionType.death,
+                    target_id=heir.id if heir else None,
+                    success=False,
+                    detail_key="death_disaster",
+                    detail=f"{agent.id} died in {kind}",
+                    deltas={"age": float(agent.age)},
+                )
+            )
+            killed += 1
+            living_count -= 1
+    food_hit = 4.0 + 10.0 * freq
+    if kind in ("flood", "frost", "heatwave"):
+        region.resource_pool = max(0.0, region.resource_pool - food_hit)
+    lon, lat = SUBREGION_CENTERS.get(sid, (0.0, 0.0))
+    alert = "red" if kind in ("earthquake", "typhoon") or killed > 0 else "yellow"
+    events.append(
+        EventRecord(
+            turn=sim.world.turn,
+            actor_id=sid,
+            action=ActionType.disaster,
+            detail_key=f"disaster_{kind}",
+            detail=f"{kind} hit {len(hit)} agents in {sid}"
+            + (f" ({killed} killed)" if killed else ""),
+            deltas={"n": float(len(hit)), "loss": loss, "killed": float(killed)},
+            lon=lon,
+            lat=lat,
+            alert=alert,
+        )
+    )
+    return events
+
+
+def apply_pulse_to_region(sim: SimulationState, region: RegionState, rng: random.Random) -> list[EventRecord]:
+    events: list[EventRecord] = []
+    hit = agents_in_region(sim, region)
+    if hit and len(hit) > 4:
+        hit = rng.sample(hit, max(4, len(hit) // 2))
+    killed = 0
+    living_count = len(agents_in_region(sim, region))
+    stress_bump = 0.45
+    kill_rate = 0.08
+    loss = 0.0
+    for agent in hit:
+        if not agent.alive:
+            continue
+        agent.wealth = max(0.0, agent.wealth - 2.4)
+        agent.energy = clamp(agent.energy - 0.14)
+        agent.happiness = clamp(agent.happiness - 0.1)
+        agent.shock_stress = clamp(agent.shock_stress + stress_bump)
+        loss += 2.4
+        if living_count <= MIN_ALIVE_PER_REGION:
+            continue
+        if rng.random() < kill_rate:
+            living_here = [a for a in agents_in_region(sim, region) if a.alive]
+            heir = _pick_heir(agent, living_here)
+            agent.alive = False
+            agent.energy = 0.0
+            sim.relationships = [
+                rel for rel in sim.relationships if rel.a_id != agent.id and rel.b_id != agent.id
+            ]
+            events.append(
+                EventRecord(
+                    turn=sim.world.turn,
+                    actor_id=agent.id,
+                    action=ActionType.death,
+                    target_id=heir.id if heir else None,
+                    success=False,
+                    detail_key="death_disaster",
+                    detail=f"{agent.id} died in crisis pulse",
+                    deltas={"age": float(agent.age)},
+                )
+            )
+            killed += 1
+            living_count -= 1
+    region.resource_pool = max(0.0, region.resource_pool - 18.0)
+    sid = region.subregion_id or region.id.value
+    lon, lat = SUBREGION_CENTERS.get(sid, (0.0, 0.0))
+    events.append(
+        EventRecord(
+            turn=sim.world.turn,
+            actor_id=sid,
+            action=ActionType.disaster,
+            detail_key="disaster_pulse",
+            detail=f"crisis pulse hit {len(hit)} agents in {sid}"
+            + (f" ({killed} killed)" if killed else ""),
+            deltas={"n": float(len(hit)), "loss": loss, "killed": float(killed)},
+            lon=lon,
+            lat=lat,
+            alert="red",
+            extra={"kind": "pulse"},
+        )
+    )
+    return events
+
+
+def apply_planned_shocks(
+    sim: SimulationState,
+    historic: list[EventRecord],
+) -> tuple[list[EventRecord], list[EventRecord], list[EventRecord], list[EventRecord]]:
+    """Apply the pre-generated column. Per-event RNG so deaths cannot desync later shocks."""
+    epidemics: list[EventRecord] = []
+    weather: list[EventRecord] = []
+    disasters: list[EventRecord] = []
+    pulse: list[EventRecord] = []
+    skip_quake = {e.actor_id for e in historic}
+    turn = sim.world.turn
+    seed = int(sim.world.seed)
+    for spec in sim.shock_plan:
+        if spec.turn != turn:
+            continue
+        region = _region_for_spec(sim, spec)
+        if region is None:
+            continue
+        rng = event_rng(seed, spec)
+        kind = spec.kind
+        if kind == "epidemic":
+            epidemics.extend(apply_epidemic_to_region(sim, region, rng))
+        elif kind.startswith("weather_"):
+            weather.extend(apply_weather_to_region(sim, region, rng, kind))
+        elif kind == "pulse":
+            pulse.extend(apply_pulse_to_region(sim, region, rng))
+        else:
+            disasters.extend(apply_disaster_kind_to_region(sim, region, rng, kind, skip_quake))
+    return epidemics, weather, disasters, pulse
+
+
 def apply_pulse_shock(sim: SimulationState, rng: random.Random) -> list[EventRecord]:
     """Forced multi-region crisis used by the resilience protocol (identical schedule)."""
     events: list[EventRecord] = []
-    targets = sim.world.regions or []
-    for region in targets:
-        hit = agents_in_region(sim, region)
-        if not hit:
-            continue
-        if len(hit) > 4:
-            hit = rng.sample(hit, max(4, len(hit) // 2))
-        killed = 0
-        living_count = len(agents_in_region(sim, region))
-        stress_bump = 0.45
-        kill_rate = 0.08
-        loss = 0.0
-        for agent in hit:
-            if not agent.alive:
-                continue
-            agent.wealth = max(0.0, agent.wealth - 2.4)
-            agent.energy = clamp(agent.energy - 0.14)
-            agent.happiness = clamp(agent.happiness - 0.1)
-            agent.shock_stress = clamp(agent.shock_stress + stress_bump)
-            loss += 2.4
-            if living_count <= MIN_ALIVE_PER_REGION:
-                continue
-            if rng.random() < kill_rate:
-                living_here = [a for a in agents_in_region(sim, region) if a.alive]
-                heir = _pick_heir(agent, living_here)
-                agent.alive = False
-                agent.energy = 0.0
-                sim.relationships = [
-                    rel for rel in sim.relationships if rel.a_id != agent.id and rel.b_id != agent.id
-                ]
-                events.append(
-                    EventRecord(
-                        turn=sim.world.turn,
-                        actor_id=agent.id,
-                        action=ActionType.death,
-                        target_id=heir.id if heir else None,
-                        success=False,
-                        detail_key="death_disaster",
-                        detail=f"{agent.id} died in crisis pulse",
-                        deltas={"age": float(agent.age)},
-                    )
-                )
-                killed += 1
-                living_count -= 1
-        region.resource_pool = max(0.0, region.resource_pool - 18.0)
-        sid = region.subregion_id or region.id.value
-        lon, lat = SUBREGION_CENTERS.get(sid, (0.0, 0.0))
-        events.append(
-            EventRecord(
-                turn=sim.world.turn,
-                actor_id=sid,
-                action=ActionType.disaster,
-                detail_key="disaster_pulse",
-                detail=f"crisis pulse hit {len(hit)} agents in {sid}"
-                + (f" ({killed} killed)" if killed else ""),
-                deltas={"n": float(len(hit)), "loss": loss, "killed": float(killed)},
-                lon=lon,
-                lat=lat,
-                alert="red",
-                extra={"kind": "pulse"},
-            )
-        )
+    for region in sim.world.regions or []:
+        events.extend(apply_pulse_to_region(sim, region, rng))
     return events
 
 
@@ -1987,16 +2115,19 @@ def end_of_turn(
         if event.extra.get("decide") == "llm" and event.action != ActionType.wait
     ]
     grouped = summarize_group_events(sim, micro_events or [], specials, snapshot)
-    # Shock stream is independent of action RNG so social variants share the same crisis schedule.
-    shock_rng = random.Random((sim.world.seed * 100003 + sim.world.turn * 9176 + 42) % (2**32))
+    # Shock stream: resilience uses a pre-generated column; environment stays stochastic.
     historic = apply_historic_quakes(sim)
-    epidemics = apply_epidemics(sim, shock_rng)
-    weather = apply_weather_shocks(sim, shock_rng)
-    skip_quake = {e.actor_id for e in historic}
-    disasters = apply_disasters(sim, shock_rng, skip_quake)
-    pulse: list[EventRecord] = []
-    if sim.world.turn in set(sim.shock_pulse_turns or []):
-        pulse = apply_pulse_shock(sim, shock_rng)
+    if sim.shock_plan:
+        epidemics, weather, disasters, pulse = apply_planned_shocks(sim, historic)
+    else:
+        shock_rng = random.Random((sim.world.seed * 100003 + sim.world.turn * 9176 + 42) % (2**32))
+        epidemics = apply_epidemics(sim, shock_rng)
+        weather = apply_weather_shocks(sim, shock_rng)
+        skip_quake = {e.actor_id for e in historic}
+        disasters = apply_disasters(sim, shock_rng, skip_quake)
+        pulse = []
+        if sim.world.turn in set(sim.shock_pulse_turns or []):
+            pulse = apply_pulse_shock(sim, shock_rng)
     regimes = apply_regime_drift(sim, rng)
     if sim.world.regions:
         for region in sim.world.regions:

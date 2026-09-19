@@ -6,6 +6,7 @@ from typing import Any
 
 from simulation.continents import CONTINENT_IDS, DEFAULT_SUBREGION
 from simulation.engine import clone_roster_for_world, generate_agent_roster
+from simulation.shocks import generate_shock_plan, shock_plan_signature
 from simulation.models import (
     AgentState,
     GeographyType,
@@ -300,8 +301,15 @@ def prepare_experiment_sim(
         identity = _RESILIENCE_SOCIAL[variant]["initial_values"]
         assert isinstance(identity, InitialValues)
         bias_roster_to_identity(sim.agents, identity)
+        sim.shock_plan = generate_shock_plan(
+            seed=seed,
+            total_turns=total_turns,
+            regions=sim.world.regions,
+            pulse_turns=sim.shock_pulse_turns,
+        )
     else:
         sim.shock_pulse_turns = []
+        sim.shock_plan = []
 
 
 def apply_variant_to_sim(sim: SimulationState, variant: str) -> None:
@@ -350,6 +358,7 @@ def describe_experiment() -> dict[str, Any]:
                     "resource_pool",
                     "disaster_frequency",
                     "shock_pulse_turns",
+                    "shock_plan",
                 ],
                 "varied": [
                     "institution",
@@ -680,6 +689,8 @@ def experiment_summary(sim: SimulationState) -> dict[str, Any]:
         "variant_label_ja": variant_label_ja(sim.experiment_variant or ""),
         "protocol": protocol,
         "shock_pulse_turns": list(sim.shock_pulse_turns or []),
+        "shock_plan_len": len(sim.shock_plan or []),
+        "shock_plan_signature": shock_plan_signature(list(sim.shock_plan or [])),
         "seed": sim.experiment_seed or sim.world.seed,
         "turn": sim.world.turn,
         "calendar_year": sim.world.start_year + sim.world.turn * sim.world.years_per_turn,

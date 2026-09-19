@@ -10,7 +10,7 @@
 | `run-011` | stub。resilience × LLM なし |
 | `run-013` | 1b A/B。resilience × `llama3.2:1b` |
 
-次の実装は同一ショック列の固定（§4）。1b の 10 seed は先にしない。次の新規 run は `run-014`。
+次の実装は Phase D（中〜大モデルの意思決定）。同一ショック列は固定済み。1b の 10 seed は先にしない。次の新規 run は `run-014`。
 
 ## stub / 1b の再現
 
