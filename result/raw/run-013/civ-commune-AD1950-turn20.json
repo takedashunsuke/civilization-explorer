@@ -1,0 +1,103 @@
+{
+  "format": "civ-experiment-result-v1",
+  "run_id": "run-013",
+  "protocol": "resilience",
+  "variant": "commune",
+  "variant_label_ja": "高福祉・共同",
+  "experiment_seed": 42,
+  "start_year": 1750,
+  "years_per_turn": 10,
+  "milestone_turn": 20,
+  "milestone_years": 200,
+  "simulation_id": "eecb2353-de12-4e48-9382-831feca4e7e6",
+  "turn": 20,
+  "calendar_year": 1950,
+  "shock_pulse_turns": [
+    4,
+    10,
+    16
+  ],
+  "llm": {
+    "provider": "ollama",
+    "ollama_model": "llama3.2:1b",
+    "openai_model": "gpt-4o-mini",
+    "wired": true,
+    "mode": "group",
+    "max_agents_per_turn": 4,
+    "group_sample_per_region": 12,
+    "timeout_sec": 8.0,
+    "note": "Group/institution LLM stance (≤12 actors/region); masses follow bulk rules."
+  },
+  "experiment_summary": {
+    "variant": "commune",
+    "variant_label_ja": "高福祉・共同",
+    "protocol": "resilience",
+    "shock_pulse_turns": [
+      4,
+      10,
+      16
+    ],
+    "seed": 42,
+    "turn": 20,
+    "calendar_year": 1950,
+    "population_alive": 183,
+    "population_delta_pct": -96.3,
+    "resource_pool": 147.9,
+    "trade_openness_mean": 0.45,
+    "conflicts_total": 33,
+    "cooperations_total": 41,
+    "regime_shifts": 0,
+    "disasters": 38,
+    "dominant_archetype": "warlord",
+    "archetypes": [
+      "warlord",
+      "merchant",
+      "warlord"
+    ],
+    "trajectories": [
+      "exodus",
+      "exodus",
+      "industry",
+      "exodus",
+      "exodus"
+    ],
+    "institutions": [
+      "democracy",
+      "democracy",
+      "democracy",
+      "democracy",
+      "democracy"
+    ],
+    "spotlight_agent_id": "a6156",
+    "spotlight_role": "warlord",
+    "shock_count": 38,
+    "disaster_deaths": 245,
+    "first_shock_turn": 2,
+    "pop_trough": 183,
+    "pop_recovery_ratio": 0.0,
+    "pop_retention_ratio": 0.05,
+    "resource_recovery_halftime": 0,
+    "regime_break": false,
+    "coop_vs_conflict_post_shock": 0.586,
+    "resilience_label": "collapsed",
+    "resilience": {
+      "shock_count": 38,
+      "disaster_deaths": 245,
+      "first_shock_turn": 2,
+      "pop_pre_shock": 3688,
+      "pop_trough": 183,
+      "pop_end": 183,
+      "pop_recovery_ratio": 0.0,
+      "pop_retention_ratio": 0.05,
+      "resource_pre_shock": 455.8,
+      "resource_end": 147.9,
+      "resource_breached_half": true,
+      "resource_recovery_halftime": 0,
+      "authority_trough": 0.629,
+      "regime_break": false,
+      "coop_vs_conflict_post_shock": 0.586,
+      "resilience_label": "collapsed"
+    }
+  },
+  "report_txt": "result/raw/run-013/civ-commune-AD1950-turn20.txt"
+}

@@ -1,6 +1,6 @@
 # 第2回ハッカソン講評と次の実装方針
 
-> ステータス: 入賞後の引継ぎ（2026-09）／コード確認 2026-09-18  
+> ステータス: 入賞後の引継ぎ（2026-09）／stub 試験 run-011・1b A/B run-013（2026-09-19）  
 > 用途: 講評の記録、ネクストアクション、レジリエンス方向の実装判断  
 > 関連: [overview.md](./overview.md) · [gap.md](./gap.md) · [review.md](./review.md) · [world-model.md](./world-model.md) · [analysis/output/cross-run-summary-2026-08-30.md](../../analysis/output/cross-run-summary-2026-08-30.md)
 
@@ -83,51 +83,55 @@
 
 ## 4. ネクストアクション（優先度）
 
-Phase A–C のコードは `3fba352` 以降に入っている。**次は stub で動かして差の経路を確認する。** 詳細な未対応は §9–10。
+Phase A–C 実装、stub 1 seed（`run-011`）、Ollama 1b 1 seed（`run-013`）まで済。  
+**次は 1b の 10 seed ではない。** 講評の厚みは「同じ危機の同定」と「中〜大モデルの意思決定」側にある。詳細は §9–10・§12。
 
-### いま回す — stub 試験（LLM なし）
+### いまの判断
 
-`backend/.env` は `LLM_PROVIDER=stub` が正。Ollama を繋いだままにしない。
+| 済 | 結果 |
+|----|------|
+| stub `run-011` | 人口は分岐（civic 371 … autocrat 217）。争い・共同は **0**。全員 collapsed |
+| 1b `run-013` | 争い・共同が出た（fracture 争い 132、commune 協力比 0.59）。人口差は縮み、全員 collapsed・台頭は warlord |
 
-1. **受け入れパイロット（短い）**
-   - `backend/.venv/bin/python scripts/pilot_phase_a.py` — 環境ノブで人口が分かれるか
-   - `backend/.venv/bin/python scripts/pilot_phase_c.py` — 同一危機 × 社会構造で指標が出るか
-2. **resilience 単発（200 年・1 seed）**
-   - `./scripts/run-experiment.sh --protocol resilience --start-year 1750 --years 200 --seed 42`
-   - またはバッチ 1 本: `./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1`
-3. **読む指標**（`resilience_label` は参考。年齢死で collapsed に寄りやすい）
-   - `pop_retention_ratio` / `disaster_deaths` / `coop_vs_conflict_post_shock` / `regime_break`
-4. **経路が見えたら seed を増やす**
-   - `./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 10`
-   - 解析: `./scripts/run-analysis-batch.sh --aggregate`
+1b は観測ラベルではなく、集団スタンス経由で **行動件数を動かした**。ただし回復／崩壊の分岐にはなっていない。重複実行 `run-012` は削除済み。次の新規 run は `run-014`。
 
-操作的な合格（stub）:
+### 次にやること（この順）
+
+1. **同一ショック列を固定する（P2 残件・高）**  
+   疫病が `trade_openness` に依存し、生存人数で RNG がずれる。「同じ危機 × 違う社会」と言い切るための同定。実装してから stub 1 seed で再測する。
+2. **Phase D：意思決定モデルを 1b 観測から引き上げる（P3・高）**  
+   `run-013` で 1b でも行動は動くと分かった。講評が求めるのは中〜大モデルのサンプル住民／集団決定。1b 10 seed を先に増やさない。
+3. **語り（P0 残り・中）**  
+   README / overview にメタ安全保障の一文（§6）。指標は保持率・協力比・制度破綻（ラベルは参考）。
+4. **観測の厚み（P4・中）**  
+   比較表の保持率を小数 3 桁にする。同一 ID 比較。UI の resilience 切替と回復曲線はデモが要るとき。
+
+操作的な合格（これからの実装）:
 
 | 段階 | 合格の目安 |
 |------|------------|
-| Phase C パイロット | pulse が `[2,5,8]`、生存または保持率に差、ショック数が近い、指標が null でない |
-| 200 年 1 seed | 4 variant の `pop_retention_ratio` が完全一致しない。差を災害死・協力比・制度で説明できる |
+| 同一ショック | 4 variant でパルス turn・災害イベント列（地域・種類）が一致。社会は応答（死・協力・回復）だけ違う |
+| Phase D 1 seed | stub（`run-011`）および 1b（`run-013`）と同じ seed で、保持率か協力比がモデルサイズで説明できる |
 | ラベル | recovered 必須ではない。単調減少なら保持率を主指標にする |
 
 ### まだ対応できていない課題（要約）
 
-実装済みに見せかけて、解釈や次の語りを崩すもの。詳細は §10。
-
 | 優先 | 課題 | 状態 |
 |------|------|------|
 | 高 | 「同一ショック列」は近似（疫病が `trade_openness` に依存し、生存人数で RNG がずれる） | 未修正 |
-| 高 | 年齢死が強く、ラベルが collapsed に寄る | 既知。保持率で読む |
-| 中 | `inequality` が初期富に乗らない。社会差は協力バイアスと再生補正が主 | 未修正 |
+| 高 | 1b は観測＋集団スタンス。住民意思決定の中〜大モデル化は未 | `run-013` で 1b A/B は済 |
+| 中 | 年齢死が強く、ラベルが collapsed に寄る | 既知。保持率で読む |
+| 中 | `inequality` が初期富に乗らない。stub の社会差は協力バイアスと再生補正が主 | 未修正 |
 | 中 | メタ安全保障の一文が README / overview に無い | 未 |
 | 中 | UI は lush 系のみ。回復曲線なし | 未 |
-| 低 | Phase D（中〜大モデルで住民意思決定） | 未。stub で差が出てから |
+| 低 | stub / 1b の 10 seed | 同定と Phase D のあと。必要なら |
 
 ### P0 — 問いと計測の再定義
 
 - [x] 中心の問いを文書化する: **「同じショックに対し、社会は回復するか崩壊するか」**
-- [x] stub 試験用の成功条件を置く（上表。ラベル閾値の再調整は残件）
+- [x] stub 試験用の成功条件を置く（ラベル閾値の再調整は残件）
 - [ ] 「メタ安全保障」との一文接続を README / overview に書く（後述 §6）
-- [x] 本ファイルと [gap.md](./gap.md) の TODO を同期する（2026-09-18）
+- [x] 本ファイルと [gap.md](./gap.md) の TODO を同期する（2026-09-19）
 
 ### P1 — ルール層で人口・ショックが分岐する（LLM なしでも差が出る）
 
@@ -143,27 +147,30 @@ Phase A–C のコードは `3fba352` 以降に入っている。**次は stub �
 - [x] CLI に `--protocol resilience` を追加（`scripts/run-experiment.py` / `pilot_phase_c.py`）
 - [x] バッチシェルが `--protocol` / `--stub` / `--reps` を受け付ける（`scripts/run-experiment-batch.sh`）
 - [x] 既存の lush/lean/volatile/balanced は「環境感度のベースライン」として残す
-- [ ] ショック列を seed から事前生成し、全 variant に同じイベントを載せる（近似の解消）
+- [ ] **ショック列を seed から事前生成し、全 variant に同じイベントを載せる** ← 次の実装
 
 ### P3 — LLM を住民意思決定に引き上げ
 
-- [ ] stub 試験でルール層だけの差を確認してから着手
-- [ ] 1b 観測専用から、中〜大規模モデルで集団／サンプル住民の行動決定へ（§5.4）
-- [ ] stub ヒューリスティックでも P1 の差が出ることを維持（LLM は増幅層）
+- [x] stub でルール層だけの差を確認（`run-011`）
+- [x] 同一プロトコルで 1b A/B（`run-013`）。争い・共同が 0 → 非ゼロになった
+- [ ] **1b 観測専用から、中〜大規模モデルで集団／サンプル住民の行動決定へ**（§5.4）← ショック列固定の次
+- [x] stub ヒューリスティックでも P1 の差が出ることを維持（LLM は増幅層）
 - [ ] コスト上限: 地域サンプル数・ターンあたり呼び出し数を設定で制御（既存 `llm_group_sample_per_region` を拡張）
 
 ### P4 — 観測・語り（厚み）
 
+- [ ] 比較表の `pop_retention_ratio` を小数 3 桁にする（1 桁だと 011 の差が潰れる）
 - [ ] 同一 ID のクロスワールド生死・台頭比較をサマリーに固定枠で出す
 - [ ] UI: ショック後の回復曲線（人口・資源）の最小表示。civic 等の variant 切替
-- [ ] 争いの再現性は「主指標にしない／条件付きで見る」方針を維持
+- [ ] 争いの再現性は「主指標にしない／条件付きで見る」方針を維持（1b では件数は出るが、まず協力比を見る）
 
 ### やらない（当面）
 
 * 全 5,000 人を毎ターン個別 LLM で動かす
 * 石油・食料など資源種類の本格マルチコモディティ化
 * 「メタ安全保障」を別プロダクトとして実装し直す（接続は語りと指標で先に）
-* stub 確認前に Ollama 1b で 10 seed フルバッチを回す（入賞時の environment 再実行は必要なら明示する）
+* **1b の 10 seed フルバッチ**（`run-013` で行動への効きは見えた。同定とモデルサイズを先に）
+* 入賞時 environment 10 run（`run-001`〜`010`）のやり直し。必要なら明示する
 
 ---
 
@@ -268,10 +275,11 @@ Phase A–C のコードは `3fba352` 以降に入っている。**次は stub �
 
 1. ~~死亡・災害致死・出生の資源連動~~（Phase A 済）  
 2. ~~レジリエンス指標を summary に追加~~（Phase B 済）  
-3. **stub でパイロット → resilience 1 seed**（いまここ）  
-4. 差の経路が説明できるなら stub 10 seed。必要なら同一ショック列の固定  
-5. overview / README にメタ安全保障の一文接続  
-6. LLM モデルサイズ引き上げ + 集団決定の比重増（stub で差が出てから）
+3. ~~stub パイロット → resilience 1 seed~~（`run-011` 済）  
+4. ~~同一プロトコルで 1b 1 seed~~（`run-013` 済。行動は動く。回復分岐には未到達）  
+5. **同一ショック列の固定**（いまここ）→ stub 1 seed で再測  
+6. 中〜大モデルで集団／サンプル決定（Phase D）  
+7. overview / README にメタ安全保障の一文  
 
 ---
 
@@ -377,14 +385,14 @@ Phase A–C で「コードはある」が、講評の次の問いに耐える�
 |------|------|
 | メタ安全保障 | §6 の一文が README / overview に未掲載 |
 | UI | `experimentWorlds.ts` は lush 系のみ。回復曲線なし |
-| Phase D | 1b 観測のまま。stub で差が出てから中〜大モデルへ |
+| Phase D | 1b で行動件数は動いた（`run-013`）。中〜大モデルの意思決定は未 |
 | 同一 ID 比較 | サマリーの固定枠なし |
 
 ---
 
-## 11. stub 試験の手順
+## 11. stub 試験の手順（実施済）
 
-LLM は増幅層。**ルール層だけで差が出ることを先に確認する。** いまの `backend/.env` は `LLM_PROVIDER=stub`。
+ルール層だけの確認。結果は `result/raw/run-011/`。手順の再現用。
 
 ### 11.1 パイロット（数分）
 
@@ -395,44 +403,44 @@ backend/.venv/bin/python scripts/pilot_phase_a.py
 backend/.venv/bin/python scripts/pilot_phase_c.py
 ```
 
-Phase C が `needs tuning` なら、200 年バッチの前にパルス・社会差・ショック数を見る。
-
 ### 11.2 resilience 1 seed（stub）
 
 ```bash
-./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1 --dry-run
 ./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1
 ```
-
-同等の単発:
-
-```bash
-LLM_PROVIDER=stub ./scripts/run-experiment.sh \
-  --protocol resilience --start-year 1750 --years 200 --seed 42
-```
-
-出力: `result/raw/run-NNN/civ-{civic,autocrat,commune,fracture}-AD1950-turn20.{json,txt}`
 
 見る場所: 各 JSON の `experiment_summary`（保持率・災害死・協力比・制度破綻・ラベル）。
 
 ### 11.3 解析
 
 ```bash
-./scripts/run-analysis-batch.sh --from-run <今回の run 番号>
-# 2 本以上そろったら
-./scripts/run-analysis-batch.sh --aggregate
+./scripts/run-analysis-batch.sh --run 11
 ```
 
-### 11.4 伸ばす条件
+`--aggregate` は提出用 environment（`run-001`〜`010`）と混ぜない。resilience だけ見るなら `--from-run 11`。
 
-* 1 seed で 4 世界の保持率が分かれ、災害死か協力比で「なぜ」が言える → `--reps 10`（stub）
-* 差がノブの写像にしか見えない → 同一ショック列の固定（§10.1）を先にする
-* stub で差が出た → そのあと Ollama（1b は観測デモ。意思決定はより大きいモデル）
+既定の `./scripts/run-experiment-batch.sh` は **environment** のまま。講評対応は **`--protocol resilience`**。次の新規 run 番号は `run-014`（`run-012` は重複実行のため削除）。
 
-environment の再実行（入賞時と同じ lush 系）が必要なときだけ:
+---
 
-```bash
-./scripts/run-experiment-batch.sh --protocol environment --stub --reps 1
-```
+## 12. 1b A/B（2026-09-19・実施済）
 
-既定の `./scripts/run-experiment-batch.sh` は **environment** のまま（提出手順を壊さない）。講評対応の主実験は **必ず `--protocol resilience`**。
+同じ resilience・seed 42・200 年。stub = `run-011`、Ollama `llama3.2:1b` = `run-013`。  
+解析: [analysis/output/run-011/comparison-2026-09-18.md](../../analysis/output/run-011/comparison-2026-09-18.md) · [analysis/output/run-013/comparison-2026-09-19.md](../../analysis/output/run-013/comparison-2026-09-19.md)
+
+| | civic | autocrat | commune | fracture |
+|--|------:|---------:|--------:|---------:|
+| 生存 011 stub | 371 | 217 | 309 | 242 |
+| 生存 013 1b | 215 | 179 | 183 | 211 |
+| 争い 011 | 0 | 0 | 0 | 0 |
+| 争い 013 | 30 | 41 | 33 | **132** |
+| 共同 011 | 0 | 0 | 0 | 0 |
+| 共同 013 | 17 | 22 | **41** | 23 |
+| 協力比 013 | 0.36 | 0.28 | **0.59** | **0.16** |
+
+読み方:
+
+* 1b の集団スタンスは **争い／共同をゼロから起こした**。分断は争いが多く、高福祉は協力比が高い。
+* 人口は全体に減り、世界差は縮んだ。ラベルは双方とも全員 `collapsed`。回復／崩壊の分岐にはなっていない。
+* 比較表の保持率 1 桁は 011 の 0.101 vs 0.059 を潰す。JSON を正とする。
+* 提出用 `run-001`〜`010` は environment × 1b のまま。混ぜて読まない。

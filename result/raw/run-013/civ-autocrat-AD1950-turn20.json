@@ -1,0 +1,99 @@
+{
+  "format": "civ-experiment-result-v1",
+  "run_id": "run-013",
+  "protocol": "resilience",
+  "variant": "autocrat",
+  "variant_label_ja": "専制・秩序",
+  "experiment_seed": 42,
+  "start_year": 1750,
+  "years_per_turn": 10,
+  "milestone_turn": 20,
+  "milestone_years": 200,
+  "simulation_id": "6b9b1217-b7f7-4dbd-8ae2-9380460f884f",
+  "turn": 20,
+  "calendar_year": 1950,
+  "shock_pulse_turns": [
+    4,
+    10,
+    16
+  ],
+  "llm": {
+    "provider": "ollama",
+    "ollama_model": "llama3.2:1b",
+    "openai_model": "gpt-4o-mini",
+    "wired": true,
+    "mode": "group",
+    "max_agents_per_turn": 4,
+    "group_sample_per_region": 12,
+    "timeout_sec": 8.0,
+    "note": "Group/institution LLM stance (≤12 actors/region); masses follow bulk rules."
+  },
+  "experiment_summary": {
+    "variant": "autocrat",
+    "variant_label_ja": "専制・秩序",
+    "protocol": "resilience",
+    "shock_pulse_turns": [
+      4,
+      10,
+      16
+    ],
+    "seed": 42,
+    "turn": 20,
+    "calendar_year": 1950,
+    "population_alive": 179,
+    "population_delta_pct": -96.4,
+    "resource_pool": 174.0,
+    "trade_openness_mean": 0.4,
+    "conflicts_total": 41,
+    "cooperations_total": 22,
+    "regime_shifts": 1,
+    "disasters": 41,
+    "dominant_archetype": "warlord",
+    "archetypes": [
+      "warlord"
+    ],
+    "trajectories": [
+      "reform",
+      "exodus",
+      "exodus"
+    ],
+    "institutions": [
+      "autocracy",
+      "autocracy",
+      "autocracy",
+      "autocracy",
+      "democracy"
+    ],
+    "spotlight_agent_id": "a6146",
+    "spotlight_role": "warlord",
+    "shock_count": 41,
+    "disaster_deaths": 219,
+    "first_shock_turn": 2,
+    "pop_trough": 179,
+    "pop_recovery_ratio": 0.0,
+    "pop_retention_ratio": 0.049,
+    "resource_recovery_halftime": 0,
+    "regime_break": true,
+    "coop_vs_conflict_post_shock": 0.281,
+    "resilience_label": "collapsed",
+    "resilience": {
+      "shock_count": 41,
+      "disaster_deaths": 219,
+      "first_shock_turn": 2,
+      "pop_pre_shock": 3674,
+      "pop_trough": 179,
+      "pop_end": 179,
+      "pop_recovery_ratio": 0.0,
+      "pop_retention_ratio": 0.049,
+      "resource_pre_shock": 441.6,
+      "resource_end": 174.0,
+      "resource_breached_half": true,
+      "resource_recovery_halftime": 0,
+      "authority_trough": 0.679,
+      "regime_break": true,
+      "coop_vs_conflict_post_shock": 0.281,
+      "resilience_label": "collapsed"
+    }
+  },
+  "report_txt": "result/raw/run-013/civ-autocrat-AD1950-turn20.txt"
+}

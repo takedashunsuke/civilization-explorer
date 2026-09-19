@@ -1,0 +1,102 @@
+{
+  "format": "civ-experiment-result-v1",
+  "run_id": "run-013",
+  "protocol": "resilience",
+  "variant": "civic",
+  "variant_label_ja": "民主・協調",
+  "experiment_seed": 42,
+  "start_year": 1750,
+  "years_per_turn": 10,
+  "milestone_turn": 20,
+  "milestone_years": 200,
+  "simulation_id": "f2280140-ec18-4411-b08a-56cfb9ad5f49",
+  "turn": 20,
+  "calendar_year": 1950,
+  "shock_pulse_turns": [
+    4,
+    10,
+    16
+  ],
+  "llm": {
+    "provider": "ollama",
+    "ollama_model": "llama3.2:1b",
+    "openai_model": "gpt-4o-mini",
+    "wired": true,
+    "mode": "group",
+    "max_agents_per_turn": 4,
+    "group_sample_per_region": 12,
+    "timeout_sec": 8.0,
+    "note": "Group/institution LLM stance (≤12 actors/region); masses follow bulk rules."
+  },
+  "experiment_summary": {
+    "variant": "civic",
+    "variant_label_ja": "民主・協調",
+    "protocol": "resilience",
+    "shock_pulse_turns": [
+      4,
+      10,
+      16
+    ],
+    "seed": 42,
+    "turn": 20,
+    "calendar_year": 1950,
+    "population_alive": 215,
+    "population_delta_pct": -95.7,
+    "resource_pool": 194.1,
+    "trade_openness_mean": 0.55,
+    "conflicts_total": 30,
+    "cooperations_total": 17,
+    "regime_shifts": 0,
+    "disasters": 41,
+    "dominant_archetype": "warlord",
+    "archetypes": [
+      "warlord",
+      "warlord"
+    ],
+    "trajectories": [
+      "faith",
+      "war",
+      "exodus",
+      "exodus",
+      "exodus"
+    ],
+    "institutions": [
+      "democracy",
+      "democracy",
+      "democracy",
+      "democracy",
+      "democracy"
+    ],
+    "spotlight_agent_id": "a5666",
+    "spotlight_role": "leader",
+    "shock_count": 41,
+    "disaster_deaths": 273,
+    "first_shock_turn": 2,
+    "pop_trough": 215,
+    "pop_recovery_ratio": 0.0,
+    "pop_retention_ratio": 0.058,
+    "resource_recovery_halftime": 0,
+    "regime_break": false,
+    "coop_vs_conflict_post_shock": 0.362,
+    "resilience_label": "collapsed",
+    "resilience": {
+      "shock_count": 41,
+      "disaster_deaths": 273,
+      "first_shock_turn": 2,
+      "pop_pre_shock": 3689,
+      "pop_trough": 215,
+      "pop_end": 215,
+      "pop_recovery_ratio": 0.0,
+      "pop_retention_ratio": 0.058,
+      "resource_pre_shock": 458.8,
+      "resource_end": 194.1,
+      "resource_breached_half": true,
+      "resource_recovery_halftime": 0,
+      "authority_trough": 0.587,
+      "regime_break": false,
+      "coop_vs_conflict_post_shock": 0.362,
+      "resilience_label": "collapsed"
+    }
+  },
+  "report_txt": "result/raw/run-013/civ-civic-AD1950-turn20.txt"
+}

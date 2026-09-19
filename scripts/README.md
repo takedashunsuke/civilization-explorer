@@ -1,25 +1,26 @@
 # scripts/
 
-ローカル実行用スクリプトです。講評後の実験手順の正は [docs/hackathon/post-award.md](../docs/hackathon/post-award.md)（§4・§11）。
+ローカル実行用スクリプトです。講評後の実験手順の正は [docs/hackathon/post-award.md](../docs/hackathon/post-award.md)（§4・§12）。
 
-## stub 試験（次に回す）
+## いまの実測
 
-LLM なしでルール層の差を見る。`backend/.env` の `LLM_PROVIDER=stub` を使う（`--stub` でも上書き可）。
+| 回 | 内容 |
+|----|------|
+| `run-001`〜`010` | 提出。environment × 1b |
+| `run-011` | stub。resilience × LLM なし |
+| `run-013` | 1b A/B。resilience × `llama3.2:1b` |
+
+次の実装は同一ショック列の固定（§4）。1b の 10 seed は先にしない。次の新規 run は `run-014`。
+
+## stub / 1b の再現
 
 ```bash
 backend/.venv/bin/python scripts/pilot_phase_a.py
 backend/.venv/bin/python scripts/pilot_phase_c.py
 ./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1
-./scripts/run-analysis-batch.sh --from-run <今回の番号>
+LLM_PROVIDER=ollama ./scripts/run-experiment-batch.sh --protocol resilience --reps 1
+./scripts/run-analysis-batch.sh --run 13
 ```
-
-| 項目 | 値 |
-|------|-----|
-| プロトコル | **resilience**（civic / autocrat / commune / fracture） |
-| LLM | **stub** |
-| まず | パイロット 2 本 → 200 年 × 1 seed |
-| 伸ばす | 差の経路が見えたら `--reps 10` |
-
 ## 実証実験バッチ（提出用 environment / 講評対応 resilience）
 
 ```bash

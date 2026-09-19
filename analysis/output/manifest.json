@@ -1,5 +1,5 @@
 {
-  "latest_run": "run-011",
+  "latest_run": "run-013",
   "tests": [
     {
       "id": "test-001",
@@ -122,6 +122,16 @@
       "files": {
         "summary": "analysis/output/run-011/summary.md",
         "comparison": "analysis/output/run-011/comparison-2026-09-18.md"
+      }
+    },
+    {
+      "id": "run-013",
+      "path": "analysis/output/run-013",
+      "result_run_path": "result/raw/run-013",
+      "updated_at": "2026-09-19T13:25:02.242613+00:00",
+      "files": {
+        "summary": "analysis/output/run-013/summary.md",
+        "comparison": "analysis/output/run-013/comparison-2026-09-19.md"
       }
     }
   ]
