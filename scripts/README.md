@@ -9,28 +9,35 @@
 | `run-001`〜`010` | 提出。environment × 1b |
 | `run-011` | stub。resilience × LLM なし（**列固定前**） |
 | `run-013` | 1b。resilience × `llama3.2:1b`（**列固定前**） |
-| `run-014` | 1b。同一ショック列 × `llama3.2:1b`（比較の正） |
-| `run2-001`〜 | 改善版 environment。入賞 `run-001`〜`010` とは別系列 |
+| `run-014` | 1b。同一ショック列 × `llama3.2:1b`（1b 側の比較の正） |
+| `run2-001`〜`010` | 改善版 environment。入賞分とは別系列 |
+| `run3-001`〜 | 講評後の主実験（バッチ **v2**）。同一列 × resilience |
 
-次の実装は Phase D（中〜大モデルの意思決定）。比較相手は `run-014`。1b の 10 seed は先にしない。`run` 系列の次番号は `run-015`。改善版 environment は `--series run2`。
+v1 バッチ（`run-experiment-batch.sh`）は提出・`run2` 用に残す。講評後は v2。着手の 1 手は stub 1 seed（[post-award.md](../docs/hackathon/post-award.md) §4.1）。1b の 10 seed は先にしない。
 
 ## stub / 1b の再現
 
 ```bash
 backend/.venv/bin/python scripts/pilot_phase_a.py
 backend/.venv/bin/python scripts/pilot_phase_c.py
-./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1
-LLM_PROVIDER=ollama ./scripts/run-experiment-batch.sh --protocol resilience --reps 1
-./scripts/run-analysis-batch.sh --run 14
 ```
-## 実証実験バッチ（提出用 environment / 講評対応 resilience）
+
+## 実証実験バッチ
+
+**v1** — 提出用 environment / 改善版 `run2`。既定は 10 seed。**このファイルは残す。**
 
 ```bash
-chmod +x scripts/*.sh   # 初回のみ
-./scripts/setup.sh      # 初回: venv + npm install
-./scripts/run-experiment-batch.sh                              # environment（第2回提出と同じ・run-015 以降）
-./scripts/run-experiment-batch.sh --series run2                # 改善版。run-001〜010 は残す
-./scripts/run-experiment-batch.sh --protocol resilience --stub # 講評対応
+./scripts/run-experiment-batch.sh                              # environment → 次の run-NNN
+./scripts/run-experiment-batch.sh --series run2                # 改善版 environment
+./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1  # 旧手順（run-011 相当）
+```
+
+**v2** — 講評後の主実験。既定は resilience × `run3` × 1 seed。
+
+```bash
+./scripts/run-experiment-batch-v2.sh --dry-run   # 系列確認
+./scripts/run-experiment-batch-v2.sh --stub      # 着手の 1 手（§4.1）
+./scripts/run-analysis-batch-v2.sh --aggregate
 ```
 
 | 項目 | environment（既定） | resilience |

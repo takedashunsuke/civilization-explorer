@@ -1,15 +1,15 @@
 {
   "experiment": "controlled_experiment",
-  "experiment_seed": 51,
+  "experiment_seed": 42,
   "milestone_turn": 20,
   "milestone_years": 200,
   "years_per_turn": 10,
   "start_year": 1750,
   "population": 5000,
-  "latest_run": "run2-010",
-  "llm_provider": "ollama",
+  "latest_run": "run3-001",
+  "llm_provider": "stub",
   "ollama_model": "llama3.2:1b",
-  "recorded_at": "2026-09-20T08:42:39.196889+00:00",
+  "recorded_at": "2026-09-20T13:21:37.256878+00:00",
   "tests": [
     {
       "id": "test-001",
@@ -1054,7 +1054,50 @@
         }
       ],
       "ollama_model": "llama3.2:1b"
+    },
+    {
+      "id": "run3-001",
+      "path": "result/raw/run3-001",
+      "recorded_at": "2026-09-20T13:21:37.256878+00:00",
+      "protocol": "resilience",
+      "experiment_seed": 42,
+      "start_year": 1750,
+      "years_per_turn": 10,
+      "milestone_turn": 20,
+      "milestone_years": 200,
+      "end_year": 1950,
+      "llm_provider": "stub",
+      "files": [
+        {
+          "variant": "civic",
+          "label_ja": "民主・協調",
+          "path": "result/raw/run3-001/civ-civic-AD1950-turn20.txt",
+          "json_path": "result/raw/run3-001/civ-civic-AD1950-turn20.json",
+          "status": "done"
+        },
+        {
+          "variant": "autocrat",
+          "label_ja": "専制・秩序",
+          "path": "result/raw/run3-001/civ-autocrat-AD1950-turn20.txt",
+          "json_path": "result/raw/run3-001/civ-autocrat-AD1950-turn20.json",
+          "status": "done"
+        },
+        {
+          "variant": "commune",
+          "label_ja": "高福祉・共同",
+          "path": "result/raw/run3-001/civ-commune-AD1950-turn20.txt",
+          "json_path": "result/raw/run3-001/civ-commune-AD1950-turn20.json",
+          "status": "done"
+        },
+        {
+          "variant": "fracture",
+          "label_ja": "無政府・分断",
+          "path": "result/raw/run3-001/civ-fracture-AD1950-turn20.txt",
+          "json_path": "result/raw/run3-001/civ-fracture-AD1950-turn20.json",
+          "status": "done"
+        }
+      ]
     }
   ],
-  "protocol": "environment"
+  "protocol": "resilience"
 }

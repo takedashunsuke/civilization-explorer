@@ -1,0 +1,313 @@
+{
+  "format": "civ-experiment-result-v1",
+  "run_id": "run3-001",
+  "protocol": "resilience",
+  "variant": "fracture",
+  "variant_label_ja": "無政府・分断",
+  "experiment_seed": 42,
+  "start_year": 1750,
+  "years_per_turn": 10,
+  "milestone_turn": 20,
+  "milestone_years": 200,
+  "simulation_id": "1349f661-667b-47dc-8ea6-47f782ea94ae",
+  "turn": 20,
+  "calendar_year": 1950,
+  "shock_pulse_turns": [
+    4,
+    10,
+    16
+  ],
+  "llm": {
+    "provider": "stub",
+    "ollama_model": "llama3.2:1b",
+    "openai_model": "gpt-4o-mini",
+    "wired": false,
+    "mode": "group",
+    "max_agents_per_turn": 4,
+    "group_sample_per_region": 12,
+    "timeout_sec": 8.0,
+    "note": "Group stance uses heuristic stub; set LLM_PROVIDER=ollama|openai to enable."
+  },
+  "experiment_summary": {
+    "variant": "fracture",
+    "variant_label_ja": "無政府・分断",
+    "protocol": "resilience",
+    "shock_pulse_turns": [
+      4,
+      10,
+      16
+    ],
+    "shock_plan_len": 42,
+    "shock_plan_signature": [
+      [
+        0,
+        "western_africa",
+        "weather_storm"
+      ],
+      [
+        2,
+        "western_africa",
+        "epidemic"
+      ],
+      [
+        2,
+        "western_europe",
+        "earthquake"
+      ],
+      [
+        2,
+        "australasia",
+        "weather_drought"
+      ],
+      [
+        3,
+        "western_africa",
+        "epidemic"
+      ],
+      [
+        3,
+        "northern_america",
+        "earthquake"
+      ],
+      [
+        4,
+        "western_africa",
+        "epidemic"
+      ],
+      [
+        4,
+        "western_europe",
+        "weather_heat"
+      ],
+      [
+        4,
+        "western_africa",
+        "pulse"
+      ],
+      [
+        4,
+        "northern_america",
+        "pulse"
+      ],
+      [
+        4,
+        "eastern_asia",
+        "pulse"
+      ],
+      [
+        4,
+        "western_europe",
+        "pulse"
+      ],
+      [
+        4,
+        "australasia",
+        "pulse"
+      ],
+      [
+        5,
+        "western_europe",
+        "weather_heat"
+      ],
+      [
+        5,
+        "australasia",
+        "flood"
+      ],
+      [
+        6,
+        "eastern_asia",
+        "epidemic"
+      ],
+      [
+        6,
+        "western_europe",
+        "earthquake"
+      ],
+      [
+        7,
+        "northern_america",
+        "earthquake"
+      ],
+      [
+        7,
+        "eastern_asia",
+        "weather_heat"
+      ],
+      [
+        8,
+        "western_africa",
+        "epidemic"
+      ],
+      [
+        8,
+        "western_europe",
+        "flood"
+      ],
+      [
+        9,
+        "western_africa",
+        "epidemic"
+      ],
+      [
+        9,
+        "northern_america",
+        "epidemic"
+      ],
+      [
+        10,
+        "western_africa",
+        "pulse"
+      ],
+      [
+        10,
+        "northern_america",
+        "pulse"
+      ],
+      [
+        10,
+        "eastern_asia",
+        "pulse"
+      ],
+      [
+        10,
+        "western_europe",
+        "pulse"
+      ],
+      [
+        10,
+        "australasia",
+        "pulse"
+      ],
+      [
+        11,
+        "eastern_asia",
+        "heatwave"
+      ],
+      [
+        12,
+        "western_africa",
+        "flood"
+      ],
+      [
+        13,
+        "western_europe",
+        "flood"
+      ],
+      [
+        13,
+        "australasia",
+        "weather_drought"
+      ],
+      [
+        14,
+        "eastern_asia",
+        "epidemic"
+      ],
+      [
+        15,
+        "northern_america",
+        "weather_heat"
+      ],
+      [
+        16,
+        "northern_america",
+        "frost"
+      ],
+      [
+        16,
+        "western_africa",
+        "pulse"
+      ],
+      [
+        16,
+        "northern_america",
+        "pulse"
+      ],
+      [
+        16,
+        "eastern_asia",
+        "pulse"
+      ],
+      [
+        16,
+        "western_europe",
+        "pulse"
+      ],
+      [
+        16,
+        "australasia",
+        "pulse"
+      ],
+      [
+        18,
+        "australasia",
+        "earthquake"
+      ],
+      [
+        19,
+        "western_europe",
+        "flood"
+      ]
+    ],
+    "seed": 42,
+    "turn": 20,
+    "calendar_year": 1950,
+    "population_alive": 127,
+    "population_delta_pct": -97.5,
+    "resource_pool": 167.1,
+    "trade_openness_mean": 0.35,
+    "conflicts_total": 0,
+    "cooperations_total": 0,
+    "regime_shifts": 3,
+    "disasters": 42,
+    "dominant_archetype": "bureaucrat",
+    "archetypes": [
+      "bureaucrat",
+      "bureaucrat",
+      "bureaucrat",
+      "explorer"
+    ],
+    "trajectories": [
+      "exodus"
+    ],
+    "institutions": [
+      "anarchy",
+      "autocracy",
+      "autocracy",
+      "autocracy",
+      "anarchy"
+    ],
+    "spotlight_agent_id": "a5586",
+    "spotlight_role": "leader",
+    "shock_count": 42,
+    "disaster_deaths": 268,
+    "first_shock_turn": 0,
+    "pop_trough": 127,
+    "pop_recovery_ratio": 0.0,
+    "pop_retention_ratio": 0.025,
+    "resource_recovery_halftime": 0,
+    "regime_break": true,
+    "coop_vs_conflict_post_shock": null,
+    "resilience_label": "collapsed",
+    "resilience": {
+      "shock_count": 42,
+      "disaster_deaths": 268,
+      "first_shock_turn": 0,
+      "pop_pre_shock": 5000,
+      "pop_trough": 127,
+      "pop_end": 127,
+      "pop_recovery_ratio": 0.0,
+      "pop_retention_ratio": 0.025,
+      "resource_pre_shock": 425.0,
+      "resource_end": 167.1,
+      "resource_breached_half": true,
+      "resource_recovery_halftime": 0,
+      "authority_trough": 0.761,
+      "regime_break": true,
+      "coop_vs_conflict_post_shock": null,
+      "resilience_label": "collapsed"
+    }
+  },
+  "report_txt": "result/raw/run3-001/civ-fracture-AD1950-turn20.txt"
+}

@@ -15,7 +15,8 @@ result/
       # または civ-civic-*.json など  # resilience
     run-002/             2 回目（同条件の再実行）
     run-003/             3 回目 …
-    run2-001/            改善版の 1 回目（`--series run2`。入賞分は残す）
+    run2-001/            改善版 environment（バッチ v1 `--series run2`。入賞分は残す）
+    run3-001/            講評後の主実験（バッチ v2。同一ショック列 × resilience）
 ```
 
 **UI と CLI の違い:** [docs/guides/execution-paths.md](../docs/guides/execution-paths.md)
@@ -29,12 +30,13 @@ result/
 | 暦年ラベル | AD **1750 → 1950**（表示用。歴史・産業は未モデル化） |
 | 年数 | **200 年**（20 ターン） |
 | 繰り返し | seed **42 … 51**（10 回）。試験は `--reps 1` |
-| 一括実行 | `./scripts/run-experiment-batch.sh` |
+| 一括実行 | v1 `./scripts/run-experiment-batch.sh`（提出・run2） / v2 `./scripts/run-experiment-batch-v2.sh`（run3） |
 
 ```bash
 ./scripts/run-experiment.sh                              # 自動で次の run-NNN（environment・100年）
 ./scripts/run-experiment.sh --protocol resilience --start-year 1750 --years 200 --seed 42
 ./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1
+./scripts/run-experiment-batch-v2.sh --stub   # 講評後の 1 手 → run3-001
 ./scripts/run-experiment-batch.sh                      # 10 run 一括（environment）
 ```
 

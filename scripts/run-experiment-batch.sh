@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
-# 実証実験の一括実行
+# 実証実験の一括実行（v1）
 # 暦年ラベル AD 1750→1950（表示用）・既定 200 年 × seed 10 本 → result/raw/{series}-NNN/
+#
+# このファイルは提出用 environment / --series run2 用に残す。挙動は変えない。
+# 講評後の主実験（resilience × run3）は v2:
+#   ./scripts/run-experiment-batch-v2.sh
 #
 # 第2回提出（environment）:
 #   ./scripts/run-experiment-batch.sh
