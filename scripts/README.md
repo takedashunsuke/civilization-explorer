@@ -10,8 +10,9 @@
 | `run-011` | stub。resilience × LLM なし（**列固定前**） |
 | `run-013` | 1b。resilience × `llama3.2:1b`（**列固定前**） |
 | `run-014` | 1b。同一ショック列 × `llama3.2:1b`（比較の正） |
+| `run2-001`〜 | 改善版 environment。入賞 `run-001`〜`010` とは別系列 |
 
-次の実装は Phase D（中〜大モデルの意思決定）。比較相手は `run-014`。1b の 10 seed は先にしない。次の新規 run は `run-015`。
+次の実装は Phase D（中〜大モデルの意思決定）。比較相手は `run-014`。1b の 10 seed は先にしない。`run` 系列の次番号は `run-015`。改善版 environment は `--series run2`。
 
 ## stub / 1b の再現
 
@@ -27,7 +28,8 @@ LLM_PROVIDER=ollama ./scripts/run-experiment-batch.sh --protocol resilience --re
 ```bash
 chmod +x scripts/*.sh   # 初回のみ
 ./scripts/setup.sh      # 初回: venv + npm install
-./scripts/run-experiment-batch.sh                              # environment（第2回提出と同じ）
+./scripts/run-experiment-batch.sh                              # environment（第2回提出と同じ・run-015 以降）
+./scripts/run-experiment-batch.sh --series run2                # 改善版。run-001〜010 は残す
 ./scripts/run-experiment-batch.sh --protocol resilience --stub # 講評対応
 ```
 
@@ -38,7 +40,7 @@ chmod +x scripts/*.sh   # 初回のみ
 | 繰り返し | **10 回**（seed 42 … 51）。`--reps` で変更 | 同じ |
 | 出力 | `result/raw/run-NNN/` + `analysis/output/run-NNN/` | 同じ（ファイル名の variant だけ違う） |
 
-`--dry-run` で実行コマンドのみ表示。`--stub` は `LLM_PROVIDER=stub`。`--years` は 10 の倍数。
+`--series run2` は `result/raw/run2-001/` から採番する。入賞の `run-001`〜`010` は上書きしない。`--dry-run` で実行コマンドのみ表示。`--stub` は `LLM_PROVIDER=stub`。`--years` は 10 の倍数。
 
 ## 一括解析（実験完了後）
 
@@ -47,6 +49,7 @@ chmod +x scripts/*.sh   # 初回のみ
 ./scripts/run-analysis-batch.sh --aggregate  # 上記 + 横断サマリー
 ./scripts/run-analysis-batch.sh --llm        # Ollama で定性も生成（任意・遅い）
 ./scripts/run-analysis-batch.sh --from-run 3 # run-003 以降だけ
+./scripts/run-analysis-batch.sh --series run2 --aggregate # 改善版だけ横断
 ```
 
 | モード | 出力 |

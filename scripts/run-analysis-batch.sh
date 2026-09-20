@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 完了済み result/raw/run-NNN/ から analysis/output/run-NNN/ を一括生成
+# 完了済み result/raw/{series}-NNN/ から analysis/output/{series}-NNN/ を一括生成
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 

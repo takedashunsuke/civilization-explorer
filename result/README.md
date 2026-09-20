@@ -9,12 +9,13 @@ result/
   manifest.json          全実行回の索引（latest_run・runs[]）
   raw/
     test-001/            パイロット（AD 1000→1100・100年）
-    run-001/             実証 1 回目（バッチ後）
+    run-001/             実証 1 回目（バッチ後・入賞）
       run.json           当該回のメタデータ（`protocol` を含む）
       civ-lush-*.json / .txt          # environment
       # または civ-civic-*.json など  # resilience
     run-002/             2 回目（同条件の再実行）
     run-003/             3 回目 …
+    run2-001/            改善版の 1 回目（`--series run2`。入賞分は残す）
 ```
 
 **UI と CLI の違い:** [docs/guides/execution-paths.md](../docs/guides/execution-paths.md)

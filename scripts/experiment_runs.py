@@ -1,4 +1,4 @@
-"""Helpers for result/raw/run-NNN/ layout."""
+"""Helpers for result/raw/{series}-NNN/ layout (default series: run)."""
 
 from __future__ import annotations
 
@@ -8,32 +8,54 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-RUN_DIR_PATTERN = re.compile(r"^run-(\d+)$")
+DEFAULT_SERIES = "run"
+SERIES_NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
+RUN_DIR_PATTERN = re.compile(r"^([A-Za-z][A-Za-z0-9]*)-(\d+)$")
 
 
-def normalize_run_id(run: str) -> str:
+def validate_series(series: str) -> str:
+    series = series.strip()
+    if not SERIES_NAME_PATTERN.match(series):
+        raise ValueError(f"invalid series: {series!r} (use run, run2, …)")
+    return series
+
+
+def parse_run_id(run: str) -> tuple[str, int]:
     run = run.strip()
-    if RUN_DIR_PATTERN.match(run):
-        return run
+    m = RUN_DIR_PATTERN.match(run)
+    if not m:
+        raise ValueError(f"invalid run id: {run!r} (use run-001, run2-001, or 1)")
+    return m.group(1), int(m.group(2))
+
+
+def normalize_run_id(run: str, *, series: str = DEFAULT_SERIES) -> str:
+    run = run.strip()
     if run.isdigit():
-        return f"run-{int(run):03d}"
-    raise ValueError(f"invalid run id: {run!r} (use run-001 or 1)")
+        return f"{validate_series(series)}-{int(run):03d}"
+    name, num = parse_run_id(run)
+    return f"{name}-{num:03d}"
 
 
-def next_run_id(raw_root: Path) -> str:
+def next_run_id(raw_root: Path, series: str = DEFAULT_SERIES) -> str:
+    series = validate_series(series)
     nums: list[int] = []
     if raw_root.is_dir():
         for p in raw_root.iterdir():
             if p.is_dir():
                 m = RUN_DIR_PATTERN.match(p.name)
-                if m:
-                    nums.append(int(m.group(1)))
-    return f"run-{max(nums, default=0) + 1:03d}"
+                if m and m.group(1) == series:
+                    nums.append(int(m.group(2)))
+    return f"{series}-{max(nums, default=0) + 1:03d}"
 
 
-def resolve_run_dir(raw_root: Path, run: str | None) -> tuple[Path, str]:
+def resolve_run_dir(
+    raw_root: Path,
+    run: str | None,
+    *,
+    series: str = DEFAULT_SERIES,
+) -> tuple[Path, str]:
     raw_root.mkdir(parents=True, exist_ok=True)
-    run_id = normalize_run_id(run) if run else next_run_id(raw_root)
+    run_id = normalize_run_id(run, series=series) if run else next_run_id(raw_root, series=series)
     return raw_root / run_id, run_id
 
 

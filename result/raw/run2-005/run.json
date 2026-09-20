@@ -1,0 +1,43 @@
+{
+  "id": "run2-005",
+  "recorded_at": "2026-09-20T03:49:52.053518+00:00",
+  "protocol": "environment",
+  "experiment_seed": 46,
+  "start_year": 1750,
+  "years_per_turn": 10,
+  "milestone_turn": 20,
+  "milestone_years": 200,
+  "end_year": 1950,
+  "llm_provider": "ollama",
+  "files": [
+    {
+      "variant": "lush",
+      "label_ja": "豊か",
+      "path": "result/raw/run2-005/civ-lush-AD1950-turn20.txt",
+      "json_path": "result/raw/run2-005/civ-lush-AD1950-turn20.json",
+      "status": "done"
+    },
+    {
+      "variant": "lean",
+      "label_ja": "乏しい",
+      "path": "result/raw/run2-005/civ-lean-AD1950-turn20.txt",
+      "json_path": "result/raw/run2-005/civ-lean-AD1950-turn20.json",
+      "status": "done"
+    },
+    {
+      "variant": "volatile",
+      "label_ja": "災害多",
+      "path": "result/raw/run2-005/civ-volatile-AD1950-turn20.txt",
+      "json_path": "result/raw/run2-005/civ-volatile-AD1950-turn20.json",
+      "status": "done"
+    },
+    {
+      "variant": "balanced",
+      "label_ja": "標準",
+      "path": "result/raw/run2-005/civ-balanced-AD1950-turn20.txt",
+      "json_path": "result/raw/run2-005/civ-balanced-AD1950-turn20.json",
+      "status": "done"
+    }
+  ],
+  "ollama_model": "llama3.2:1b"
+}

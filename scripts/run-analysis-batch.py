@@ -5,6 +5,7 @@ Usage (from repo root):
   ./scripts/run-analysis-batch.sh              # quant tables for all complete runs
   ./scripts/run-analysis-batch.sh --llm        # + Ollama qualitative (slow)
   ./scripts/run-analysis-batch.sh --run 3      # single run-003
+  ./scripts/run-analysis-batch.sh --series run2 # improved batch only
   ./scripts/run-analysis-batch.sh --from-run 5 # run-005 … latest
 """
 
@@ -25,35 +26,63 @@ from analysis_batch import (  # noqa: E402
     load_result_manifest,
     process_run,
 )
-from experiment_runs import normalize_run_id  # noqa: E402
+from experiment_runs import normalize_run_id, parse_run_id, validate_series  # noqa: E402
 
 
-def filter_runs(runs: list[dict], *, run_id: str | None, from_run: str | None) -> list[dict]:
+def filter_runs(
+    runs: list[dict],
+    *,
+    run_id: str | None,
+    from_run: str | None,
+    series: str | None,
+) -> list[dict]:
+    if series:
+        series = validate_series(series)
+        runs = [r for r in runs if _series_of(r.get("id", "")) == series]
     if run_id:
-        rid = normalize_run_id(run_id)
+        rid = normalize_run_id(run_id, series=series or "run")
         matched = [r for r in runs if r.get("id") == rid]
         if not matched:
             raise SystemExit(f"run not found or incomplete: {rid}")
         return matched
     if from_run:
-        start = normalize_run_id(from_run)
+        start = normalize_run_id(from_run, series=series or "run")
         return [r for r in runs if r.get("id", "") >= start]
     return runs
 
 
+def _series_of(run_id: str) -> str:
+    try:
+        name, _ = parse_run_id(run_id)
+        return name
+    except ValueError:
+        return ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Batch analysis for experiment runs")
-    parser.add_argument("--run", metavar="ID", help="Single run (e.g. run-003 or 3)")
+    parser.add_argument("--run", metavar="ID", help="Single run (e.g. run-003, run2-001, or 3)")
     parser.add_argument("--from-run", metavar="ID", help="From this run through latest")
+    parser.add_argument(
+        "--series",
+        metavar="NAME",
+        help="Only this series (e.g. run2). Bare --run 1 then means run2-001",
+    )
     parser.add_argument("--llm", action="store_true", help="Call Ollama for qualitative sections")
     parser.add_argument("--force", action="store_true", help="Overwrite existing comparison/summary")
     parser.add_argument("--aggregate", action="store_true", help="Write analysis/output/cross-run-summary.md")
     parser.add_argument("--dry-run", action="store_true", help="List targets only")
     args = parser.parse_args()
 
+    if args.series:
+        try:
+            validate_series(args.series)
+        except ValueError as exc:
+            parser.error(str(exc))
+
     manifest = load_result_manifest(ROOT)
     runs = complete_run_entries(manifest)
-    runs = filter_runs(runs, run_id=args.run, from_run=args.from_run)
+    runs = filter_runs(runs, run_id=args.run, from_run=args.from_run, series=args.series)
 
     if not runs:
         print("No complete runs found in result/manifest.json")

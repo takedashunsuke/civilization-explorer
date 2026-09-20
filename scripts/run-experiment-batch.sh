@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # 実証実験の一括実行
-# 暦年ラベル AD 1750→1950（表示用）・既定 200 年 × seed 10 本 → result/raw/run-NNN/
+# 暦年ラベル AD 1750→1950（表示用）・既定 200 年 × seed 10 本 → result/raw/{series}-NNN/
 #
 # 第2回提出（environment）:
 #   ./scripts/run-experiment-batch.sh
+# 入賞 run-001〜010 を残した改善版:
+#   ./scripts/run-experiment-batch.sh --series run2
 # 講評対応（resilience・stub 試験）:
 #   ./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1
 set -euo pipefail
@@ -19,6 +21,7 @@ REPS=10
 REPS_SET=0
 DRY_RUN=0
 STUB=0
+SERIES="run"
 
 usage() {
   cat <<'EOF'
@@ -27,6 +30,8 @@ Usage: ./scripts/run-experiment-batch.sh [options]
   --protocol environment|resilience
       environment: lush/lean/volatile/balanced（第2回提出・既定）
       resilience: civic/autocrat/commune/fracture（講評対応の主プロトコル）
+  --series NAME   出力フォルダの接頭辞（既定: run → run-001）。
+                  入賞分を残す改善版は run2 → run2-001
   --stub          LLM_PROVIDER=stub で実行（ヒューリスティックのみ）
   --reps N        seed 本数（既定: 10。--from-seed 未指定時）
   --years N       シミュレーション年数（既定: 200。10 の倍数）
@@ -58,6 +63,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --from-seed)
       SEED_START="${2:-}"
+      shift 2
+      ;;
+    --series)
+      SERIES="${2:-}"
+      if [[ -z "$SERIES" || ! "$SERIES" =~ ^[A-Za-z][A-Za-z0-9]*$ ]]; then
+        echo "--series must be alphanumeric starting with a letter (e.g. run2)" >&2
+        exit 1
+      fi
       shift 2
       ;;
     --dry-run) DRY_RUN=1; shift ;;
@@ -107,6 +120,7 @@ fi
 
 echo "=== Civilization Explorer — 実証実験バッチ ==="
 echo "  プロトコル: ${PROTOCOL}"
+echo "  系列: ${SERIES}（result/raw/${SERIES}-NNN/。既存 run-001〜 は上書きしない）"
 echo "  各 run: ${VARIANT_NOTE} × 2 ファイル（.json + .txt）"
 echo "  期間: AD ${START_YEAR} → AD ${END_YEAR}（${YEARS} 年 / ${TURNS} ターン・暦年は表示用ラベル）"
 echo "  繰り返し: ${REPS} 回（seed ${SEED_START} … ${SEED_END}）"
@@ -130,11 +144,11 @@ for i in $(seq 0 $((REPS - 1))); do
   n=$((i + 1))
   echo "--- [$n/${REPS}] protocol=${PROTOCOL} seed=${seed} AD ${START_YEAR}→${END_YEAR} ---"
   if [[ "$DRY_RUN" -eq 1 ]]; then
-    echo "$RUNNER --protocol $PROTOCOL --seed $seed --start-year $START_YEAR --years $YEARS"
+    echo "$RUNNER --protocol $PROTOCOL --series $SERIES --seed $seed --start-year $START_YEAR --years $YEARS"
     continue
   fi
   run_start=$(date +%s)
-  "$RUNNER" --protocol "$PROTOCOL" --seed "$seed" --start-year "$START_YEAR" --years "$YEARS"
+  "$RUNNER" --protocol "$PROTOCOL" --series "$SERIES" --seed "$seed" --start-year "$START_YEAR" --years "$YEARS"
   run_elapsed=$(( $(date +%s) - run_start ))
   echo "    done in ${run_elapsed}s"
   echo ""

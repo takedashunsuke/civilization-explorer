@@ -30,6 +30,7 @@ from experiment_runs import (  # noqa: E402
     relative_repo_path,
     resolve_run_dir,
     upsert_run_manifest,
+    validate_series,
 )
 
 from simulation import create_simulation, tick  # noqa: E402
@@ -267,15 +268,25 @@ def main() -> int:
     parser.add_argument(
         "--run",
         metavar="ID",
-        help="Run folder under result/raw/ (e.g. run-002 or 2). Default: auto next run-NNN",
+        help="Run folder under result/raw/ (e.g. run-002, run2-001, or 2). Default: auto next in --series",
+    )
+    parser.add_argument(
+        "--series",
+        default="run",
+        help="Run id prefix when --run is omitted (default: run → run-001). Use run2 for an improved batch",
     )
     parser.add_argument(
         "--out-dir",
         type=Path,
         default=None,
-        help="Override output directory (advanced; skips run-NNN layout)",
+        help="Override output directory (advanced; skips {series}-NNN layout)",
     )
     args = parser.parse_args()
+
+    try:
+        validate_series(args.series)
+    except ValueError as exc:
+        parser.error(str(exc))
 
     years_per_turn = DEFAULT_YEARS_PER_TURN
     if args.years is not None:
@@ -301,7 +312,7 @@ def main() -> int:
         out_dir = args.out_dir
         run_id = None
     else:
-        out_dir, run_id = resolve_run_dir(raw_root, args.run)
+        out_dir, run_id = resolve_run_dir(raw_root, args.run, series=args.series)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     llm = describe_provider()
