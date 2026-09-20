@@ -162,11 +162,12 @@
 - [x] **stub でパイロット → resilience 1 seed を実測**（2026-09-18、`result/raw/run-011/`）
 - [x] 同一プロトコルで Ollama 1b 1 seed（2026-09-19、`result/raw/run-013/`）。争い・共同が出現。重複 `run-012` は削除
 - [x] **ショック列を事前生成し、全 variant に同じイベントを載せる**（2026-09-19。`scripts/pilot_phase_c.py` で列一致）
-- [ ] 中〜大モデルで住民／集団意思決定の比重を上げる（1b は観測＋スタンス。10 seed は先にしない）
+- [x] 同一列の 1b 200 年再測（2026-09-20、`result/raw/run-014/`）。計画 42 件一致。生存は autocrat 優位、協力比は civic 優位
+- [ ] 中〜大モデルで住民／集団意思決定の比重を上げる（比較は `run-014`。1b 10 seed は先にしない）
 - [ ] overview / README にメタ安全保障との一文接続
 - [ ] 比較表の保持率を小数 3 桁に。UI: resilience variant 切替と回復曲線
 
-講評の残件と次の順番は [post-award.md](./post-award.md) §4 を正とする（Phase D → 語り）。
+講評の残件と次の順番は [post-award.md](./post-award.md) §4 を正とする（Phase D → 任意 stub 再測 → 語り）。
 
 ### 後回し
 

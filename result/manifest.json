@@ -6,10 +6,10 @@
   "years_per_turn": 10,
   "start_year": 1750,
   "population": 5000,
-  "latest_run": "run-013",
+  "latest_run": "run-014",
   "llm_provider": "ollama",
   "ollama_model": "llama3.2:1b",
-  "recorded_at": "2026-09-19T13:24:46.846720+00:00",
+  "recorded_at": "2026-09-19T20:00:36.598995+00:00",
   "tests": [
     {
       "id": "test-001",
@@ -566,6 +566,50 @@
           "label_ja": "無政府・分断",
           "path": "result/raw/run-013/civ-fracture-AD1950-turn20.txt",
           "json_path": "result/raw/run-013/civ-fracture-AD1950-turn20.json",
+          "status": "done"
+        }
+      ],
+      "ollama_model": "llama3.2:1b"
+    },
+    {
+      "id": "run-014",
+      "path": "result/raw/run-014",
+      "recorded_at": "2026-09-19T20:00:36.598995+00:00",
+      "protocol": "resilience",
+      "experiment_seed": 42,
+      "start_year": 1750,
+      "years_per_turn": 10,
+      "milestone_turn": 20,
+      "milestone_years": 200,
+      "end_year": 1950,
+      "llm_provider": "ollama",
+      "files": [
+        {
+          "variant": "civic",
+          "label_ja": "民主・協調",
+          "path": "result/raw/run-014/civ-civic-AD1950-turn20.txt",
+          "json_path": "result/raw/run-014/civ-civic-AD1950-turn20.json",
+          "status": "done"
+        },
+        {
+          "variant": "autocrat",
+          "label_ja": "専制・秩序",
+          "path": "result/raw/run-014/civ-autocrat-AD1950-turn20.txt",
+          "json_path": "result/raw/run-014/civ-autocrat-AD1950-turn20.json",
+          "status": "done"
+        },
+        {
+          "variant": "commune",
+          "label_ja": "高福祉・共同",
+          "path": "result/raw/run-014/civ-commune-AD1950-turn20.txt",
+          "json_path": "result/raw/run-014/civ-commune-AD1950-turn20.json",
+          "status": "done"
+        },
+        {
+          "variant": "fracture",
+          "label_ja": "無政府・分断",
+          "path": "result/raw/run-014/civ-fracture-AD1950-turn20.txt",
+          "json_path": "result/raw/run-014/civ-fracture-AD1950-turn20.json",
           "status": "done"
         }
       ],

@@ -7,10 +7,11 @@
 | 回 | 内容 |
 |----|------|
 | `run-001`〜`010` | 提出。environment × 1b |
-| `run-011` | stub。resilience × LLM なし |
-| `run-013` | 1b A/B。resilience × `llama3.2:1b` |
+| `run-011` | stub。resilience × LLM なし（**列固定前**） |
+| `run-013` | 1b。resilience × `llama3.2:1b`（**列固定前**） |
+| `run-014` | 1b。同一ショック列 × `llama3.2:1b`（比較の正） |
 
-次の実装は Phase D（中〜大モデルの意思決定）。同一ショック列は固定済み。1b の 10 seed は先にしない。次の新規 run は `run-014`。
+次の実装は Phase D（中〜大モデルの意思決定）。比較相手は `run-014`。1b の 10 seed は先にしない。次の新規 run は `run-015`。
 
 ## stub / 1b の再現
 
@@ -19,7 +20,7 @@ backend/.venv/bin/python scripts/pilot_phase_a.py
 backend/.venv/bin/python scripts/pilot_phase_c.py
 ./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1
 LLM_PROVIDER=ollama ./scripts/run-experiment-batch.sh --protocol resilience --reps 1
-./scripts/run-analysis-batch.sh --run 13
+./scripts/run-analysis-batch.sh --run 14
 ```
 ## 実証実験バッチ（提出用 environment / 講評対応 resilience）
 
