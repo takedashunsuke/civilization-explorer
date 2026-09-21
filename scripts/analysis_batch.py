@@ -44,7 +44,7 @@ RESILIENCE_ROWS: list[tuple[str, str, str]] = [
     ("disaster_deaths", "災害死", "d"),
     ("pop_trough", "人口最下点", "d"),
     ("pop_recovery_ratio", "人口回復率", "f1"),
-    ("pop_retention_ratio", "人口保持率", "f1"),
+    ("pop_retention_ratio", "人口保持率", "f3"),
     ("resource_recovery_halftime", "資源半減回復ターン", "d"),
     ("regime_break", "制度破綻", "s"),
     ("coop_vs_conflict_post_shock", "ショック後 協力比", "f1"),
@@ -117,6 +117,8 @@ def _fmt_cell(value: Any, kind: str) -> str:
         return str(int(value))
     if kind == "f1":
         return f"{float(value):.1f}"
+    if kind == "f3":
+        return f"{float(value):.3f}"
     if kind == "pct":
         return f"{float(value):+.1f}"
     return str(value)
@@ -205,7 +207,7 @@ def build_comparison_markdown(
     lines.extend([
         "",
         "読み方: `pop_recovery_ratio` はショック前→最下点の落差に対する期末の戻り率。"
-        " 単調減少では 0 になりやすいので、併せて `pop_retention_ratio`（期末/ショック前）を見る。"
+        " 単調減少では 0 になりやすいので、併せて `pop_retention_ratio`（期末/ショック前、表は小数 3 桁）を見る。"
         " `resource_recovery_halftime` はショック前資源の 50% を一度割ったあと戻るまでのターン（割っていなければ —）。"
         " `resilience_label` は recovered / stressed / collapsed の簡易ラベル。",
         "",
@@ -416,6 +418,8 @@ def build_cross_run_markdown(
         "",
         "## 人口保持率 — civic / autocrat / commune / fracture（resilience protocol）",
         "",
+        "小数 3 桁（JSON の `pop_retention_ratio` と同じ精度。1 桁だと 0.056 と 0.002 がどちらも 0.0 になる）。",
+        "",
         "| run | seed | 民主・協調 | 専制・秩序 | 高福祉・共同 | 無政府・分断 |",
         "|-----|------|------------|------------|--------------|--------------|",
     ])
@@ -424,7 +428,7 @@ def build_cross_run_markdown(
     else:
         for run_id, seed, payloads in res_payloads:
             cells = [
-                _fmt_cell(payloads[vid]["experiment_summary"].get("pop_retention_ratio"), "f1")
+                _fmt_cell(payloads[vid]["experiment_summary"].get("pop_retention_ratio"), "f3")
                 for vid in RESILIENCE_VARIANT_ORDER
             ]
             lines.append(f"| {run_id} | {seed} | " + " | ".join(cells) + " |")

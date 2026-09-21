@@ -44,8 +44,8 @@ backend/.venv/bin/python scripts/pilot_phase_c.py
 ```bash
 ./scripts/run-experiment-batch-v2.sh --dry-run   # 系列確認
 ./scripts/run-experiment-batch-v2.sh --stub      # 済: run3-001
-./scripts/run-experiment-batch-v2.sh             # 次: run3-003（.env の 8B 決定）
-./scripts/run-analysis-batch-v2.sh --aggregate
+./scripts/run-experiment-batch-v2.sh             # 済: run3-002 / run3-003（.env の観測・決定モデル）
+./scripts/run-analysis-batch-v2.sh --aggregate --force
 ```
 
 | 項目 | environment（既定） | resilience |

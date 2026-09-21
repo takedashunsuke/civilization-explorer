@@ -25,13 +25,13 @@
 | 災害死 | 308 | 281 | **327** | **268** |
 | 人口最下点 | **278** | 159 | 236 | **127** |
 | 人口回復率 | 0.0 | 0.0 | 0.0 | 0.0 |
-| 人口保持率 | **0.1** | **0.0** | **0.0** | **0.0** |
+| 人口保持率 | **0.056** | 0.032 | 0.047 | **0.025** |
 | 資源半減回復ターン | — | 0 | 0 | 0 |
 | 制度破綻 | no | no | no | yes |
 | ショック後 協力比 | — | — | — | — |
 | レジリエンスラベル | collapsed | collapsed | collapsed | collapsed |
 
-読み方: `pop_recovery_ratio` はショック前→最下点の落差に対する期末の戻り率。 単調減少では 0 になりやすいので、併せて `pop_retention_ratio`（期末/ショック前）を見る。 `resource_recovery_halftime` はショック前資源の 50% を一度割ったあと戻るまでのターン（割っていなければ —）。 `resilience_label` は recovered / stressed / collapsed の簡易ラベル。
+読み方: `pop_recovery_ratio` はショック前→最下点の落差に対する期末の戻り率。 単調減少では 0 になりやすいので、併せて `pop_retention_ratio`（期末/ショック前、表は小数 3 桁）を見る。 `resource_recovery_halftime` はショック前資源の 50% を一度割ったあと戻るまでのターン（割っていなければ —）。 `resilience_label` は recovered / stressed / collapsed の簡易ラベル。
 
 ## 2. 以降（定性）
 

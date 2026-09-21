@@ -46,6 +46,18 @@
 
 索引: [output/manifest.json](./output/manifest.json) · [result/manifest.json](../result/manifest.json)
 
+## 講評後（resilience · 系列 `run3`）
+
+同一ショック列 × 社会構造。計画 42 件は `run3-001` / `002` / `003` で同一。方針: [post-award.md §4.2](../docs/hackathon/post-award.md)
+
+| 実行回 | LLM | 生存 | 保持率 | 読み |
+|--------|-----|------|--------|------|
+| [run3-001](./output/run3-001/summary.md) | stub | 278 / 159 / 236 / 127 | **0.056** / 0.032 / 0.047 / 0.025 | 共和が最多。争い・共同は 0 |
+| [run3-002](./output/run3-002/summary.md) | 1b 観測＋サンプル | 190 / 182 / 189 / 93 | 0.038 / 0.036 / 0.038 / 0.019 | stub と 014 の間 |
+| [run3-003](./output/run3-003/summary.md) | 観測 1b・決定 8B | **10 / 10 / 10 / 10** | **0.002**（4 世界とも） | 共同 318–372。社会差は消えた |
+
+次の実験番号は `run3-004`（8B 偏りの切り分け 1 本）。10 seed やさらに大きいモデルは先にしない。
+
 ## 手順
 
 1. `./scripts/run-experiment-batch.sh` → 生ログ

@@ -17,6 +17,8 @@ result/
     run-003/             3 回目 …
     run2-001/            改善版 environment（バッチ v1 `--series run2`。入賞分は残す）
     run3-001/            講評後の主実験（バッチ v2。同一ショック列 × resilience）
+    run3-002/            1b 観測＋サンプル上書き
+    run3-003/            観測 1b・決定 8B。共同は増えたが社会差は消えた
 ```
 
 **UI と CLI の違い:** [docs/guides/execution-paths.md](../docs/guides/execution-paths.md)
