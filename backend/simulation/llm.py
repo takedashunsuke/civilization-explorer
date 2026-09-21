@@ -74,13 +74,25 @@ def _narrative_instruction() -> str:
     )
 
 
+def _ollama_model_for(*, role: str) -> str:
+    settings = get_settings()
+    if role == "decide":
+        decision = (settings.ollama_model_decision or "").strip()
+        if decision:
+            return decision
+    return settings.ollama_model
+
+
 def describe_provider() -> dict[str, Any]:
     settings = get_settings()
     provider = (settings.llm_provider or "stub").strip().lower()
     wired = provider in {"ollama", "openai"}
+    observe_model = settings.ollama_model
+    decide_model = _ollama_model_for(role="decide") if provider == "ollama" else settings.openai_model
     return {
         "provider": provider,
-        "ollama_model": settings.ollama_model,
+        "ollama_model": observe_model,
+        "ollama_model_decision": decide_model if provider == "ollama" else None,
         "openai_model": settings.openai_model,
         "wired": wired,
         "mode": "group+sample",
@@ -88,8 +100,9 @@ def describe_provider() -> dict[str, Any]:
         "group_sample_per_region": settings.llm_group_sample_per_region,
         "timeout_sec": settings.llm_timeout_sec,
         "note": (
-            f"Group stance (≤{settings.llm_group_sample_per_region} actors/region) plus "
-            f"≤{settings.llm_max_agents_per_turn} sample-resident LLM overrides per region."
+            f"Observe={observe_model}; decide={decide_model}. "
+            f"Group stance (≤{settings.llm_group_sample_per_region}/region) plus "
+            f"≤{settings.llm_max_agents_per_turn} sample-resident overrides/region."
             if wired
             else "Group stance uses heuristic stub; sample-resident overrides are off."
         ),
@@ -277,11 +290,12 @@ def _post_json(url: str, body: dict[str, Any], timeout: float, headers: dict[str
         return json.loads(resp.read().decode("utf-8"))
 
 
-def _call_ollama(prompt: str, *, num_predict: int = 96) -> str:
+def _call_ollama(prompt: str, *, num_predict: int = 96, role: str = "observe") -> str:
     settings = get_settings()
+    model = _ollama_model_for(role=role)
     base = settings.ollama_base_url.rstrip("/")
     payload = {
-        "model": settings.ollama_model,
+        "model": model,
         "messages": [{"role": "user", "content": prompt}],
         "stream": False,
         "format": "json",
@@ -290,8 +304,10 @@ def _call_ollama(prompt: str, *, num_predict: int = 96) -> str:
             "num_predict": num_predict,
         },
     }
-    # Region observe needs a longer budget than single-agent decisions.
     timeout = max(settings.llm_timeout_sec, 12.0 if num_predict > 160 else settings.llm_timeout_sec)
+    # Larger decision models need more than the 1b observe budget.
+    if role == "decide" and model != settings.ollama_model:
+        timeout = max(timeout, 45.0)
     result = _post_json(f"{base}/api/chat", payload, timeout=timeout)
     message = result.get("message") or {}
     return str(message.get("content") or "")
@@ -327,11 +343,11 @@ def _call_openai(prompt: str, *, num_predict: int = 96) -> str:
     return str((choices[0].get("message") or {}).get("content") or "")
 
 
-def complete_decision_text(prompt: str, *, num_predict: int = 96) -> str:
+def complete_decision_text(prompt: str, *, num_predict: int = 96, role: str = "observe") -> str:
     settings = get_settings()
     provider = (settings.llm_provider or "stub").strip().lower()
     if provider == "ollama":
-        return _call_ollama(prompt, num_predict=num_predict)
+        return _call_ollama(prompt, num_predict=num_predict, role=role)
     if provider == "openai":
         return _call_openai(prompt, num_predict=num_predict)
     raise RuntimeError(f"LLM provider '{provider}' is not wired")
@@ -346,7 +362,7 @@ def decide_one(
     observation = build_observation(sim, agent, neighbors)
     prompt = build_prompt(observation)
     try:
-        text = complete_decision_text(prompt)
+        text = complete_decision_text(prompt, role="decide")
         choice = parse_decision(text, neighbor_ids)
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, RuntimeError, OSError) as exc:
         logger.info("LLM decide failed for %s: %s", agent.id, exc)
@@ -830,7 +846,7 @@ def observe_and_steer_one_region(
     )
     heuristic_policy = heuristic_region_policy(fact, heuristic)
     try:
-        text = complete_decision_text(prompt, num_predict=180)
+        text = complete_decision_text(prompt, num_predict=180, role="observe")
     except Exception as exc:  # noqa: BLE001
         logger.info("region steer failed for %s: %s", fact.get("region_id"), exc)
         return heuristic, heuristic_policy

@@ -171,6 +171,8 @@ World の `institution` に加え、実行時に次を持つ。
 | 変数 | 既定 | 説明 |
 |------|------|------|
 | `LLM_PROVIDER` | `stub` | `stub` / `ollama` / `openai` |
+| `OLLAMA_MODEL` | `llama3.2:1b` | 地域観測・集団スタンス |
+| `OLLAMA_MODEL_DECISION` | （空＝観測と同じ） | Phase D の個人決定。例: `llama3.1:8b` |
 | `LLM_GROUP_SAMPLE_PER_REGION` | `12` | 列あたりのサンプル実行者数 |
 | `LLM_MAX_AGENTS_PER_TURN` | `4` | 地域あたりの個人 LLM 上書き人数（Phase D） |
 | `LLM_TIMEOUT_SEC` | `8` | 1 回の LLM 呼び出し上限（秒） |

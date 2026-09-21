@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     llm_provider: str = "stub"
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "llama3.2"
+    # Empty = same as ollama_model. Phase D: raise this (e.g. llama3.1:8b) and keep observe on 1b.
+    ollama_model_decision: str = ""
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     # llm_max_agents_per_turn: Phase D sample-resident overrides per region per turn.

@@ -215,6 +215,11 @@ def update_manifest(
     protocol: str,
 ) -> None:
     settings = get_settings()
+    observe = settings.ollama_model if settings.llm_provider == "ollama" else None
+    decide = (settings.ollama_model_decision or "").strip() if observe else ""
+    ollama_label = observe
+    if observe and decide and decide != observe:
+        ollama_label = f"{observe}+decide:{decide}"
     upsert_run_manifest(
         ROOT / "result" / "manifest.json",
         run_id=run_id,
@@ -222,7 +227,7 @@ def update_manifest(
         repo_root=ROOT,
         records=records,
         llm_provider=settings.llm_provider,
-        ollama_model=settings.ollama_model if settings.llm_provider == "ollama" else None,
+        ollama_model=ollama_label,
         milestone_turn=milestone_turn,
         milestone_years=milestone_turn * years_per_turn,
         start_year=start_year,
@@ -324,7 +329,10 @@ def main() -> int:
         f"LLM={llm.get('provider')} (wired={llm.get('wired')})",
     )
     if llm.get("provider") == "ollama":
-        print(f"  Ollama: {llm.get('ollama_model')} @ {get_settings().ollama_base_url}")
+        observe = llm.get("ollama_model")
+        decide = llm.get("ollama_model_decision") or observe
+        extra = f" observe={observe} decide={decide}" if decide != observe else f" {observe}"
+        print(f"  Ollama:{extra} @ {get_settings().ollama_base_url}")
     if run_id:
         print(f"  Run: {run_id} → {relative_repo_path(out_dir, ROOT)}")
     records: list[dict] = []

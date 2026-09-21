@@ -1,6 +1,6 @@
 # 実証 run 横断サマリー — 2026-09-21
 
-対象: 2 run（`result/manifest.json` の完了分）
+対象: 3 run（`result/manifest.json` の完了分）
 
 environment と resilience が混在していても、それぞれの表に振り分ける。
 
@@ -16,6 +16,7 @@ environment と resilience が混在していても、それぞれの表に振�
 |-----|------|------------|------------|--------------|--------------|
 | run3-001 | 42 | 0.1 | 0.0 | 0.0 | 0.0 |
 | run3-002 | 42 | 0.0 | 0.0 | 0.0 | 0.0 |
+| run3-003 | 42 | 0.0 | 0.0 | 0.0 | 0.0 |
 
 ## 災害死 — resilience protocol
 
@@ -23,6 +24,7 @@ environment と resilience が混在していても、それぞれの表に振�
 |-----|------|------------|------------|--------------|--------------|
 | run3-001 | 42 | 308 | 281 | 327 | 268 |
 | run3-002 | 42 | 282 | 306 | 305 | 278 |
+| run3-003 | 42 | 196 | 197 | 203 | 203 |
 
 ## レジリエンスラベル — resilience protocol
 
@@ -30,3 +32,4 @@ environment と resilience が混在していても、それぞれの表に振�
 |-----|------|------------|------------|--------------|--------------|
 | run3-001 | 42 | collapsed | collapsed | collapsed | collapsed |
 | run3-002 | 42 | collapsed | collapsed | collapsed | collapsed |
+| run3-003 | 42 | collapsed | collapsed | collapsed | collapsed |

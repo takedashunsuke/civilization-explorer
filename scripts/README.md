@@ -32,11 +32,19 @@ backend/.venv/bin/python scripts/pilot_phase_c.py
 ./scripts/run-experiment-batch.sh --protocol resilience --stub --reps 1  # 旧手順（run-011 相当）
 ```
 
-**v2** — 講評後の主実験。既定は resilience × `run3` × 1 seed。
+**v2** — 講評後の主実験。既定は resilience × `run3` × 1 seed。`.env` の LLM を使う（`--stub` を付けない）。
+
+観測と決定はモデルを分けられる。
+
+| 変数 | 役割 |
+|------|------|
+| `OLLAMA_MODEL` | 地域観測・集団スタンス（`run3-003` では 1b のまま） |
+| `OLLAMA_MODEL_DECISION` | サンプル住民の個人決定（空なら観測と同じ。8B 比較なら `llama3.1:8b`） |
 
 ```bash
 ./scripts/run-experiment-batch-v2.sh --dry-run   # 系列確認
-./scripts/run-experiment-batch-v2.sh --stub      # 着手の 1 手（§4.1）
+./scripts/run-experiment-batch-v2.sh --stub      # 済: run3-001
+./scripts/run-experiment-batch-v2.sh             # 次: run3-003（.env の 8B 決定）
 ./scripts/run-analysis-batch-v2.sh --aggregate
 ```
 
