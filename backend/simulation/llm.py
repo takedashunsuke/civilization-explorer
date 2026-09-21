@@ -83,15 +83,15 @@ def describe_provider() -> dict[str, Any]:
         "ollama_model": settings.ollama_model,
         "openai_model": settings.openai_model,
         "wired": wired,
-        "mode": "group",
+        "mode": "group+sample",
         "max_agents_per_turn": settings.llm_max_agents_per_turn,
         "group_sample_per_region": settings.llm_group_sample_per_region,
         "timeout_sec": settings.llm_timeout_sec,
         "note": (
-            f"Group/institution LLM stance (≤{settings.llm_group_sample_per_region} actors/region); "
-            "masses follow bulk rules."
+            f"Group stance (≤{settings.llm_group_sample_per_region} actors/region) plus "
+            f"≤{settings.llm_max_agents_per_turn} sample-resident LLM overrides per region."
             if wired
-            else "Group stance uses heuristic stub; set LLM_PROVIDER=ollama|openai to enable."
+            else "Group stance uses heuristic stub; sample-resident overrides are off."
         ),
     }
 
@@ -109,6 +109,7 @@ def build_observation(
         if region
         else sim.world.institution_runtime.authority
     )
+    policy = next((p for p in sim.region_policies if p.region_id == agent.region_id), None)
     reading = next((r for r in sim.region_readings if r.region_id == agent.region_id), None)
     return {
         "self": {
@@ -140,6 +141,8 @@ def build_observation(
             "region_trajectory": reading.trajectory if reading else "",
             "rising_archetype": reading.rising_archetype if reading else "",
             "discontent": round(reading.discontent, 2) if reading else None,
+            "group_action": policy.action.value if policy else "wait",
+            "group_intensity": round(policy.intensity, 2) if policy else None,
         },
         "neighbors": [
             {
@@ -193,7 +196,9 @@ def build_prompt(observation: dict[str, Any]) -> str:
         f"region={world['region']} climate={world.get('climate')}.\n"
         f"Region trajectory={traj}; mood={mood}; "
         f"rising={world.get('rising_archetype') or 'none'}; "
-        f"discontent={world.get('discontent')}.\n"
+        f"discontent={world.get('discontent')}; "
+        f"group_stance={world.get('group_action') or 'wait'}. "
+        "You may follow the group stance or deviate.\n"
         f"Neighbors: {neighbor_lines}."
     )
 

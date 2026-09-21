@@ -5,7 +5,7 @@ import random
 from collections import defaultdict
 
 from simulation.continents import CONTINENT_PRESETS, SUBREGION_CENTERS, resolve_preset, resolve_subregion
-from simulation.llm import observe_and_steer_regions
+from simulation.llm import decide_batch, observe_and_steer_regions
 from config import get_settings
 from simulation.shocks import (
     apply_epidemic_to_region,
@@ -577,7 +577,7 @@ def _policy_target(sim: SimulationState, agent: AgentState, action: ActionType, 
 
 
 def decide_actions(sim: SimulationState, rng: random.Random) -> list[ChosenAction]:
-    """Enact region/institution stances on a small sample — not per-person LLM."""
+    """Enact region stances on a sample; wired LLM may override a few residents."""
     settings = get_settings()
     sample_n = max(4, int(settings.llm_group_sample_per_region))
     policies = {p.region_id: p for p in sim.region_policies}
@@ -619,8 +619,61 @@ def decide_actions(sim: SimulationState, rng: random.Random) -> list[ChosenActio
             )
             choices.append(_attach_migrate_coords(agent, choice, rng))
 
-    # Group stance already picked who moves; do not expand/override via cohort heuristics.
-    return choices
+    return _apply_sample_resident_overrides(sim, choices, rng)
+
+
+def _apply_sample_resident_overrides(
+    sim: SimulationState,
+    choices: list[ChosenAction],
+    rng: random.Random,
+) -> list[ChosenAction]:
+    """Phase D: a few sampled residents may override the group stance via decide_batch."""
+    settings = get_settings()
+    provider = (settings.llm_provider or "stub").strip().lower()
+    if provider not in {"ollama", "openai"}:
+        return choices
+    per_region = max(0, int(settings.llm_max_agents_per_turn))
+    if per_region <= 0 or not choices:
+        return choices
+
+    agents_by_id = {a.id: a for a in sim.agents if a.alive}
+    candidates: list[AgentState] = []
+    seen: set[str] = set()
+    regions = list(sim.world.regions) if sim.world.regions else []
+    for region in regions:
+        taken = 0
+        for choice in choices:
+            if taken >= per_region:
+                break
+            agent = agents_by_id.get(choice.agent_id)
+            if agent is None or agent.region_id != region.id.value or agent.id in seen:
+                continue
+            seen.add(agent.id)
+            candidates.append(agent)
+            taken += 1
+    if not candidates:
+        return choices
+
+    overlays = decide_batch(sim, candidates, nearby_with_trust)
+    if not overlays:
+        return choices
+
+    by_id = {c.agent_id: i for i, c in enumerate(choices)}
+    out = list(choices)
+    extras: list[ChosenAction] = []
+    for agent_id, overlay in overlays.items():
+        agent = agents_by_id.get(agent_id)
+        if agent is None:
+            continue
+        if not overlay.reason and overlay.rationale:
+            overlay.reason = overlay.rationale
+        attached = _attach_migrate_coords(agent, overlay, rng)
+        idx = by_id.get(agent_id)
+        if idx is None:
+            extras.append(attached)
+        else:
+            out[idx] = attached
+    return out + extras
 
 
 def resolve_actions(

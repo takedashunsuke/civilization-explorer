@@ -159,11 +159,12 @@ World の `institution` に加え、実行時に次を持つ。
 
 * 列あたり最大 `LLM_GROUP_SAMPLE_PER_REGION`（既定 12）人をリーダー・特異 traits 優先で選ぶ
 * 方針の `intensity` に応じてサンプル内の一部に行動を適用
+* Phase D: `LLM_PROVIDER=ollama|openai` のとき、地域あたり最大 `LLM_MAX_AGENTS_PER_TURN`（既定 4）人が `decide_one` で方針を上書きできる。stub では呼ばない
 * 行動空間: `wait` / `cooperate` / `conflict` / `migrate` / `obey` / `resist`
 
-#### レガシー: 個人単位 LLM（`decide_one` / `decide_batch`）
+#### 個人単位 LLM（`decide_one` / `decide_batch`）
 
-コード上は残るが、現行 `engine.tick` からは呼ばれない。将来の拡張用。
+集団方針のあと、サンプル住民の上書きに使う。失敗時はその人だけグループ方針のまま。
 
 #### 設定（`.env`）
 
@@ -171,6 +172,7 @@ World の `institution` に加え、実行時に次を持つ。
 |------|------|------|
 | `LLM_PROVIDER` | `stub` | `stub` / `ollama` / `openai` |
 | `LLM_GROUP_SAMPLE_PER_REGION` | `12` | 列あたりのサンプル実行者数 |
+| `LLM_MAX_AGENTS_PER_TURN` | `4` | 地域あたりの個人 LLM 上書き人数（Phase D） |
 | `LLM_TIMEOUT_SEC` | `8` | 1 回の LLM 呼び出し上限（秒） |
 | `LLM_CONCURRENCY` | `1` | 並列ワーカー数 |
 | `LLM_NARRATIVE_LANG` | `ja` | UI 向け要約・理由の言語（`ja` / `en`） |

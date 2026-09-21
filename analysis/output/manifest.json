@@ -1,5 +1,5 @@
 {
-  "latest_run": "run3-001",
+  "latest_run": "run3-002",
   "tests": [
     {
       "id": "test-001",
@@ -248,10 +248,20 @@
       "id": "run3-001",
       "path": "analysis/output/run3-001",
       "result_run_path": "result/raw/run3-001",
-      "updated_at": "2026-09-20T23:18:20.865412+00:00",
+      "updated_at": "2026-09-21T00:30:40.136871+00:00",
       "files": {
         "summary": "analysis/output/run3-001/summary.md",
         "comparison": "analysis/output/run3-001/comparison-2026-09-21.md"
+      }
+    },
+    {
+      "id": "run3-002",
+      "path": "analysis/output/run3-002",
+      "result_run_path": "result/raw/run3-002",
+      "updated_at": "2026-09-21T00:30:40.141710+00:00",
+      "files": {
+        "summary": "analysis/output/run3-002/summary.md",
+        "comparison": "analysis/output/run3-002/comparison-2026-09-21.md"
       }
     }
   ]
