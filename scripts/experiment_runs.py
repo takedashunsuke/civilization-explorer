@@ -241,7 +241,7 @@ def ensure_analysis_run_dir(
             "| ファイル | 内容 |\n"
             "|----------|------|\n"
             "| `comparison-*.md` | 4 世界の定量・定性比較 |\n"
-            "| `agent-role-deep-dive-*.md` | 同一人物の役割差 |\n"
+            "| `same-id-comparison-*.md` | 同一 ID（初期名簿）の生死・指導者 |\n"
             "| `summary.md` | 提出用サマリー |\n"
             "| `llm-response-*.md` | （任意）LLM 生出力 |\n",
             encoding="utf-8",

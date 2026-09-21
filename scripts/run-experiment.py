@@ -32,6 +32,7 @@ from experiment_runs import (  # noqa: E402
     upsert_run_manifest,
     validate_series,
 )
+from same_id_compare import snapshot_from_sim  # noqa: E402
 
 from simulation import create_simulation, tick  # noqa: E402
 from simulation.experiment import (  # noqa: E402
@@ -346,6 +347,9 @@ def main() -> int:
         prepare_experiment_sim(sim, variant=variant, seed=args.seed, total_turns=turns)
         tick(sim, n=turns)
         summary = experiment_summary(sim)
+        same_id = snapshot_from_sim(sim)
+        same_id["spotlight_agent_id"] = summary.get("spotlight_agent_id")
+        same_id["spotlight_role"] = summary.get("spotlight_role")
         report = build_report(sim, summary, run_id=run_id)
         filename = _export_filename(variant, _calendar_year(sim), sim.world.turn)
         out_path = out_dir / filename
@@ -369,6 +373,7 @@ def main() -> int:
             "shock_pulse_turns": list(sim.shock_pulse_turns or []),
             "llm": llm,
             "experiment_summary": summary,
+            "same_id": same_id,
             "report_txt": f"{run_rel}/{filename}",
         }
         json_path = out_dir / json_name

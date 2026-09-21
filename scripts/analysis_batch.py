@@ -10,6 +10,14 @@ from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from same_id_compare import (
+    cross_run_same_id_row,
+    render_same_id_markdown,
+    render_same_id_summary_frame,
+    same_id_document,
+    stats_from_payloads,
+)
+
 VARIANT_ORDER = ("lush", "lean", "volatile", "balanced")
 VARIANT_LABEL_JA = {
     "lush": "豊か",
@@ -145,6 +153,14 @@ def _bold_extremes(row_values: list[str], kind: str) -> list[str]:
     return out
 
 
+def _same_id_stats(repo_root: Path, payloads: dict[str, dict[str, Any]]):
+    order, _labels, headers = resolve_variant_layout(payloads)
+    try:
+        return stats_from_payloads(repo_root, payloads, order=order, headers=headers)
+    except FileNotFoundError:
+        return None
+
+
 def build_comparison_markdown(
     *,
     run_id: str,
@@ -152,6 +168,7 @@ def build_comparison_markdown(
     payloads: dict[str, dict[str, Any]],
     analysis_date: str,
     llm_note: str | None = None,
+    repo_root: Path | None = None,
 ) -> str:
     order, _labels, headers = resolve_variant_layout(payloads)
     summaries = {vid: payloads[vid]["experiment_summary"] for vid in order}
@@ -211,6 +228,13 @@ def build_comparison_markdown(
         " `resource_recovery_halftime` はショック前資源の 50% を一度割ったあと戻るまでのターン（割っていなければ —）。"
         " `resilience_label` は recovered / stressed / collapsed の簡易ラベル。",
         "",
+    ])
+    if repo_root is not None:
+        same_id = _same_id_stats(repo_root, payloads)
+        if same_id is not None:
+            lines.append(render_same_id_markdown(same_id).rstrip())
+            lines.append("")
+    lines.extend([
         "## 2. 以降（定性）",
         "",
         "環境ごとの要約・意外な差・発表フックは `--llm` 実行後に `llm-response-*.md` を反映するか、手動で追記してください。",
@@ -228,6 +252,8 @@ def build_summary_markdown(
     payloads: dict[str, dict[str, Any]],
     comparison_name: str,
     analysis_date: str,
+    repo_root: Path | None = None,
+    same_id_name: str | None = None,
 ) -> str:
     order, _labels, headers = resolve_variant_layout(payloads)
     meta = payloads[order[0]]
@@ -245,7 +271,8 @@ def build_summary_markdown(
         f"# 実行結果サマリー — {run_id}",
         "",
         f"> **実行回:** `{run_id}` · 生ログ: [{result_path}/](../../{result_path}/)  ",
-        f"> 比較: [{comparison_name}](./{comparison_name})",
+        f"> 比較: [{comparison_name}](./{comparison_name})"
+        + (f" · 同一 ID: [{same_id_name}](./{same_id_name})" if same_id_name else ""),
         "",
         f"自動生成: {analysis_date}（`scripts/run-analysis-batch.sh`）",
         "",
@@ -274,6 +301,12 @@ def build_summary_markdown(
     for key, label, kind in SUMMARY_ROWS[:6]:
         cells = [_fmt_cell(summaries[vid].get(key), kind) for vid in order]
         lines.append("| " + " | ".join([label, *cells]) + " |")
+
+    if repo_root is not None:
+        same_id = _same_id_stats(repo_root, payloads)
+        if same_id is not None:
+            lines.append("")
+            lines.append(render_same_id_summary_frame(same_id).rstrip())
 
     lines.extend([
         "",
@@ -458,6 +491,23 @@ def build_cross_run_markdown(
                 for vid in RESILIENCE_VARIANT_ORDER
             ]
             lines.append(f"| {run_id} | {seed} | " + " | ".join(cells) + " |")
+        lines.extend(
+            [
+                "",
+                "## 同一 ID（初期名簿 a1–a5000）— 1 世界だけ生存",
+                "",
+                "子孫 ID は世界間で別人。比較してよいのは初期名簿のみ。",
+                "",
+                "| run | 4 世界死亡 | 1 世界のみ生存 | 2 世界以上 | 初期名簿の期末指導者 |",
+                "|-----|------------|----------------|------------|----------------------|",
+            ]
+        )
+        for run_id, _seed, payloads in res_payloads:
+            stats = _same_id_stats(repo_root, payloads)
+            if stats is None:
+                lines.append(f"| {run_id} | — | — | — | — |")
+            else:
+                lines.append(cross_run_same_id_row(run_id, stats))
     lines.append("")
     return "\n".join(lines)
 
@@ -519,9 +569,18 @@ def process_run(
             payloads=payloads,
             analysis_date=day,
             llm_note=llm_note,
+            repo_root=repo_root,
         ),
         encoding="utf-8",
     )
+    same_id_name: str | None = None
+    same_id = _same_id_stats(repo_root, payloads)
+    if same_id is not None:
+        same_id_name = f"same-id-comparison-{day}.md"
+        (out_dir / same_id_name).write_text(
+            same_id_document(same_id, run_id=run_id, analysis_date=day),
+            encoding="utf-8",
+        )
     summary_path.write_text(
         build_summary_markdown(
             run_id=run_id,
@@ -529,6 +588,8 @@ def process_run(
             payloads=payloads,
             comparison_name=comparison_name,
             analysis_date=day,
+            repo_root=repo_root,
+            same_id_name=same_id_name,
         ),
         encoding="utf-8",
     )
@@ -537,9 +598,16 @@ def process_run(
         "summary": f"analysis/output/{run_id}/summary.md",
         "comparison": f"analysis/output/{run_id}/{comparison_name}",
     }
+    if same_id_name:
+        files["same_id"] = f"analysis/output/{run_id}/{same_id_name}"
     if llm_response_name:
         files["llm_response"] = f"analysis/output/{run_id}/{llm_response_name}"
 
     upsert_analysis_manifest(repo_root, run_id=run_id, result_run_path=result_path, files=files)
-    print(f"  wrote {run_id}: {comparison_name}, summary.md" + (f", {llm_response_name}" if llm_response_name else ""))
+    extra = []
+    if same_id_name:
+        extra.append(same_id_name)
+    if llm_response_name:
+        extra.append(llm_response_name)
+    print(f"  wrote {run_id}: {comparison_name}, summary.md" + (f", {', '.join(extra)}" if extra else ""))
     return files
