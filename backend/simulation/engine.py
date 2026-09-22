@@ -50,6 +50,10 @@ from simulation.models import (
 from simulation.terrain import biome_at, generate_terrain, random_land_position, snap_to_land
 
 
+ROSTER_WEALTH_SPREAD_FLOOR = 4.0
+ROSTER_WEALTH_SPREAD_SCALE = 28.0
+ROSTER_WEALTH_BASELINE_INEQUALITY = 0.5
+ROSTER_WEALTH_MIN = 0.5
 SETTLEMENT_DISTANCE = 22.0
 SETTLEMENT_MIN_SIZE = 2
 POPULATION_MIN = 1000
@@ -226,7 +230,7 @@ def generate_agent_roster(region_params: list[RegionParams], seed: int) -> list[
             traits = roll_traits(rng, trait_rate=region.trait_rate)
             if "charisma" in traits:
                 ambi = max(ambi, 0.68)
-            spread = 4.0 + 28.0 * spec.initial_values.inequality
+            spread = roster_wealth_spread(spec.initial_values.inequality)
             wealth = rng.uniform(max(2.0, 14.0 - spread / 2), 14.0 + spread / 2)
             if "genius" in traits:
                 wealth += 4
@@ -270,6 +274,33 @@ def clone_roster_for_world(roster: list[AgentState]) -> list[AgentState]:
         copy.shock_stress = 0.0
         out.append(copy)
     return out
+
+
+def roster_wealth_spread(inequality: float) -> float:
+    """Half-width of the initial wealth draw. Matches generate_agent_roster."""
+    return ROSTER_WEALTH_SPREAD_FLOOR + ROSTER_WEALTH_SPREAD_SCALE * clamp(float(inequality))
+
+
+def apply_identity_wealth(
+    agents: list[AgentState],
+    inequality: float,
+    *,
+    baseline_inequality: float = ROSTER_WEALTH_BASELINE_INEQUALITY,
+) -> None:
+    """Respread cloned roster wealth. Rank order (who is richer) stays; the gap follows inequality."""
+    old = roster_wealth_spread(baseline_inequality)
+    new = roster_wealth_spread(inequality)
+    if old <= 0:
+        return
+    factor = new / old
+    if abs(factor - 1.0) < 1e-9:
+        return
+    living = [agent for agent in agents if agent.alive]
+    if not living:
+        return
+    mean = sum(a.wealth for a in living) / len(living)
+    for agent in living:
+        agent.wealth = max(ROSTER_WEALTH_MIN, mean + (agent.wealth - mean) * factor)
 
 
 def create_simulation(

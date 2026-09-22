@@ -6,10 +6,10 @@
   "years_per_turn": 10,
   "start_year": 1750,
   "population": 5000,
-  "latest_run": "run3-003",
+  "latest_run": "run3-004",
   "llm_provider": "ollama",
   "ollama_model": "llama3.2:1b+decide:llama3.1:8b",
-  "recorded_at": "2026-09-21T13:15:23.459070+00:00",
+  "recorded_at": "2026-09-22T01:10:21.484777+00:00",
   "tests": [
     {
       "id": "test-001",
@@ -1181,6 +1181,50 @@
           "label_ja": "無政府・分断",
           "path": "result/raw/run3-003/civ-fracture-AD1950-turn20.txt",
           "json_path": "result/raw/run3-003/civ-fracture-AD1950-turn20.json",
+          "status": "done"
+        }
+      ],
+      "ollama_model": "llama3.2:1b+decide:llama3.1:8b"
+    },
+    {
+      "id": "run3-004",
+      "path": "result/raw/run3-004",
+      "recorded_at": "2026-09-22T01:10:21.484777+00:00",
+      "protocol": "resilience",
+      "experiment_seed": 42,
+      "start_year": 1750,
+      "years_per_turn": 10,
+      "milestone_turn": 20,
+      "milestone_years": 200,
+      "end_year": 1950,
+      "llm_provider": "ollama",
+      "files": [
+        {
+          "variant": "civic",
+          "label_ja": "民主・協調",
+          "path": "result/raw/run3-004/civ-civic-AD1950-turn20.txt",
+          "json_path": "result/raw/run3-004/civ-civic-AD1950-turn20.json",
+          "status": "done"
+        },
+        {
+          "variant": "autocrat",
+          "label_ja": "専制・秩序",
+          "path": "result/raw/run3-004/civ-autocrat-AD1950-turn20.txt",
+          "json_path": "result/raw/run3-004/civ-autocrat-AD1950-turn20.json",
+          "status": "done"
+        },
+        {
+          "variant": "commune",
+          "label_ja": "高福祉・共同",
+          "path": "result/raw/run3-004/civ-commune-AD1950-turn20.txt",
+          "json_path": "result/raw/run3-004/civ-commune-AD1950-turn20.json",
+          "status": "done"
+        },
+        {
+          "variant": "fracture",
+          "label_ja": "無政府・分断",
+          "path": "result/raw/run3-004/civ-fracture-AD1950-turn20.txt",
+          "json_path": "result/raw/run3-004/civ-fracture-AD1950-turn20.json",
           "status": "done"
         }
       ],

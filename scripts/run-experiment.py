@@ -333,7 +333,7 @@ def main() -> int:
         observe = llm.get("ollama_model")
         decide = llm.get("ollama_model_decision") or observe
         extra = f" observe={observe} decide={decide}" if decide != observe else f" {observe}"
-        print(f"  Ollama:{extra} @ {get_settings().ollama_base_url}")
+        print(f"  Ollama:{extra} max_agents={llm.get('max_agents_per_turn')} @ {get_settings().ollama_base_url}")
     if run_id:
         print(f"  Run: {run_id} → {relative_repo_path(out_dir, ROOT)}")
     records: list[dict] = []

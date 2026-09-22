@@ -11,7 +11,7 @@
 | `run-013` | 1b。resilience × `llama3.2:1b`（**列固定前**） |
 | `run-014` | 1b。同一ショック列 × `llama3.2:1b`（1b 側の比較の正） |
 | `run2-001`〜`010` | 改善版 environment。入賞分とは別系列 |
-| `run3-001`〜 | 講評後の主実験（バッチ **v2**）。同一列 × resilience |
+| `run3-001`〜`004` | 講評後の主実験（バッチ **v2**）。同一列 × resilience。004 で切り分け済 |
 
 v1 バッチ（`run-experiment-batch.sh`）は提出・`run2` 用に残す。講評後は v2。着手の 1 手は stub 1 seed（[post-award.md](../docs/hackathon/post-award.md) §4.1）。1b の 10 seed は先にしない。
 
@@ -39,12 +39,13 @@ backend/.venv/bin/python scripts/pilot_phase_c.py
 | 変数 | 役割 |
 |------|------|
 | `OLLAMA_MODEL` | 地域観測・集団スタンス（`run3-003` では 1b のまま） |
-| `OLLAMA_MODEL_DECISION` | サンプル住民の個人決定（空なら観測と同じ。8B 比較なら `llama3.1:8b`） |
+| `LLM_MAX_AGENTS_PER_TURN` | 地域あたりの個人決定人数（`run3-003` は 4、`run3-004` は 1） |
 
 ```bash
 ./scripts/run-experiment-batch-v2.sh --dry-run   # 系列確認
 ./scripts/run-experiment-batch-v2.sh --stub      # 済: run3-001
 ./scripts/run-experiment-batch-v2.sh             # 済: run3-002 / run3-003（.env の観測・決定モデル）
+LLM_MAX_AGENTS_PER_TURN=1 ./scripts/run-experiment-batch-v2.sh  # 済: run3-004
 ./scripts/run-analysis-batch-v2.sh --aggregate --force
 ```
 

@@ -19,6 +19,7 @@ result/
     run3-001/            講評後の主実験（バッチ v2。同一ショック列 × resilience）
     run3-002/            1b 観測＋サンプル上書き
     run3-003/            観測 1b・決定 8B。共同は増えたが社会差は消えた
+    run3-004/            8B のまま MAX_AGENTS=1。共同は半減、争いは戻る、生存差は薄い
 ```
 
 **UI と CLI の違い:** [docs/guides/execution-paths.md](../docs/guides/execution-paths.md)

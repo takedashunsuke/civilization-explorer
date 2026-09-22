@@ -1,0 +1,346 @@
+{
+  "format": "civ-experiment-result-v1",
+  "run_id": "run3-004",
+  "protocol": "resilience",
+  "variant": "commune",
+  "variant_label_ja": "高福祉・共同",
+  "experiment_seed": 42,
+  "start_year": 1750,
+  "years_per_turn": 10,
+  "milestone_turn": 20,
+  "milestone_years": 200,
+  "simulation_id": "b1f64be7-f0cc-4251-a629-7fab2321de42",
+  "turn": 20,
+  "calendar_year": 1950,
+  "shock_pulse_turns": [
+    4,
+    10,
+    16
+  ],
+  "llm": {
+    "provider": "ollama",
+    "ollama_model": "llama3.2:1b",
+    "ollama_model_decision": "llama3.1:8b",
+    "openai_model": "gpt-4o-mini",
+    "wired": true,
+    "mode": "group+sample",
+    "max_agents_per_turn": 1,
+    "group_sample_per_region": 12,
+    "timeout_sec": 45.0,
+    "note": "Observe=llama3.2:1b; decide=llama3.1:8b. Group stance (≤12/region) plus ≤1 sample-resident overrides/region."
+  },
+  "experiment_summary": {
+    "variant": "commune",
+    "variant_label_ja": "高福祉・共同",
+    "protocol": "resilience",
+    "shock_pulse_turns": [
+      4,
+      10,
+      16
+    ],
+    "shock_plan_len": 42,
+    "shock_plan_signature": [
+      [
+        0,
+        "western_africa",
+        "weather_storm"
+      ],
+      [
+        2,
+        "western_africa",
+        "epidemic"
+      ],
+      [
+        2,
+        "western_europe",
+        "earthquake"
+      ],
+      [
+        2,
+        "australasia",
+        "weather_drought"
+      ],
+      [
+        3,
+        "western_africa",
+        "epidemic"
+      ],
+      [
+        3,
+        "northern_america",
+        "earthquake"
+      ],
+      [
+        4,
+        "western_africa",
+        "epidemic"
+      ],
+      [
+        4,
+        "western_europe",
+        "weather_heat"
+      ],
+      [
+        4,
+        "western_africa",
+        "pulse"
+      ],
+      [
+        4,
+        "northern_america",
+        "pulse"
+      ],
+      [
+        4,
+        "eastern_asia",
+        "pulse"
+      ],
+      [
+        4,
+        "western_europe",
+        "pulse"
+      ],
+      [
+        4,
+        "australasia",
+        "pulse"
+      ],
+      [
+        5,
+        "western_europe",
+        "weather_heat"
+      ],
+      [
+        5,
+        "australasia",
+        "flood"
+      ],
+      [
+        6,
+        "eastern_asia",
+        "epidemic"
+      ],
+      [
+        6,
+        "western_europe",
+        "earthquake"
+      ],
+      [
+        7,
+        "northern_america",
+        "earthquake"
+      ],
+      [
+        7,
+        "eastern_asia",
+        "weather_heat"
+      ],
+      [
+        8,
+        "western_africa",
+        "epidemic"
+      ],
+      [
+        8,
+        "western_europe",
+        "flood"
+      ],
+      [
+        9,
+        "western_africa",
+        "epidemic"
+      ],
+      [
+        9,
+        "northern_america",
+        "epidemic"
+      ],
+      [
+        10,
+        "western_africa",
+        "pulse"
+      ],
+      [
+        10,
+        "northern_america",
+        "pulse"
+      ],
+      [
+        10,
+        "eastern_asia",
+        "pulse"
+      ],
+      [
+        10,
+        "western_europe",
+        "pulse"
+      ],
+      [
+        10,
+        "australasia",
+        "pulse"
+      ],
+      [
+        11,
+        "eastern_asia",
+        "heatwave"
+      ],
+      [
+        12,
+        "western_africa",
+        "flood"
+      ],
+      [
+        13,
+        "western_europe",
+        "flood"
+      ],
+      [
+        13,
+        "australasia",
+        "weather_drought"
+      ],
+      [
+        14,
+        "eastern_asia",
+        "epidemic"
+      ],
+      [
+        15,
+        "northern_america",
+        "weather_heat"
+      ],
+      [
+        16,
+        "northern_america",
+        "frost"
+      ],
+      [
+        16,
+        "western_africa",
+        "pulse"
+      ],
+      [
+        16,
+        "northern_america",
+        "pulse"
+      ],
+      [
+        16,
+        "eastern_asia",
+        "pulse"
+      ],
+      [
+        16,
+        "western_europe",
+        "pulse"
+      ],
+      [
+        16,
+        "australasia",
+        "pulse"
+      ],
+      [
+        18,
+        "australasia",
+        "earthquake"
+      ],
+      [
+        19,
+        "western_europe",
+        "flood"
+      ]
+    ],
+    "seed": 42,
+    "turn": 20,
+    "calendar_year": 1950,
+    "population_alive": 19,
+    "population_delta_pct": -99.6,
+    "resource_pool": 4.2,
+    "trade_openness_mean": 0.45,
+    "conflicts_total": 19,
+    "cooperations_total": 179,
+    "regime_shifts": 0,
+    "disasters": 42,
+    "dominant_archetype": "explorer",
+    "archetypes": [
+      "warlord",
+      "explorer",
+      "explorer",
+      "bureaucrat"
+    ],
+    "trajectories": [
+      "exodus",
+      "exodus",
+      "exodus",
+      "faith",
+      "exodus"
+    ],
+    "institutions": [
+      "democracy",
+      "democracy",
+      "democracy",
+      "democracy",
+      "democracy"
+    ],
+    "spotlight_agent_id": "a5753",
+    "spotlight_role": "warlord",
+    "shock_count": 42,
+    "disaster_deaths": 232,
+    "first_shock_turn": 0,
+    "pop_trough": 19,
+    "pop_recovery_ratio": 0.0,
+    "pop_retention_ratio": 0.004,
+    "resource_recovery_halftime": 0,
+    "regime_break": false,
+    "coop_vs_conflict_post_shock": 0.904,
+    "resilience_label": "collapsed",
+    "resilience": {
+      "shock_count": 42,
+      "disaster_deaths": 232,
+      "first_shock_turn": 0,
+      "pop_pre_shock": 5000,
+      "pop_trough": 19,
+      "pop_end": 19,
+      "pop_recovery_ratio": 0.0,
+      "pop_retention_ratio": 0.004,
+      "resource_pre_shock": 425.0,
+      "resource_end": 4.2,
+      "resource_breached_half": true,
+      "resource_recovery_halftime": 0,
+      "authority_trough": 0.677,
+      "regime_break": false,
+      "coop_vs_conflict_post_shock": 0.904,
+      "resilience_label": "collapsed"
+    }
+  },
+  "same_id": {
+    "initial_roster_size": 5000,
+    "initial_alive_ids": [
+      "a2206"
+    ],
+    "leaders": [
+      {
+        "id": "a5755",
+        "region_id": "america",
+        "settlement_id": "s1",
+        "initial_roster": false
+      },
+      {
+        "id": "a5753",
+        "region_id": "africa",
+        "settlement_id": "s2",
+        "initial_roster": false
+      },
+      {
+        "id": "a5748",
+        "region_id": "america",
+        "settlement_id": "s3",
+        "initial_roster": false
+      }
+    ],
+    "spotlight_agent_id": "a5753",
+    "spotlight_role": "warlord"
+  },
+  "report_txt": "result/raw/run3-004/civ-commune-AD1950-turn20.txt"
+}

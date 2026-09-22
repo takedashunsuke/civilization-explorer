@@ -31,6 +31,17 @@ from simulation.shocks import shock_plan_signature  # noqa: E402
 
 SEED = 42
 TURNS = 10
+_WEALTH_ORDER = ("commune", "civic", "autocrat", "fracture")
+
+
+def _wealth_std(agents) -> float:
+    xs = [a.wealth for a in agents if a.alive]
+    mean = sum(xs) / len(xs)
+    return (sum((x - mean) ** 2 for x in xs) / len(xs)) ** 0.5
+
+
+def _wealth_rank(agents) -> tuple[str, ...]:
+    return tuple(a.id for a in sorted(agents, key=lambda x: (round(x.wealth, 6), x.id)))
 
 
 def _emitted_column(sim) -> list[tuple[int, str, str]]:
@@ -51,11 +62,20 @@ def main() -> int:
     plan_ref: list[tuple[int, str, str]] | None = None
     emitted: list[list[tuple[int, str, str]]] = []
     shock_counts: list[int] = []
+    wealth_std: dict[str, float] = {}
+    rank_ref: tuple[str, ...] | None = None
+    rank_ok = True
 
     for variant in RESILIENCE_VARIANT_IDS:
         params = world_params_for_variant(variant, SEED, start_year=1750)
         sim = create_simulation(f"pilot-c-{variant}", params, agent_roster=fresh_roster_copy(SEED))
         prepare_experiment_sim(sim, variant=variant, seed=SEED, total_turns=TURNS)
+        wealth_std[variant] = _wealth_std(sim.agents)
+        ranks = _wealth_rank(sim.agents)
+        if rank_ref is None:
+            rank_ref = ranks
+        elif ranks != rank_ref:
+            rank_ok = False
         if pulse_ref is None:
             pulse_ref = list(sim.shock_pulse_turns)
         sig = shock_plan_signature(list(sim.shock_plan or []))
@@ -94,6 +114,8 @@ def main() -> int:
     ok_shock_equal = shock_spread == 0
     ok_social_split = spread >= 20 or retain_spread >= 0.02
     ok_metrics = all(r.get("pop_retention_ratio") is not None for r in rows)
+    ordered_std = [wealth_std[v] for v in _WEALTH_ORDER]
+    ok_wealth_spread = all(ordered_std[i] < ordered_std[i + 1] for i in range(len(ordered_std) - 1))
 
     print("Acceptance:")
     print(f"  pulse schedule [2,5,8]: {pulse_ref} -> {'PASS' if ok_pulse else 'FAIL'}")
@@ -112,8 +134,23 @@ def main() -> int:
         f"{'PASS' if ok_social_split else 'FAIL'}"
     )
     print(f"  resilience metrics present: {'PASS' if ok_metrics else 'FAIL'}")
+    print(
+        "  initial wealth std commune<civic<autocrat<fracture: "
+        + ", ".join(f"{v}={wealth_std[v]:.3f}" for v in _WEALTH_ORDER)
+        + f" -> {'PASS' if ok_wealth_spread else 'FAIL'}"
+    )
+    print(f"  wealth rank preserved across variants: {'PASS' if rank_ok else 'FAIL'}")
 
-    if ok_pulse and ok_plan and ok_emitted and ok_shock_equal and ok_social_split and ok_metrics:
+    if (
+        ok_pulse
+        and ok_plan
+        and ok_emitted
+        and ok_shock_equal
+        and ok_social_split
+        and ok_metrics
+        and ok_wealth_spread
+        and rank_ok
+    ):
         print("\nPhase C pilot: OK")
         return 0
     print("\nPhase C pilot: needs tuning")

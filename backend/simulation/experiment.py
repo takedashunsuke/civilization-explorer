@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from simulation.continents import CONTINENT_IDS, DEFAULT_SUBREGION
-from simulation.engine import clone_roster_for_world, generate_agent_roster
+from simulation.engine import apply_identity_wealth, clone_roster_for_world, generate_agent_roster
 from simulation.shocks import generate_shock_plan, shock_plan_signature
 from simulation.models import (
     AgentState,
@@ -301,6 +301,8 @@ def prepare_experiment_sim(
         identity = _RESILIENCE_SOCIAL[variant]["initial_values"]
         assert isinstance(identity, InitialValues)
         bias_roster_to_identity(sim.agents, identity)
+        apply_identity_wealth(sim.agents, identity.inequality)
+        sim.world.initial_total_wealth = round(sum(a.wealth for a in sim.agents), 3)
         sim.shock_plan = generate_shock_plan(
             seed=seed,
             total_turns=total_turns,
