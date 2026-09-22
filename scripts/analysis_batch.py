@@ -38,6 +38,8 @@ SUMMARY_ROWS: list[tuple[str, str, str]] = [
     ("population_alive", "生存人口", "d"),
     ("population_delta_pct", "人口変化 %", "pct"),
     ("resource_pool", "共有資源（合計）", "f1"),
+    ("initial_inequality", "初期格差ノブ", "f2"),
+    ("initial_wealth_std", "初期富の標準偏差", "f1"),
     ("trade_openness_mean", "交易開放（平均）", "f1"),
     ("conflicts_total", "争い（累計）", "d"),
     ("cooperations_total", "共同（累計）", "d"),
@@ -125,6 +127,8 @@ def _fmt_cell(value: Any, kind: str) -> str:
         return str(int(value))
     if kind == "f1":
         return f"{float(value):.1f}"
+    if kind == "f2":
+        return f"{float(value):.2f}"
     if kind == "f3":
         return f"{float(value):.3f}"
     if kind == "pct":
@@ -200,6 +204,8 @@ def build_comparison_markdown(
 
     for key, label, kind in SUMMARY_ROWS:
         cells = [_fmt_cell(summaries[vid].get(key), kind) for vid in order]
+        if all(c == "—" for c in cells):
+            continue
         cells = _bold_extremes(cells, kind)
         lines.append("| " + " | ".join([label, *cells]) + " |")
 
@@ -300,6 +306,8 @@ def build_summary_markdown(
     summaries = {vid: payloads[vid]["experiment_summary"] for vid in order}
     for key, label, kind in SUMMARY_ROWS[:6]:
         cells = [_fmt_cell(summaries[vid].get(key), kind) for vid in order]
+        if all(c == "—" for c in cells):
+            continue
         lines.append("| " + " | ".join([label, *cells]) + " |")
 
     if repo_root is not None:

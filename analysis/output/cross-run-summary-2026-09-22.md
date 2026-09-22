@@ -1,6 +1,6 @@
 # 実証 run 横断サマリー — 2026-09-22
 
-対象: 4 run（`result/manifest.json` の完了分）
+対象: 5 run（`result/manifest.json` の完了分）
 
 environment と resilience が混在していても、それぞれの表に振り分ける。
 
@@ -20,6 +20,7 @@ environment と resilience が混在していても、それぞれの表に振�
 | run3-002 | 42 | 0.038 | 0.036 | 0.038 | 0.019 |
 | run3-003 | 42 | 0.002 | 0.002 | 0.002 | 0.002 |
 | run3-004 | 42 | 0.004 | 0.005 | 0.004 | 0.004 |
+| run3-005 | 42 | 0.008 | 0.005 | 0.003 | 0.003 |
 
 ## 災害死 — resilience protocol
 
@@ -29,6 +30,7 @@ environment と resilience が混在していても、それぞれの表に振�
 | run3-002 | 42 | 282 | 306 | 305 | 278 |
 | run3-003 | 42 | 196 | 197 | 203 | 203 |
 | run3-004 | 42 | 233 | 249 | 232 | 252 |
+| run3-005 | 42 | 247 | 252 | 243 | 227 |
 
 ## レジリエンスラベル — resilience protocol
 
@@ -38,6 +40,7 @@ environment と resilience が混在していても、それぞれの表に振�
 | run3-002 | 42 | collapsed | collapsed | collapsed | collapsed |
 | run3-003 | 42 | collapsed | collapsed | collapsed | collapsed |
 | run3-004 | 42 | collapsed | collapsed | collapsed | collapsed |
+| run3-005 | 42 | collapsed | collapsed | collapsed | collapsed |
 
 ## 同一 ID（初期名簿 a1–a5000）— 1 世界だけ生存
 
@@ -49,3 +52,4 @@ environment と resilience が混在していても、それぞれの表に振�
 | run3-002 | 4996 | 4 | 0 | a1097, a2911, a4069 |
 | run3-003 | 4985 | 15 | 0 | a1891, a2418 |
 | run3-004 | 4996 | 4 | 0 | — |
+| run3-005 | 4997 | 3 | 0 | a2402 |

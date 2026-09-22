@@ -125,6 +125,8 @@ def build_report(sim: SimulationState, summary: dict, *, run_id: str | None = No
         ("population_alive", "生存人口"),
         ("population_delta_pct", "人口変化%"),
         ("resource_pool", "共有資源（合計）"),
+        ("initial_inequality", "初期格差ノブ"),
+        ("initial_wealth_std", "初期富の標準偏差"),
         ("trade_openness_mean", "交易開放（平均）"),
         ("conflicts_total", "争い"),
         ("cooperations_total", "共同"),

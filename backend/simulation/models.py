@@ -209,6 +209,7 @@ class WorldState(BaseModel):
     seed: int
     initial_population: int = 8
     initial_total_wealth: float = 0.0
+    initial_wealth_std: float = 0.0
     initial_resource_pool: float = 0.0
     population_cap: int
     resource_pool: float

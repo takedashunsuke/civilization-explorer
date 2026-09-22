@@ -20,6 +20,7 @@ result/
     run3-002/            1b 観測＋サンプル上書き
     run3-003/            観測 1b・決定 8B。共同は増えたが社会差は消えた
     run3-004/            8B のまま MAX_AGENTS=1。共同は半減、争いは戻る、生存差は薄い
+    run3-005/            004 と同じモデル・人数・列。初期富の幅だけ。生存 39 / 23 / 13 / 13
 ```
 
 **UI と CLI の違い:** [docs/guides/execution-paths.md](../docs/guides/execution-paths.md)

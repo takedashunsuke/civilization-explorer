@@ -1,5 +1,5 @@
 {
-  "latest_run": "run3-004",
+  "latest_run": "run3-005",
   "tests": [
     {
       "id": "test-001",
@@ -248,7 +248,7 @@
       "id": "run3-001",
       "path": "analysis/output/run3-001",
       "result_run_path": "result/raw/run3-001",
-      "updated_at": "2026-09-22T06:12:13.991057+00:00",
+      "updated_at": "2026-09-22T09:36:41.133126+00:00",
       "files": {
         "summary": "analysis/output/run3-001/summary.md",
         "comparison": "analysis/output/run3-001/comparison-2026-09-22.md",
@@ -259,7 +259,7 @@
       "id": "run3-002",
       "path": "analysis/output/run3-002",
       "result_run_path": "result/raw/run3-002",
-      "updated_at": "2026-09-22T06:12:14.177001+00:00",
+      "updated_at": "2026-09-22T09:36:41.292040+00:00",
       "files": {
         "summary": "analysis/output/run3-002/summary.md",
         "comparison": "analysis/output/run3-002/comparison-2026-09-22.md",
@@ -270,7 +270,7 @@
       "id": "run3-003",
       "path": "analysis/output/run3-003",
       "result_run_path": "result/raw/run3-003",
-      "updated_at": "2026-09-22T06:12:14.331463+00:00",
+      "updated_at": "2026-09-22T09:36:41.429497+00:00",
       "files": {
         "summary": "analysis/output/run3-003/summary.md",
         "comparison": "analysis/output/run3-003/comparison-2026-09-22.md",
@@ -281,11 +281,22 @@
       "id": "run3-004",
       "path": "analysis/output/run3-004",
       "result_run_path": "result/raw/run3-004",
-      "updated_at": "2026-09-22T06:12:14.352769+00:00",
+      "updated_at": "2026-09-22T09:36:41.451711+00:00",
       "files": {
         "summary": "analysis/output/run3-004/summary.md",
         "comparison": "analysis/output/run3-004/comparison-2026-09-22.md",
         "same_id": "analysis/output/run3-004/same-id-comparison-2026-09-22.md"
+      }
+    },
+    {
+      "id": "run3-005",
+      "path": "analysis/output/run3-005",
+      "result_run_path": "result/raw/run3-005",
+      "updated_at": "2026-09-22T09:36:41.475134+00:00",
+      "files": {
+        "summary": "analysis/output/run3-005/summary.md",
+        "comparison": "analysis/output/run3-005/comparison-2026-09-22.md",
+        "same_id": "analysis/output/run3-005/same-id-comparison-2026-09-22.md"
       }
     }
   ]

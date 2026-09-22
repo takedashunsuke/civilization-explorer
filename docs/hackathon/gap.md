@@ -175,10 +175,10 @@
 - [x] 比較表の保持率を小数 3 桁に（`analysis_batch.py`。run3 再生成済み）
 - [x] 同一 ID 比較をサマリーの固定枠に（2026-09-22。初期名簿 a1–a5000 のみ。子孫 ID は別人）
 - [x] 8B 偏りの切り分け 1 本（`run3-004`。`LLM_MAX_AGENTS_PER_TURN=1`、観測 1b / 決定 8B）
-- [x] `inequality` を初期富に乗せる（順位固定・幅だけ。004 には未適用）
+- [x] `inequality` を初期富に乗せる（順位固定・幅だけ。`run3-005` で 1 seed。004 には未適用）
 - [x] UI: resilience variant 切替と回復曲線
 
-講評の残件と次の順番は [post-award.md](./post-award.md) §4.2 を正とする（切り分け・inequality・UI まで済）。比較は `run3-001`〜`004`。
+講評の残件と次の順番は [post-award.md](./post-award.md) §4.2 を正とする。比較は `run3-001`〜`005`。次は年齢死とショック帰属死の分離。
 
 ### 後回し
 

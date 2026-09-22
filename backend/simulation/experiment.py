@@ -302,7 +302,12 @@ def prepare_experiment_sim(
         assert isinstance(identity, InitialValues)
         bias_roster_to_identity(sim.agents, identity)
         apply_identity_wealth(sim.agents, identity.inequality)
-        sim.world.initial_total_wealth = round(sum(a.wealth for a in sim.agents), 3)
+        living_wealth = [a.wealth for a in sim.agents if a.alive]
+        sim.world.initial_total_wealth = round(sum(living_wealth), 3)
+        if living_wealth:
+            mean_w = sum(living_wealth) / len(living_wealth)
+            var_w = sum((w - mean_w) ** 2 for w in living_wealth) / len(living_wealth)
+            sim.world.initial_wealth_std = round(var_w**0.5, 4)
         sim.shock_plan = generate_shock_plan(
             seed=seed,
             total_turns=total_turns,
@@ -699,6 +704,12 @@ def experiment_summary(sim: SimulationState) -> dict[str, Any]:
         "population_alive": len(alive),
         "population_delta_pct": pop_delta_pct,
         "resource_pool": round(resource_now, 1),
+        "initial_inequality": round(
+            (sim.world.regions[0].initial_values.inequality if sim.world.regions else 0.5),
+            2,
+        ),
+        "initial_total_wealth": round(sim.world.initial_total_wealth, 1),
+        "initial_wealth_std": round(sim.world.initial_wealth_std, 3),
         "trade_openness_mean": round(trade_open, 2),
         "conflicts_total": conflicts,
         "cooperations_total": cooperations,
