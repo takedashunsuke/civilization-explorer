@@ -47,6 +47,8 @@ def main() -> int:
             f"recovery={summary['pop_recovery_ratio']}  "
             f"res={summary['resource_pool']}  half_t={summary['resource_recovery_halftime']}  "
             f"shocks={summary['shock_count']}  deaths_d={summary['disaster_deaths']}  "
+            f"age={summary.get('age_deaths')}  shock_d={summary.get('shock_attributed_deaths')}  "
+            f"share={summary.get('shock_death_share')}  mort={summary.get('shock_mortality_ratio')}  "
             f"break={summary['regime_break']}  label={summary['resilience_label']}"
         )
 

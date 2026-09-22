@@ -1150,9 +1150,60 @@ def apply_aging(sim: SimulationState) -> None:
             agent.shock_stress = clamp(agent.shock_stress * SHOCK_STRESS_DECAY)
 
 
+DEATH_CAUSE_KEYS = {
+    "age": "death_age",
+    "hardship": "death_hardship",
+    "scarcity": "death_scarcity",
+    "shock": "death_shock",
+}
+
+
 def _resource_scarcity(pool: float) -> float:
     """0 when pool >= comfort; approaches 1 as the shared pool empties."""
     return clamp(1.0 - float(pool) / RESOURCE_COMFORT)
+
+
+def _age_death_chance(age: int) -> float:
+    if age < 45:
+        return 0.002
+    if age < 55:
+        return 0.008
+    if age < 65:
+        return 0.018
+    if age < 75:
+        return 0.04
+    return 0.08
+
+
+def _yearly_death_components(
+    agent: AgentState,
+    region: RegionState | None = None,
+    *,
+    region_alive: int = 0,
+) -> dict[str, float]:
+    """Hazard parts for a yearly death. Sum is the yearly chance (before the 0.22 cap)."""
+    age_c = _age_death_chance(agent.age)
+    hardship_c = 0.0
+    if agent.wealth < 3:
+        hardship_c += 0.01
+    if agent.happiness < 0.25:
+        hardship_c += 0.008
+    scarcity_c = 0.0
+    if region is not None:
+        scarcity_c += 0.014 * _resource_scarcity(region.resource_pool)
+        if region_alive > 0:
+            per_capita = region.resource_pool / float(region_alive)
+            if per_capita < 0.08:
+                scarcity_c += 0.01
+            elif per_capita < 0.15:
+                scarcity_c += 0.005
+    shock_c = 0.025 * float(agent.shock_stress)
+    return {
+        "age": age_c,
+        "hardship": hardship_c,
+        "scarcity": scarcity_c,
+        "shock": shock_c,
+    }
 
 
 def _yearly_death_chance(
@@ -1161,33 +1212,26 @@ def _yearly_death_chance(
     *,
     region_alive: int = 0,
 ) -> float:
-    age = agent.age
-    if age < 45:
-        chance = 0.002
-    elif age < 55:
-        chance = 0.008
-    elif age < 65:
-        chance = 0.018
-    elif age < 75:
-        chance = 0.04
-    else:
-        chance = 0.08
-    if agent.wealth < 3:
-        chance += 0.01
-    if agent.happiness < 0.25:
-        chance += 0.008
-    # Environment pathways (Phase A): scarcity and recent shock raise mortality.
-    if region is not None:
-        scarcity = _resource_scarcity(region.resource_pool)
-        chance += 0.014 * scarcity
-        if region_alive > 0:
-            per_capita = region.resource_pool / float(region_alive)
-            if per_capita < 0.08:
-                chance += 0.01
-            elif per_capita < 0.15:
-                chance += 0.005
-    chance += 0.025 * float(agent.shock_stress)
-    return min(0.22, chance)
+    parts = _yearly_death_components(agent, region, region_alive=region_alive)
+    return min(0.22, sum(parts.values()))
+
+
+def _pick_death_cause(rng: random.Random, parts: dict[str, float]) -> str:
+    total = sum(max(0.0, w) for w in parts.values())
+    if total <= 0:
+        return "age"
+    roll = rng.random() * total
+    acc = 0.0
+    last = "age"
+    for cause, weight in parts.items():
+        w = max(0.0, weight)
+        if w <= 0:
+            continue
+        acc += w
+        last = cause
+        if roll <= acc:
+            return cause
+    return last
 
 
 def _death_chance(
@@ -1267,12 +1311,16 @@ def apply_deaths(sim: SimulationState, rng: random.Random) -> None:
             if rng.random() >= _death_chance(agent, years, region, region_alive=region_alive):
                 continue
             heir = _pick_heir(agent, living)
+            parts = _yearly_death_components(agent, region, region_alive=region_alive)
+            cause = _pick_death_cause(rng, parts)
+            detail_key = DEATH_CAUSE_KEYS.get(cause, "death_age")
             _emit_death(
                 sim,
                 agent,
                 heir=heir,
-                detail_key="death",
-                detail=f"{agent.id} died at {agent.age}",
+                detail_key=detail_key,
+                detail=f"{agent.id} died at {agent.age} ({cause})",
+                deltas={f"p_{k}": round(v, 5) for k, v in parts.items()},
             )
 
 
@@ -1742,7 +1790,7 @@ def summarize_group_events(
                     actor_id=group,
                     action=ActionType.death,
                     target_id=event.actor_id,
-                    detail_key="group_death",
+                    detail_key=event.detail_key or "group_death",
                     detail=event.detail,
                     deltas=event.deltas,
                 )

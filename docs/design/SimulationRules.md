@@ -286,7 +286,7 @@ power(x) = x.wealth * 0.4 + x.energy * 0.3 + x.aggression * 0.3 + noise()
 ## 5. ターン末の世界更新
 
 1. 出生: 生存数が `population_cap` 未満で、繁殖適齢かつ富・幸福が高い親がいれば亜地域ごとに追加（地域あたり上限あり）
-2. 加齢（`years_per_turn` 歳）と死亡（高齢・困窮。最低2人は残す）。遺産は同集落へ
+2. 加齢（`years_per_turn` 歳）と死亡。年次死は競合リスクで `death_age` / `death_hardship` / `death_scarcity` / `death_shock` に振り分ける。災害直死は `death_disaster`。列あたり最低2人は残す。遺産は同集落へ
 3. 特性の獲得／喪失（カリスマ・天才は固定ではない）
 4. 集落の再編成（距離閾値）。福祉・災害・体制遷移の対象は亜地域所属で切る
 5. `resource_pool` の自然回復（定数、または education に比例）
@@ -304,6 +304,8 @@ power(x) = x.wealth * 0.4 + x.energy * 0.3 + x.aggression * 0.3 + noise()
 | 協力率 | 当該 Turn の `cooperate` 成功数 / 行動数（地域行は当該地域の協力イベント） |
 | 権威 | `authority` |
 | 平均幸福 | `happiness` 平均 |
+| 年齢・困窮死 | 年次死のうち `death_age` + `death_hardship` |
+| ショック帰属死 | `death_disaster` + `death_shock` + `death_scarcity`。ラベルはショック前人口に対する比 |
 
 移住は集落（なければ亜地域）が同じ変位で動く。大陸をまたぐ移動は低確率の例外。初期 Relationship は空（全対全は組まない）。
 

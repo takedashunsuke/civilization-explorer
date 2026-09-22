@@ -474,6 +474,11 @@ def describe_experiment() -> dict[str, Any]:
 
 
 AUTHORITY_BREAK_THRESHOLD = 0.35
+DEATH_AGE_KEYS = frozenset({"death_age", "death_hardship"})
+DEATH_SHOCK_KEYS = frozenset({"death_disaster", "death_shock", "death_scarcity"})
+# Shock-attributed mortality vs pre-shock population (label uses these, not total retention).
+SHOCK_MORTALITY_RECOVERED = 0.08
+SHOCK_MORTALITY_COLLAPSED = 0.18
 
 
 def compute_resilience_metrics(sim: SimulationState) -> dict[str, Any]:
@@ -485,8 +490,16 @@ def compute_resilience_metrics(sim: SimulationState) -> dict[str, Any]:
         else float(sim.world.resource_pool)
     )
     shock_count = sum(1 for e in sim.events if e.action.value == "disaster")
-    disaster_deaths = sum(
-        1 for e in sim.events if e.action.value == "death" and e.detail_key == "death_disaster"
+    death_keys = [e.detail_key for e in sim.events if e.action.value == "death"]
+    disaster_deaths = sum(1 for k in death_keys if k == "death_disaster")
+    age_deaths = sum(1 for k in death_keys if k in DEATH_AGE_KEYS)
+    scarcity_deaths = sum(1 for k in death_keys if k == "death_scarcity")
+    shock_stress_deaths = sum(1 for k in death_keys if k == "death_shock")
+    unattributed_deaths = sum(1 for k in death_keys if k in {"death", "group_death"})
+    shock_attributed_deaths = sum(1 for k in death_keys if k in DEATH_SHOCK_KEYS)
+    total_deaths = len(death_keys)
+    shock_death_share = (
+        round(shock_attributed_deaths / total_deaths, 3) if total_deaths else None
     )
 
     history = list(sim.history)
@@ -617,13 +630,14 @@ def compute_resilience_metrics(sim: SimulationState) -> dict[str, Any]:
     denom = post_coop + post_conflict
     coop_vs_conflict_post_shock = round(post_coop / denom, 3) if denom else None
 
-    # Label: prefer bounce-back when present; else use retention under chronic decline.
+    # Label: age-driven decline is background. Collapse/recovery is about shock-attributed death.
     bounced = pop_end > pop_trough * 1.02 and drop > 0
+    shock_mortality_ratio = round(shock_attributed_deaths / max(pop_pre, 1), 3)
     if bounced and pop_recovery_ratio >= 0.6 and not regime_break:
         resilience_label = "recovered"
-    elif pop_retention_ratio >= 0.55 and not regime_break:
+    elif shock_mortality_ratio < SHOCK_MORTALITY_RECOVERED and not regime_break:
         resilience_label = "recovered"
-    elif pop_retention_ratio < 0.35 or (pop_recovery_ratio < 0.15 and pop_retention_ratio < 0.45):
+    elif shock_mortality_ratio >= SHOCK_MORTALITY_COLLAPSED:
         resilience_label = "collapsed"
     else:
         resilience_label = "stressed"
@@ -631,6 +645,14 @@ def compute_resilience_metrics(sim: SimulationState) -> dict[str, Any]:
     return {
         "shock_count": shock_count,
         "disaster_deaths": disaster_deaths,
+        "age_deaths": age_deaths,
+        "scarcity_deaths": scarcity_deaths,
+        "shock_stress_deaths": shock_stress_deaths,
+        "unattributed_deaths": unattributed_deaths,
+        "shock_attributed_deaths": shock_attributed_deaths,
+        "total_deaths": total_deaths,
+        "shock_death_share": shock_death_share,
+        "shock_mortality_ratio": shock_mortality_ratio,
         "first_shock_turn": first_shock_turn,
         "pop_pre_shock": pop_pre,
         "pop_trough": pop_trough,
@@ -724,6 +746,10 @@ def experiment_summary(sim: SimulationState) -> dict[str, Any]:
         # Phase B resilience (flat keys for analysis tables)
         "shock_count": resilience["shock_count"],
         "disaster_deaths": resilience["disaster_deaths"],
+        "age_deaths": resilience["age_deaths"],
+        "shock_attributed_deaths": resilience["shock_attributed_deaths"],
+        "shock_death_share": resilience["shock_death_share"],
+        "shock_mortality_ratio": resilience["shock_mortality_ratio"],
         "first_shock_turn": resilience["first_shock_turn"],
         "pop_trough": resilience["pop_trough"],
         "pop_recovery_ratio": resilience["pop_recovery_ratio"],

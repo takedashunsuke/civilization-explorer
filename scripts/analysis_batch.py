@@ -52,6 +52,10 @@ SUMMARY_ROWS: list[tuple[str, str, str]] = [
 RESILIENCE_ROWS: list[tuple[str, str, str]] = [
     ("shock_count", "ショック数", "d"),
     ("disaster_deaths", "災害死", "d"),
+    ("age_deaths", "年齢・困窮死", "d"),
+    ("shock_attributed_deaths", "ショック帰属死", "d"),
+    ("shock_death_share", "ショック死割合", "f3"),
+    ("shock_mortality_ratio", "ショック死亡率", "f3"),
     ("pop_trough", "人口最下点", "d"),
     ("pop_recovery_ratio", "人口回復率", "f1"),
     ("pop_retention_ratio", "人口保持率", "f3"),
@@ -223,6 +227,8 @@ def build_comparison_markdown(
             if isinstance(val, bool):
                 val = "yes" if val else "no"
             raw.append(_fmt_cell(val, kind))
+        if all(c == "—" for c in raw):
+            continue
         if kind != "s":
             raw = _bold_extremes(raw, kind)
         lines.append("| " + " | ".join([label, *raw]) + " |")
@@ -231,8 +237,8 @@ def build_comparison_markdown(
         "",
         "読み方: `pop_recovery_ratio` はショック前→最下点の落差に対する期末の戻り率。"
         " 単調減少では 0 になりやすいので、併せて `pop_retention_ratio`（期末/ショック前、表は小数 3 桁）を見る。"
-        " `resource_recovery_halftime` はショック前資源の 50% を一度割ったあと戻るまでのターン（割っていなければ —）。"
-        " `resilience_label` は recovered / stressed / collapsed の簡易ラベル。",
+        " 年齢死は背景として切り、ラベルは `shock_mortality_ratio`（ショック帰属死 / ショック前人口）で読む。"
+        " ショック帰属死 = 災害直死 + ストレス年次死 + 資源不足死。`resilience_label` は recovered / stressed / collapsed。",
         "",
     ])
     if repo_root is not None:
@@ -483,6 +489,36 @@ def build_cross_run_markdown(
         for run_id, seed, payloads in res_payloads:
             cells = [
                 _fmt_cell(payloads[vid]["experiment_summary"].get("disaster_deaths"), "d")
+                for vid in RESILIENCE_VARIANT_ORDER
+            ]
+            lines.append(f"| {run_id} | {seed} | " + " | ".join(cells) + " |")
+        lines.extend([
+            "",
+            "## ショック帰属死 — resilience protocol",
+            "",
+            "災害直死 + ストレス年次死 + 資源不足死。旧 run は未計測（—）。",
+            "",
+            "| run | seed | 民主・協調 | 専制・秩序 | 高福祉・共同 | 無政府・分断 |",
+            "|-----|------|------------|------------|--------------|--------------|",
+        ])
+        for run_id, seed, payloads in res_payloads:
+            cells = [
+                _fmt_cell(payloads[vid]["experiment_summary"].get("shock_attributed_deaths"), "d")
+                for vid in RESILIENCE_VARIANT_ORDER
+            ]
+            lines.append(f"| {run_id} | {seed} | " + " | ".join(cells) + " |")
+        lines.extend([
+            "",
+            "## ショック死亡率 — resilience protocol",
+            "",
+            "ショック帰属死 / ショック前人口。ラベルの主指標。",
+            "",
+            "| run | seed | 民主・協調 | 専制・秩序 | 高福祉・共同 | 無政府・分断 |",
+            "|-----|------|------------|------------|--------------|--------------|",
+        ])
+        for run_id, seed, payloads in res_payloads:
+            cells = [
+                _fmt_cell(payloads[vid]["experiment_summary"].get("shock_mortality_ratio"), "f3")
                 for vid in RESILIENCE_VARIANT_ORDER
             ]
             lines.append(f"| {run_id} | {seed} | " + " | ".join(cells) + " |")

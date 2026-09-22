@@ -93,6 +93,8 @@ def main() -> int:
             f"alive={summary['population_alive']:4}  retain={summary['pop_retention_ratio']}  "
             f"recovery={summary['pop_recovery_ratio']}  "
             f"shocks={summary['shock_count']}  deaths_d={summary['disaster_deaths']}  "
+            f"age={summary.get('age_deaths')}  shock_d={summary.get('shock_attributed_deaths')}  "
+            f"share={summary.get('shock_death_share')}  mort={summary.get('shock_mortality_ratio')}  "
             f"plan={summary.get('shock_plan_len')}  "
             f"coop_ratio={summary['coop_vs_conflict_post_shock']}  "
             f"break={summary['regime_break']}  label={summary['resilience_label']}"
