@@ -2,6 +2,8 @@
 
 操作・設計は [demo-v3.md](./demo-v3.md)。概念整理は [world-model.md](./world-model.md)。ギャップは [gap.md](./gap.md)。
 
+**ブラッシュアップ稿:** [slides-ver2.md](./slides-ver2.md)（問い・構成は同じ。実測の読みを補強）
+
 ---
 
 ## スライドタイトル構成案
