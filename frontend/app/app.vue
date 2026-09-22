@@ -11,6 +11,7 @@ import { polityKind, settlementColor } from '~/utils/groupColors'
 import WorldMap2D from '~/components/WorldMap2D.vue'
 import SimulationConceptIntro from '~/components/SimulationConceptIntro.vue'
 import SimulationMilestoneModal, { type MilestoneSnapshot } from '~/components/SimulationMilestoneModal.vue'
+import RecoveryCurve from '~/components/RecoveryCurve.vue'
 import { buildTurnDigest } from '~/utils/turnDigest'
 import {
   ADVANCED_SCENARIO_IDS,
@@ -23,9 +24,14 @@ import {
 } from '~/utils/scenarioTemplates'
 import {
   EXPERIMENT_SEED,
-  EXPERIMENT_VARIANT_IDS,
+  defaultVariantForProtocol,
+  isEnvironmentVariant,
+  protocolForVariant,
+  variantIdsForProtocol,
+  type ExperimentProtocol,
   type ExperimentSummary,
   type ExperimentVariantId,
+  type HistoryPoint,
 } from '~/utils/experimentWorlds'
 import { buildOpeningStory, buildOutcomeArc, buildTurnStory } from '~/utils/storyNarrative'
 import {
@@ -177,7 +183,9 @@ type Simulation = {
   controlled_experiment?: boolean
   experiment_variant?: string
   experiment_seed?: number
+  experiment_protocol?: string
   experiment_summary?: ExperimentSummary
+  history?: HistoryPoint[]
 }
 
 const AUTO_INTERVAL_MS = 800
@@ -268,6 +276,7 @@ const conditionStep = ref(1)
 const scenarioSetupStep = ref(1)
 const conditionsFieldsEl = ref<HTMLElement | null>(null)
 const selectedTemplateId = ref<ScenarioTemplateId>(defaultScenarioTemplateId())
+const experimentProtocol = ref<ExperimentProtocol>('environment')
 const activeExperimentVariant = ref<ExperimentVariantId>('balanced')
 const experimentSummaries = ref<Partial<Record<ExperimentVariantId, ExperimentSummary>>>({})
 const selectedAgentId = ref<string | null>(null)
@@ -281,19 +290,73 @@ const isMidrunConditionsEdit = computed(
   () => Boolean(sim.value && sim.value.world.turn > 0),
 )
 
+const activeVariantIds = computed(() => variantIdsForProtocol(experimentProtocol.value))
+
+const experimentWorldsTitle = computed(() =>
+  experimentProtocol.value === 'resilience'
+    ? t('experiment.worldsTitleResilience')
+    : t('experiment.worldsTitle'),
+)
+
+const experimentPickWorldLead = computed(() =>
+  experimentProtocol.value === 'resilience'
+    ? t('scenario.experimentPickWorldResilience')
+    : t('scenario.experimentPickWorldEnvironment'),
+)
+
+const experimentFixedHint = computed(() =>
+  experimentProtocol.value === 'resilience'
+    ? t('scenario.experimentFixedResilience')
+    : t('scenario.experimentFixed'),
+)
+
+const experimentCompareTitle = computed(() =>
+  experimentProtocol.value === 'resilience'
+    ? t('experiment.compareTitleResilience')
+    : t('experiment.compareTitle'),
+)
+
+const simHistory = computed(() => sim.value?.history ?? [])
+
+function setExperimentProtocol(protocol: ExperimentProtocol) {
+  if (isMidrunConditionsEdit.value) return
+  if (experimentProtocol.value === protocol) return
+  experimentProtocol.value = protocol
+  experimentSummaries.value = {}
+  activeExperimentVariant.value = defaultVariantForProtocol(protocol)
+}
+
 const experimentWorldLabels: Record<ExperimentVariantId, string> = {
   lush: 'experiment.worldLush',
   lean: 'experiment.worldLean',
   volatile: 'experiment.worldVolatile',
   balanced: 'experiment.worldBalanced',
+  civic: 'experiment.worldCivic',
+  autocrat: 'experiment.worldAutocrat',
+  commune: 'experiment.worldCommune',
+  fracture: 'experiment.worldFracture',
 }
 
 const experimentComparisonRows = computed(() =>
-  EXPERIMENT_VARIANT_IDS.map((id) => ({
-    id,
-    summary: experimentSummaries.value[id],
-  })).filter((row) => row.summary),
+  activeVariantIds.value
+    .map((id) => ({
+      id,
+      summary: experimentSummaries.value[id],
+    }))
+    .filter((row) => row.summary),
 )
+
+function formatRetention(value: number | null | undefined): string {
+  if (value == null || Number.isNaN(Number(value))) return '—'
+  return Number(value).toFixed(3)
+}
+
+function resilienceLabelText(label: string | null | undefined): string {
+  if (!label) return '—'
+  const key = `experiment.resilienceLabel.${label}`
+  const translated = t(key)
+  return translated === key ? label : translated
+}
 
 const spotlightAgent = computed(() => {
   const id = selectedAgentId.value || sim.value?.experiment_summary?.spotlight_agent_id
@@ -551,7 +614,10 @@ function syncConditionsFromSim() {
   conditionStep.value = 1
   if (sim.value.controlled_experiment) {
     scenarioMode.value = 'experiment'
-    activeExperimentVariant.value = (sim.value.experiment_variant || 'balanced') as ExperimentVariantId
+    const variant = (sim.value.experiment_variant || 'balanced') as ExperimentVariantId
+    experimentProtocol.value =
+      (sim.value.experiment_protocol as ExperimentProtocol | undefined) || protocolForVariant(variant)
+    activeExperimentVariant.value = variant
     activeTemplateId.value = 'controlled_experiment'
   } else {
     scenarioMode.value = 'custom'
@@ -1396,6 +1462,8 @@ const milestoneSnapshot = computed((): MilestoneSnapshot | null => {
     happiness: metrics?.mean_happiness,
     dominantArchetype:
       archetypeKey && archetypeKey !== 'none' ? digestArchetypeLabel(archetypeKey) : undefined,
+    popRetentionRatio: summary?.pop_retention_ratio ?? null,
+    resilienceLabel: summary?.resilience_label ?? null,
   }
 })
 
@@ -1464,12 +1532,13 @@ async function applySimulationConditions() {
   error.value = ''
   try {
     const regions = regionConditionsPayload()
-    const body = sim.value.controlled_experiment
-      ? {
-          experiment_variant: activeExperimentVariant.value,
-          regions,
-        }
-      : { regions }
+    const body =
+      sim.value.controlled_experiment && isEnvironmentVariant(activeExperimentVariant.value)
+        ? {
+            experiment_variant: activeExperimentVariant.value,
+            regions,
+          }
+        : { regions }
     sim.value = await api<Simulation>(`/simulations/${sim.value.id}/conditions`, {
       method: 'PATCH',
       body,
@@ -1503,6 +1572,7 @@ async function createControlledWorld(variant: ExperimentVariantId) {
       },
     })
     sim.value = result
+    experimentProtocol.value = protocolForVariant(variant)
     storeExperimentSummary(result.experiment_summary)
     activeExperimentVariant.value = variant
     activeTemplateId.value = 'controlled_experiment'
@@ -1702,10 +1772,10 @@ onBeforeUnmount(() => {
           />
         </div>
         <div class="header-meta">
-          <div v-if="isControlledMode && sim" class="experiment-worlds" role="group" :aria-label="t('experiment.worldsTitle')">
-            <span class="experiment-worlds-label">{{ t('experiment.worldsTitle') }}</span>
+          <div v-if="isControlledMode && sim" class="experiment-worlds" role="group" :aria-label="experimentWorldsTitle">
+            <span class="experiment-worlds-label">{{ experimentWorldsTitle }}</span>
             <button
-              v-for="variant in EXPERIMENT_VARIANT_IDS"
+              v-for="variant in activeVariantIds"
               :key="variant"
               type="button"
               class="experiment-world-btn"
@@ -1790,6 +1860,49 @@ onBeforeUnmount(() => {
         <div class="digest-body">
           <div v-show="digestSidebarTab === 'situation'" class="digest-tab-panel">
               <p v-if="isControlledMode && experimentEmergenceLine" class="digest-emergence">{{ experimentEmergenceLine }}</p>
+              <p
+                v-if="isControlledMode && sim?.experiment_summary?.pop_retention_ratio != null"
+                class="digest-retention"
+              >
+                {{
+                  t('experiment.retentionNow', {
+                    value: formatRetention(sim.experiment_summary.pop_retention_ratio),
+                  })
+                }}
+                <template v-if="sim.experiment_summary.resilience_label">
+                  · {{ resilienceLabelText(sim.experiment_summary.resilience_label) }}
+                </template>
+              </p>
+              <RecoveryCurve v-if="isControlledMode" :history="simHistory" />
+              <section
+                v-if="isControlledMode && experimentComparisonRows.length"
+                class="digest-compare"
+                :aria-label="experimentCompareTitle"
+              >
+                <p class="digest-compare-title">{{ experimentCompareTitle }}</p>
+                <table class="experiment-compare-table">
+                  <thead>
+                    <tr>
+                      <th>{{ t('experiment.colWorld') }}</th>
+                      <th>{{ t('experiment.colPopulation') }}</th>
+                      <th>{{ t('experiment.colRetention') }}</th>
+                      <th>{{ t('experiment.colCooperation') }}</th>
+                      <th>{{ t('experiment.colConflict') }}</th>
+                      <th>{{ t('experiment.colLabel') }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="row in experimentComparisonRows" :key="row.id">
+                      <td>{{ t(experimentWorldLabels[row.id]) }}</td>
+                      <td>{{ row.summary?.population_alive ?? '—' }}</td>
+                      <td>{{ formatRetention(row.summary?.pop_retention_ratio) }}</td>
+                      <td>{{ row.summary?.cooperations_total ?? '—' }}</td>
+                      <td>{{ row.summary?.conflicts_total ?? '—' }}</td>
+                      <td>{{ resilienceLabelText(row.summary?.resilience_label) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </section>
 
               <section v-if="digestHasFocus" class="digest-focus-card">
                 <div class="digest-focus-head">
@@ -2017,7 +2130,42 @@ onBeforeUnmount(() => {
       @continue="continueFromMilestone"
       @change-conditions="changeConditionsFromMilestone"
       @export="exportMilestoneReport"
-    />
+    >
+      <template #recovery>
+        <RecoveryCurve v-if="isControlledMode" :history="simHistory" />
+      </template>
+      <template #compare>
+        <section
+          v-if="isControlledMode && experimentComparisonRows.length"
+          class="milestone-compare"
+          :aria-label="experimentCompareTitle"
+        >
+          <h3 class="milestone-compare-title">{{ experimentCompareTitle }}</h3>
+          <table class="experiment-compare-table">
+            <thead>
+              <tr>
+                <th>{{ t('experiment.colWorld') }}</th>
+                <th>{{ t('experiment.colPopulation') }}</th>
+                <th>{{ t('experiment.colRetention') }}</th>
+                <th>{{ t('experiment.colCooperation') }}</th>
+                <th>{{ t('experiment.colConflict') }}</th>
+                <th>{{ t('experiment.colLabel') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="row in experimentComparisonRows" :key="row.id">
+                <td>{{ t(experimentWorldLabels[row.id]) }}</td>
+                <td>{{ row.summary?.population_alive ?? '—' }}</td>
+                <td>{{ formatRetention(row.summary?.pop_retention_ratio) }}</td>
+                <td>{{ row.summary?.cooperations_total ?? '—' }}</td>
+                <td>{{ row.summary?.conflicts_total ?? '—' }}</td>
+                <td>{{ resilienceLabelText(row.summary?.resilience_label) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </section>
+      </template>
+    </SimulationMilestoneModal>
 
     <div v-if="conditionsOpen" class="modal-backdrop" @click="!creating && (conditionsOpen = false)" />
     <aside
@@ -2035,11 +2183,14 @@ onBeforeUnmount(() => {
         <div ref="conditionsFieldsEl" class="conditions-fields">
           <template v-if="isMidrunConditionsEdit">
             <p class="conditions-midrun-lead">{{ t('scenario.midrunLead') }}</p>
-            <section v-if="scenarioMode === 'experiment'" class="conditions-section scenario-worlds-section">
-              <p class="conditions-lead">{{ t('scenario.experimentPickWorld') }}</p>
+            <section
+              v-if="scenarioMode === 'experiment' && experimentProtocol === 'environment'"
+              class="conditions-section scenario-worlds-section"
+            >
+              <p class="conditions-lead">{{ experimentPickWorldLead }}</p>
               <div class="world-card-grid">
                 <button
-                  v-for="variant in EXPERIMENT_VARIANT_IDS"
+                  v-for="variant in activeVariantIds"
                   :key="variant"
                   type="button"
                   class="world-card"
@@ -2053,6 +2204,12 @@ onBeforeUnmount(() => {
               </div>
               <p class="hint scenario-fixed-hint">{{ t('scenario.experimentMidrunHint') }}</p>
             </section>
+            <p
+              v-else-if="scenarioMode === 'experiment' && experimentProtocol === 'resilience'"
+              class="hint scenario-fixed-hint"
+            >
+              {{ t('scenario.experimentMidrunHintResilience') }}
+            </p>
             <section class="conditions-section conditions-midrun-policy">
               <p class="conditions-lead">{{ t('scenario.midrunSocialLead') }}</p>
               <DataTable :value="midrunPolicyAxes" class="conditions-dt">
@@ -2165,10 +2322,33 @@ onBeforeUnmount(() => {
             </p>
 
             <section v-if="scenarioMode === 'experiment'" class="conditions-section scenario-worlds-section">
-              <p class="conditions-lead">{{ t('scenario.experimentPickWorld') }}</p>
+              <p class="conditions-lead">{{ t('scenario.experimentPickProtocol') }}</p>
+              <div class="scenario-mode-cards protocol-cards">
+                <button
+                  type="button"
+                  class="scenario-mode-card"
+                  :class="{ active: experimentProtocol === 'environment' }"
+                  :disabled="creating"
+                  @click="setExperimentProtocol('environment')"
+                >
+                  <strong>{{ t('scenario.experimentProtocolEnvironment') }}</strong>
+                  <span>{{ t('scenario.experimentProtocolEnvironmentDesc') }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="scenario-mode-card"
+                  :class="{ active: experimentProtocol === 'resilience' }"
+                  :disabled="creating"
+                  @click="setExperimentProtocol('resilience')"
+                >
+                  <strong>{{ t('scenario.experimentProtocolResilience') }}</strong>
+                  <span>{{ t('scenario.experimentProtocolResilienceDesc') }}</span>
+                </button>
+              </div>
+              <p class="conditions-lead">{{ experimentPickWorldLead }}</p>
               <div class="world-card-grid">
                 <button
-                  v-for="variant in EXPERIMENT_VARIANT_IDS"
+                  v-for="variant in activeVariantIds"
                   :key="variant"
                   type="button"
                   class="world-card"
@@ -2180,7 +2360,7 @@ onBeforeUnmount(() => {
                   <span>{{ t(`experiment.worldDesc.${variant}`) }}</span>
                 </button>
               </div>
-              <p class="hint scenario-fixed-hint">{{ t('scenario.experimentFixed') }}</p>
+              <p class="hint scenario-fixed-hint">{{ experimentFixedHint }}</p>
             </section>
 
             <template v-else>
@@ -4209,6 +4389,32 @@ label {
   border: 1px solid var(--line);
   padding: 0.25rem 0.35rem;
   text-align: left;
+}
+
+.digest-retention {
+  margin: 0.25rem 0 0;
+  font-size: 0.68rem;
+  color: var(--muted);
+}
+
+.digest-compare {
+  margin: 0.45rem 0 0.35rem;
+}
+
+.digest-compare-title,
+.milestone-compare-title {
+  margin: 0 0 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.milestone-compare {
+  margin: 0.5rem 0 0.65rem;
+}
+
+.protocol-cards {
+  margin-bottom: 0.85rem;
 }
 
 .experiment-fixed,

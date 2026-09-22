@@ -56,7 +56,7 @@ MVP 向けの最小ルール。
 | `welfare_rate` | number (0–1) | 列内の再分配（施し）。0 ならなし |
 | `religion` | enum | `folk` / `polytheism` / `monotheism` / `secular`（旧 `organized` は一神教扱い）。服従・抵抗の出やすさ |
 | `terrain` | object | 粗いタイル（既定 48×48）。biome は `ocean` / `coast` / `river` / `plain` / `mountain` / `marsh` / `tundra` / `desert` |
-| `initial_values` | object | 初期価値観（例: 協力傾向・権威受容） |
+| `initial_values` | object | 初期価値観（協力・野心）と、resilience では初期富の幅（`inequality`） |
 
 ### 2.2 Agent
 
@@ -178,6 +178,8 @@ World の `institution` に加え、実行時に次を持つ。
 | `LLM_TIMEOUT_SEC` | `8` | 1 回の LLM 呼び出し上限（秒） |
 | `LLM_CONCURRENCY` | `1` | 並列ワーカー数 |
 | `LLM_NARRATIVE_LANG` | `ja` | UI 向け要約・理由の言語（`ja` / `en`） |
+
+resilience の初期ロスターは同一 ID・同一順位の富をコピーしたあと、`inequality` で幅だけ伸ばす／縮める（`apply_identity_wealth`）。environment は基準 0.5 のまま。
 
 ### 3.2 解決ルール（最小）
 

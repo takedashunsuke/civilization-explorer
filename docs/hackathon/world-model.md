@@ -105,7 +105,7 @@
 | 人格 | `personality`（野心・協調・攻撃） | 固定 |
 | 稀少特性 | `traits`（charisma / genius 等） | 固定 |
 | 初期位置 | `position`, `region_id`, `subregion_id` | 固定 |
-| 初期富・年齢 | `wealth`, `age` | 固定（所属・生死は ④ で変化） |
+| 初期富・年齢 | `wealth`, `age` | ID・順位は固定。resilience では `inequality` で富の**幅**だけ変える（誰が相対的に豊かかは同じ） |
 
 根拠: `generate_agent_roster()` + `clone_roster_for_world()`。
 

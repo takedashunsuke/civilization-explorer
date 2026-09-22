@@ -17,6 +17,8 @@ export type MilestoneSnapshot = {
   trust?: number
   happiness?: number
   dominantArchetype?: string
+  popRetentionRatio?: number | null
+  resilienceLabel?: string | null
 }
 
 defineProps<{
@@ -41,6 +43,13 @@ function pct(value: number | undefined): string {
 function deltaLabel(delta: number): string {
   if (delta > 0) return `+${delta}`
   return String(delta)
+}
+
+function resilienceLabelText(label: string | null | undefined): string {
+  if (!label) return '—'
+  const key = `experiment.resilienceLabel.${label}`
+  const translated = t(key)
+  return translated === key ? label : translated
 }
 </script>
 
@@ -78,8 +87,19 @@ function deltaLabel(delta: number): string {
             <li>{{ t('milestone.settlements', { count: snapshot.settlements }) }}</li>
             <li>{{ t('milestone.conflicts', { count: snapshot.conflicts }) }}</li>
             <li>{{ t('milestone.cooperations', { count: snapshot.cooperations }) }}</li>
+            <li v-if="snapshot.popRetentionRatio != null">
+              {{ t('experiment.colRetention') }}
+              {{ Number(snapshot.popRetentionRatio).toFixed(3) }}
+            </li>
+            <li v-if="snapshot.resilienceLabel">
+              {{ t('experiment.colLabel') }}
+              {{ resilienceLabelText(snapshot.resilienceLabel) }}
+            </li>
           </ul>
         </section>
+
+        <slot name="recovery" />
+        <slot name="compare" />
 
         <section
           v-if="snapshot.inequality != null || snapshot.trust != null || snapshot.happiness != null"
@@ -149,7 +169,7 @@ function deltaLabel(delta: number): string {
   top: 50%;
   transform: translate(-50%, -50%);
   z-index: 50;
-  width: min(36rem, calc(100vw - 1.5rem));
+  width: min(42rem, calc(100vw - 1.5rem));
   max-height: calc(100dvh - 2rem);
   overflow: hidden;
   display: flex;

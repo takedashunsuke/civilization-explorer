@@ -55,12 +55,16 @@
 |------|------|
 | シナリオ「対照実験（同一 5,000 人 × 4 環境）」 | ✅ |
 | ヘッダーで 4 環境切替（豊か / 乏しい / 災害多 / 標準） | ✅（切替のたび新規 sim 作成） |
+| プロトコル切替（環境 / 社会＝resilience） | ✅ |
+| resilience 4 世界切替（civic / autocrat / commune / fracture） | ✅（切替のたび新規 sim 作成） |
+| 回復曲線（人口・資源・災害マーカー） | ✅（`sim.history` → RecoveryCurve） |
 | 平面地図（個人・集団） | ✅ |
 | 状況パネル（緊張・繁栄・軌道・台頭タイプ） | ✅ |
 | 100 年マイルストーン停止 | ✅（`findCrossedMilestoneYear`、100 年刻み） |
 | 西暦 2500 年上限 | ✅（`MAX_CALENDAR_YEAR`） |
 | 自動再生（×5 で 50 年ずつ） | ✅ |
-| `experimentSummaries` に variant 別サマリー蓄積 | ✅（メモリ内） |
+| `experimentSummaries` に variant 別サマリー蓄積 | ✅（メモリ内・プロトコル切替でクリア） |
+| 4 世界比較表（保持率 3 桁） | ✅（digest・マイルストーン） |
 
 ### 観測層
 
@@ -87,7 +91,7 @@
 
 | 項目 | 問題 |
 |------|------|
-| 「100 年後の差」比較表 | i18n・CSS・`experimentComparisonRows` はあるが **テンプレート未接続** |
+| 「100 年後の差」比較表 | ✅（digest・マイルストーン。保持率 3 桁） |
 | 同一人物のクロスワールド役割比較 | **UI 未実装**（地図クリックは当該世界の地域観測のみ） |
 | 人物ごとの「なぜ？」 | `whyTitle` 文言のみ。**Agent 単位の説明 API なし** |
 | spotlight | 世界ごとに **別の Agent を選ぶことがある**。固定の「人物 X」にならない |
@@ -144,7 +148,7 @@
 
 ### P1 — デモ体験（短時間で効く UI）
 
-- [ ] 「100 年後の差」比較表を `experimentComparisonRows` から描画
+- [x] 「100 年後の差」比較表を `experimentComparisonRows` から描画
 - [ ] 固定 Agent ID を選び、4 世界での指導者フラグ・地域読みを手動比較できる表示（最小版で可）
 
 ### P2 — ストーリーが出るように（時間があれば）
@@ -170,10 +174,11 @@
 - [x] overview / README にメタ安全保障との一文接続
 - [x] 比較表の保持率を小数 3 桁に（`analysis_batch.py`。run3 再生成済み）
 - [x] 同一 ID 比較をサマリーの固定枠に（2026-09-22。初期名簿 a1–a5000 のみ。子孫 ID は別人）
-- [ ] UI: resilience variant 切替と回復曲線
-- [ ] （任意）8B 偏りの切り分け 1 本（`run3-004`）
+- [x] 8B 偏りの切り分け 1 本（`run3-004`。`LLM_MAX_AGENTS_PER_TURN=1`、観測 1b / 決定 8B）
+- [x] `inequality` を初期富に乗せる（順位固定・幅だけ。004 には未適用）
+- [x] UI: resilience variant 切替と回復曲線
 
-講評の残件と次の順番は [post-award.md](./post-award.md) §4.2 を正とする（語り・保持率 3 桁・同一 ID 済。実験を足すなら切り分け 1 本）。比較は `run3-001` / `run3-002` / `run3-003`。
+講評の残件と次の順番は [post-award.md](./post-award.md) §4.2 を正とする（切り分け・inequality・UI まで済）。比較は `run3-001`〜`004`。
 
 ### 後回し
 
